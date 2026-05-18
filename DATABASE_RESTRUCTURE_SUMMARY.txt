@@ -1,0 +1,340 @@
+===============================================================
+DATABASE RESTRUCTURE SUMMARY - Teacher-Curriculum Many-to-Many
+===============================================================
+Date: 2025-11-12
+Purpose: Separate faculty affiliation from curriculum teaching assignments
+
+===============================================================
+OVERVIEW
+===============================================================
+
+PROBLEM:
+- Old structure: user.curriculum_id (single value)
+- Cannot represent teachers teaching in multiple curriculums
+- Cannot distinguish "home faculty" (สังกัดคณะ) from "teaching curriculums" (หลักสูตรที่สอน)
+
+SOLUTION:
+- New table: teacher_curriculum (many-to-many junction table)
+- Teachers MUST have faculty_id (home faculty affiliation - required)
+- Teachers CAN teach in multiple curriculums (any faculty)
+- Support for primary curriculum and cross-faculty teaching
+
+===============================================================
+DATABASE CHANGES
+===============================================================
+
+1. NEW TABLE: teacher_curriculum
+   - Maps teachers to curriculums (many-to-many relationship)
+   - Fields:
+     * id (auto increment primary key)
+     * teacher_uid (INT(3) UNSIGNED - references user.uid)
+     * curriculum_id (INT(11) - references curriculum.id)
+     * role (ENUM: instructor, coordinator, assistant)
+     * is_primary (TINYINT: 1=primary curriculum, 0=additional)
+     * assigned_at (timestamp)
+     * status (TINYINT: 1=active, 0=inactive)
+     * notes (TEXT - additional info)
+
+   - Constraints:
+     * Unique constraint on (teacher_uid, curriculum_id)
+     * Foreign key to user.uid (CASCADE on delete/update)
+     * Foreign key to curriculum.id (CASCADE on delete/update)
+
+2. NEW VIEW: teacher_curriculum_view
+   - Simplified queries for teacher-curriculum relationships
+   - Includes:
+     * Teacher information (name, email, type, home faculty)
+     * Curriculum information (name, code, degree, curriculum's faculty)
+     * Cross-faculty indicator (is_cross_faculty = 1 when teacher.faculty_id != curriculum.faculty_id)
+
+3. DATA MIGRATION:
+   - Migrated 199 existing curriculum assignments from user.curriculum_id
+   - All migrated as "primary" curriculum (is_primary = 1)
+   - All set as "instructor" role
+   - user.curriculum_id field kept for backward compatibility (will be deprecated later)
+
+4. VERIFICATION RESULTS:
+   - Total migrated records: 199
+   - Current cross-faculty assignments: 0 (all teachers in their own faculty)
+   - All assignments marked as active
+
+===============================================================
+CODE CHANGES - UserModel.php
+===============================================================
+
+NEW METHODS ADDED:
+
+1. getTeacherCurriculums($teacherUid)
+   - Get all curriculums assigned to a teacher
+   - Returns array ordered by: primary first, then by curriculum name
+   - Only returns active assignments
+
+2. getTeacherPrimaryCurriculum($teacherUid)
+   - Get the primary curriculum for a teacher
+   - Returns single curriculum or null
+
+3. assignTeacherToCurriculum($teacherUid, $curriculumId, $role, $isPrimary)
+   - Assign teacher to a curriculum
+   - Parameters:
+     * $teacherUid - Teacher's UID
+     * $curriculumId - Curriculum ID
+     * $role - 'instructor', 'coordinator', or 'assistant' (default: 'instructor')
+     * $isPrimary - true/false (default: false)
+   - Auto-updates if assignment already exists
+   - Auto-unsets other primary assignments when setting new primary
+
+4. removeTeacherFromCurriculum($teacherUid, $curriculumId)
+   - Remove teacher from a curriculum
+   - Permanently deletes the assignment record
+
+5. setTeacherPrimaryCurriculum($teacherUid, $curriculumId)
+   - Change which curriculum is primary for a teacher
+   - Auto-unsets previous primary assignment
+
+6. getCurriculumTeachers($curriculumId)
+   - Get all teachers assigned to a specific curriculum
+   - Returns array ordered by: primary teachers first, then by name
+   - Shows teachers from all faculties (including cross-faculty)
+
+7. getCrossFacultyTeachingAssignments()
+   - Get all cross-faculty teaching assignments
+   - Shows teachers teaching in curriculums outside their home faculty
+   - Useful for reports and analytics
+
+8. getUsersWithCurriculumEnhanced()
+   - Enhanced version of getUsersWithCurriculum()
+   - Shows primary curriculum + count of total curriculums
+   - Shows list of other (non-primary) curriculums
+   - Ready to use for upgraded UI
+
+===============================================================
+HOW TO USE - EXAMPLES
+===============================================================
+
+Example 1: Assign a teacher to multiple curriculums
+---------------------------------------------------
+$userModel = new \App\Models\UserModel();
+
+// Assign to primary curriculum (teacher's home faculty)
+$userModel->assignTeacherToCurriculum(
+    teacherUid: 15,      // Teacher UID
+    curriculumId: 64,    // Curriculum ID
+    role: 'instructor',  // Role
+    isPrimary: true      // This is primary curriculum
+);
+
+// Assign to additional curriculum (cross-faculty)
+$userModel->assignTeacherToCurriculum(
+    teacherUid: 15,      // Same teacher
+    curriculumId: 38,    // Different curriculum (different faculty)
+    role: 'coordinator', // Different role
+    isPrimary: false     // Not primary
+);
+
+Example 2: Get all curriculums for a teacher
+-------------------------------------------
+$curriculums = $userModel->getTeacherCurriculums(15);
+
+// Returns:
+// [
+//   {
+//     "curriculum_id": 64,
+//     "curriculum_name": "วิทยาศาสตรบัณฑิต สาขาวิชาเคมี",
+//     "is_primary": 1,
+//     "role": "instructor",
+//     "teacher_faculty_name": "คณะวิทยาศาสตร์",
+//     "curriculum_faculty_name": "คณะวิทยาศาสตร์",
+//     "is_cross_faculty": 0
+//   },
+//   {
+//     "curriculum_id": 38,
+//     "curriculum_name": "ครุศาสตรบัณฑิต สาขาวิชาประถมศึกษา",
+//     "is_primary": 0,
+//     "role": "coordinator",
+//     "teacher_faculty_name": "คณะวิทยาศาสตร์",
+//     "curriculum_faculty_name": "คณะครุศาสตร์",
+//     "is_cross_faculty": 1
+//   }
+// ]
+
+Example 3: Get all teachers in a curriculum
+------------------------------------------
+$teachers = $userModel->getCurriculumTeachers(38);
+
+// Returns all teachers (from any faculty) teaching in curriculum 38
+
+Example 4: Change primary curriculum
+------------------------------------
+$userModel->setTeacherPrimaryCurriculum(
+    teacherUid: 15,
+    curriculumId: 38  // Make curriculum 38 the new primary
+);
+
+Example 5: Remove teacher from curriculum
+----------------------------------------
+$userModel->removeTeacherFromCurriculum(
+    teacherUid: 15,
+    curriculumId: 64  // Remove from curriculum 64
+);
+
+===============================================================
+BUSINESS RULES
+===============================================================
+
+1. FACULTY AFFILIATION (user.faculty_id)
+   - REQUIRED for all teachers
+   - Represents administrative/home faculty (สังกัดคณะ)
+   - Cannot be null for user_type = 'TEACHER'
+   - Separate from teaching assignments
+
+2. CURRICULUM ASSIGNMENTS (teacher_curriculum table)
+   - Teachers can teach in MULTIPLE curriculums
+   - Teachers can teach in curriculums from OTHER faculties
+   - Each teacher should have ONE primary curriculum
+   - Primary curriculum typically (but not always) from home faculty
+   - Additional curriculums marked as is_primary = 0
+
+3. CROSS-FACULTY TEACHING
+   - Allowed and supported
+   - Tracked via is_cross_faculty indicator in view
+   - When teacher.faculty_id != curriculum.faculty_id
+
+4. ROLES
+   - instructor: Regular teaching staff
+   - coordinator: Program coordinator
+   - assistant: Teaching assistant
+
+===============================================================
+UI/UX RECOMMENDATIONS
+===============================================================
+
+1. TEACHER MANAGEMENT PAGE
+   - Show primary curriculum prominently
+   - Show badge count for additional curriculums (e.g., "+2 more")
+   - Allow multi-select for curriculum assignment
+   - Indicate cross-faculty assignments with different color/icon
+
+2. CURRICULUM MANAGEMENT PAGE
+   - Show all teachers assigned to curriculum
+   - Group by: Home Faculty teachers vs Cross-Faculty teachers
+   - Show role badges (instructor/coordinator/assistant)
+   - Allow drag-and-drop assignment
+
+3. VALIDATION ALERTS
+   - Warn if teacher has no faculty_id
+   - Warn if teacher has no primary curriculum
+   - Highlight cross-faculty assignments
+
+4. FILTERS
+   - Filter by home faculty
+   - Filter by teaching curriculum
+   - Filter cross-faculty only
+   - Filter by role
+
+===============================================================
+NEXT STEPS (TODO)
+===============================================================
+
+1. UPDATE UI:
+   - Modify curriculum-user management JavaScript to:
+     * Show multiple curriculum badges per teacher
+     * Allow adding/removing curriculum assignments
+     * Support primary curriculum toggle
+     * Show cross-faculty indicators
+
+2. CREATE API ENDPOINTS:
+   - POST /user/assignCurriculum
+   - DELETE /user/removeCurriculum
+   - PUT /user/setPrimaryCurriculum
+   - GET /user/{uid}/curriculums
+
+3. ADD VALIDATION:
+   - Application-level: Require faculty_id for teachers
+   - Ensure at least one primary curriculum
+   - Prevent removal of last curriculum
+
+4. REPORTING:
+   - Cross-faculty teaching report
+   - Teacher workload by curriculum count
+   - Faculty collaboration matrix
+
+5. DEPRECATION PLAN:
+   - Phase out user.curriculum_id field
+   - Update all old queries to use teacher_curriculum
+   - Remove curriculum_id column after full migration
+
+===============================================================
+ROLLBACK INSTRUCTIONS
+===============================================================
+
+If issues occur, run these commands:
+
+DROP VIEW IF EXISTS `teacher_curriculum_view`;
+DROP TABLE IF EXISTS `teacher_curriculum`;
+
+Note: user.curriculum_id field remains unchanged, so old system will work.
+
+===============================================================
+TESTING QUERIES
+===============================================================
+
+-- Count teachers with multiple curriculums
+SELECT teacher_uid, COUNT(*) as curriculum_count
+FROM teacher_curriculum
+WHERE status = 1
+GROUP BY teacher_uid
+HAVING curriculum_count > 1;
+
+-- Find teachers without primary curriculum
+SELECT u.uid, u.thai_name, u.thai_lastname
+FROM user u
+LEFT JOIN teacher_curriculum tc ON u.uid = tc.teacher_uid AND tc.is_primary = 1
+WHERE u.user_type = 'TEACHER' AND tc.id IS NULL;
+
+-- Cross-faculty teaching report
+SELECT * FROM teacher_curriculum_view WHERE is_cross_faculty = 1;
+
+-- Teacher workload by curriculum count
+SELECT
+    u.uid,
+    u.thai_name,
+    u.thai_lastname,
+    uf.name as faculty_name,
+    COUNT(tc.id) as total_curriculums,
+    GROUP_CONCAT(c.name SEPARATOR ' | ') as curriculum_names
+FROM user u
+LEFT JOIN faculties uf ON u.faculty_id = uf.id
+LEFT JOIN teacher_curriculum tc ON u.uid = tc.teacher_uid AND tc.status = 1
+LEFT JOIN curriculum c ON tc.curriculum_id = c.id
+WHERE u.user_type = 'TEACHER' AND u.active = 1
+GROUP BY u.uid
+ORDER BY total_curriculums DESC, u.thai_name ASC;
+
+===============================================================
+FILES MODIFIED
+===============================================================
+
+NEW FILES:
+1. database_migration_teacher_curriculum.sql - Migration script
+2. DATABASE_RESTRUCTURE_SUMMARY.txt - This file
+
+MODIFIED FILES:
+1. app/Models/UserModel.php
+   - Added 8 new methods for teacher-curriculum management
+   - Lines 324-521
+
+DATABASE CHANGES:
+1. New table: teacher_curriculum
+2. New view: teacher_curriculum_view
+3. New indexes on user table (idx_user_faculty, idx_user_type)
+
+===============================================================
+CONTACT & SUPPORT
+===============================================================
+
+For questions about this restructure:
+1. Check CodeIgniter logs: writable/logs/log-YYYY-MM-DD.log
+2. Test queries against teacher_curriculum_view
+3. Verify foreign key constraints working correctly
+
+===============================================================

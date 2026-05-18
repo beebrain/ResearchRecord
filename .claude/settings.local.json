@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root researchrecord --default-character-set=utf8mb4 -e \"SELECT COUNT(*) as cross_faculty_count FROM teacher_curriculum_view WHERE is_cross_faculty = 1;\")",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root researchrecord --default-character-set=utf8mb4 -e \"SELECT u.uid, u.thai_name, u.thai_lastname, uf.name as faculty_name, COUNT(tc.id) as total_curriculums, GROUP_CONCAT(c.name SEPARATOR '' | '') as curriculum_names FROM user u LEFT JOIN faculties uf ON u.faculty_id = uf.id LEFT JOIN teacher_curriculum tc ON u.uid = tc.teacher_uid AND tc.status = 1 LEFT JOIN curriculum c ON tc.curriculum_id = c.id WHERE u.user_type = ''TEACHER'' AND u.active = 1 GROUP BY u.uid ORDER BY total_curriculums DESC, u.thai_name ASC LIMIT 10;\")",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root researchrecord --default-character-set=utf8mb4 -e \"SELECT teacher_uid, thai_name, thai_lastname, teacher_faculty_name, curriculum_name, role, is_primary, is_cross_faculty FROM teacher_curriculum_view WHERE teacher_uid = 15 ORDER BY is_primary DESC;\")",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root researchrecord -e \"SELECT COUNT(*) as total, COUNT(CASE WHEN user_type = ''TEACHER'' THEN 1 END) as teachers, COUNT(CASE WHEN user_type IS NULL THEN 1 END) as null_type FROM user WHERE active = 1;\")",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\":*)",
+      "Bash(net stop Apache2.4)",
+      "Bash(net start:*)",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root researchrecord -e \"DESCRIBE publications;\")",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root researchrecord -e \"SHOW CREATE VIEW publication_view\\G\")",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root researchrecord -e \"DROP VIEW IF EXISTS publication_view; CREATE VIEW publication_view AS SELECT p.id, p.title, p.publication_type, p.source, p.publication_year, p.publication_month, p.created_at, p.created_by, CONCAT(u.gf_name, '' '', u.gl_name) as created_by_name, GROUP_CONCAT( CASE WHEN author_curriculum.name IS NOT NULL THEN CONCAT(author_curriculum.name) ELSE '''' END ORDER BY pa.author_order SEPARATOR '', '') as author_curriculum, GROUP_CONCAT( CASE WHEN pa.author_id IS NOT NULL AND a.user_uid IS NOT NULL THEN CONCAT(uu.gf_name, '' '', uu.gl_name) ELSE pa.author_name END ORDER BY pa.author_order SEPARATOR '', '') as authors_names_en, GROUP_CONCAT( CASE WHEN pa.author_id IS NOT NULL AND a.user_uid IS NOT NULL THEN CONCAT(uu.thai_name, '' '', uu.thai_lastname) ELSE pa.author_name END ORDER BY pa.author_order SEPARATOR '', '') as authors_names_thai, GROUP_CONCAT( DISTINCT author_faculty.name ORDER BY author_faculty.name SEPARATOR '', '') as author_faculties FROM publications p LEFT JOIN user u ON p.created_by = u.uid LEFT JOIN curriculum creator_curriculum ON u.curriculum_id = creator_curriculum.id LEFT JOIN faculties creator_faculty ON creator_curriculum.faculty_id = creator_faculty.id LEFT JOIN publication_authors pa ON p.id = pa.publication_id LEFT JOIN authors a ON pa.author_id = a.id LEFT JOIN user uu ON a.user_uid = uu.uid LEFT JOIN curriculum author_curriculum ON uu.curriculum_id = author_curriculum.id LEFT JOIN faculties author_faculty ON author_curriculum.faculty_id = author_faculty.id GROUP BY p.id, p.title, p.publication_type, p.source, p.publication_year, p.publication_month, p.created_at, p.created_by, u.gf_name, u.gl_name;\")",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root researchrecord -e \"SELECT id, title, publication_year, publication_month FROM publication_view ORDER BY publication_year DESC, publication_month DESC LIMIT 5;\")",
+      "Bash(tail -50 \"c:\\xampp\\htdocs\\researchRecord\\writable\\logs\\log-<?php echo date(''Y-m-d''); ?>.log\" 2)",
+      "Bash(nul)",
+      "Bash(powershell -Command:*)",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root researchrecord --default-character-set=utf8mb4 -e \"SELECT COUNT(*) as total_teachers FROM user WHERE active = 1 AND user_type = ''TEACHER'';\")",
+      "Bash(timeout /t 5)",
+      "Bash(findstr:*)",
+      "Bash(more:*)",
+      "Bash(php update_teacher_faculty.php:*)",
+      "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root researchrecord --default-character-set=utf8mb4 -e \"SELECT \n    COUNT(*) as total_with_faculty,\n    COUNT(DISTINCT faculty_id) as unique_faculties\nFROM user \nWHERE active = 1 \nAND user_type = ''TEACHER'' \nAND faculty_id IS NOT NULL;\")",
+      "Bash(dir /s /b \"c:\\xampp\\htdocs\\researchRecord\\app\\Views\\*curriculum*\")",
+      "Bash(dir \"c:\\\\xampp\\\\htdocs\\\\researchRecord\" /b)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

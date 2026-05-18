@@ -1,0 +1,82 @@
+﻿php : Xdebug: [Step Debug] Time-out connecting to debugging client, waited: 200 ms. Tried: localhost:9003 (through 
+xdebug.client_host/xdebug.client_port).
+At C:\Users\brand\AppData\Local\Temp\ps-script-497d3dde-d3d1-49f9-958d-b466ea71c3ac.ps1:94 char:1
++ php test_system.php 2>&1 | Out-File -FilePath test_output.txt -Encodi ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Xdebug: [Step D...g.client_port).:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+=== เธฃเธฐเธเธเธ—เธ”เธชเธญเธ Research Record Management ===
+
+1. เธ•เธฃเธงเธเธชเธญเธ PHP Version...
+   โ… PASSED: PHP version 8.1.12
+
+2. เธ•เธฃเธงเธเธชเธญเธ PHP Extensions...
+   โ… mysqli: loaded
+   โ… mbstring: loaded
+   โ… intl: loaded
+   โ… json: loaded
+   โ… curl: loaded
+
+3. เธ•เธฃเธงเธเธชเธญเธเนเธเธฅเนเธชเธณเธเธฑเธ...
+   โ… index.php: exists
+   โ… app/Config/Database.php: exists
+   โ… app/Config/Routes.php: exists
+   โ… app/Config/Paths.php: exists
+   โ… composer.json: exists
+
+4. เธ•เธฃเธงเธเธชเธญเธเธเธฒเธฃเน€เธเธทเนเธญเธกเธ•เนเธญเธเธฒเธเธเนเธญเธกเธนเธฅ...
+PHP Warning:  syntax error, unexpected '$' in .env on line 61
+ in C:\xampp\htdocs\researchRecord\test_system.php on line 66
+
+Warning: syntax error, unexpected '$' in .env on line 61
+ in C:\xampp\htdocs\researchRecord\test_system.php on line 66
+   โ… PASSED: Connected to database 'researchrecord'
+
+   4.1 เธ•เธฃเธงเธเธชเธญเธเธ•เธฒเธฃเธฒเธเนเธเธเธฒเธเธเนเธญเธกเธนเธฅ...
+      โ… user: exists (410 records)
+      โ… publications: exists (59 records)
+      โ… authors: exists (15 records)
+      โ… faculties: exists (8 records)
+      โ… curriculum: exists (75 records)
+
+5. เธ•เธฃเธงเธเธชเธญเธ Composer Dependencies...
+   โ… vendor/autoload.php: exists
+   โ… CodeIgniter 4: installed
+
+6. เธ•เธฃเธงเธเธชเธญเธ Permissions...
+   โ… writable/cache: writable
+   โ… writable/logs: writable
+   โ… writable/session: writable
+   โ… writable/uploads: writable
+
+7. เธ•เธฃเธงเธเธชเธญเธ Syntax Errors...
+   โ… index.php: syntax OK
+   โ… app/Config/Database.php: syntax OK
+   โ… app/Config/Routes.php: syntax OK
+
+8. เธ•เธฃเธงเธเธชเธญเธ Routes Configuration...
+   โ… Authentication routes: configured
+   โ… Dashboard routes: configured
+   โ… Publication routes: configured
+   โ… Admin routes: configured
+
+9. เธ•เธฃเธงเธเธชเธญเธ Web Server...
+   โ… cURL extension: available
+   โ ๏ธ  Home/Login page (http://localhost/researchRecord/): HTTP 404
+   โ ๏ธ  Login page (http://localhost/researchRecord/auth/login): HTTP 404
+   โ ๏ธ  Dashboard (requires auth) (http://localhost/researchRecord/dashboard): HTTP 404
+
+============================================================
+เธชเธฃเธธเธเธเธฅเธเธฒเธฃเธ—เธ”เธชเธญเธ:
+============================================================
+โ… เธเนเธฒเธ: 30 เธฃเธฒเธขเธเธฒเธฃ
+โ ๏ธ  เธเธณเน€เธ•เธทเธญเธ: 3 เธฃเธฒเธขเธเธฒเธฃ
+โ เธเธดเธ”เธเธฅเธฒเธ”: 0 เธฃเธฒเธขเธเธฒเธฃ
+
+เธเธณเน€เธ•เธทเธญเธ:
+  โ ๏ธ  Web server returned HTTP 404 for http://localhost/researchRecord/
+  โ ๏ธ  Web server returned HTTP 404 for http://localhost/researchRecord/auth/login
+  โ ๏ธ  Web server returned HTTP 404 for http://localhost/researchRecord/dashboard
+
+โ… เธฃเธฐเธเธเธเธฃเนเธญเธกเนเธเนเธเธฒเธ เนเธ•เนเธกเธตเธเธณเน€เธ•เธทเธญเธเธเธฒเธเธญเธขเนเธฒเธ

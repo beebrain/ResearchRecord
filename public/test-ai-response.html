@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ทดสอบ AI Response (n8n format)</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+        h1 { color: #1a1a1a; }
+        .test { margin: 1rem 0; padding: 1rem; border-radius: 8px; }
+        .pass { background: #dcfce7; color: #166534; }
+        .fail { background: #fee2e2; color: #991b1b; }
+        pre { background: #f3f4f6; padding: 0.75rem; overflow: auto; font-size: 12px; }
+        .url { word-break: break-all; color: #2563eb; }
+    </style>
+</head>
+<body>
+    <h1>ทดสอบการ parse ผลตอบกลับจาก n8n API</h1>
+    <p>ใช้รูปแบบ array ระดับ root และตรวจว่าใช้รายการแรกเท่านั้น</p>
+    <p>URL ทดสอบ: <span class="url" id="testUrl">https://research.academic.uru.ac.th/index.php/utility/downloadFile/1770622966_f9a554ac1e2a92026862.pdf</span></p>
+    <div id="results"></div>
+
+    <script>
+        window.BASE_URL = '';
+    </script>
+    <script src="assets/js/publication-ai.js"></script>
+    <script>
+        (function () {
+            var testUrl = 'https://research.academic.uru.ac.th/index.php/utility/downloadFile/1770622966_f9a554ac1e2a92026862.pdf';
+
+            // รูปแบบที่ n8n API ส่งกลับ (root-level array)
+            var n8nResponse = [
+                {
+                    "source": "ai_extraction",
+                    "type": "journal",
+                    "journalname": "Journal of Nursing and Health Science Research",
+                    "title_en": "The Model Efficiency Management of the Rehabilitation and Nursing Home Center Uttaradit Rajabhat University",
+                    "title_th": "รูปแบบการบริหารจัดการที่มีประสิทธิภาพของศูนย์เวชศาสตร์ฟื้นฟูและดูแลผู้สูงอายุ มหาวิทยาลัยราชภัฏอุตรดิตถ์",
+                    "authors_en": ["Kanyarat Phuengbanhan", "Anurak Panyanuwat", "Nicharee Jaikamwang", "Chichaya Changrian", "Pimradar Tummeepukdee"],
+                    "authors_th": ["กัญญารัตน์ ผึ่งบรรหาร", "อนุรักษ์ ปัญญานุวัฒน์", "ณิชารีย์ ใจค าวัง", "ชิชญาสุ์ ช่างเรียน", "พิมพ์รดา ธรรมีภักดี"],
+                    "abstract_en": "This research was to study the model efficiency management...",
+                    "abstract_th": "การวิจัยนี้มีวัตถุประสงค์เพื่อศึกษารูปแบบการบริหารจัดการที่มีประสิทธิภาพ...",
+                    "keywords_en": ["The Model of Management", "Efficiency", "Rehabilitation and Nursing Home Center"],
+                    "keywords_th": ["รูปแบบการบริหารจัดการ", "ประสิทธิภาพ", "ศูนย์เวชศาสตร์ฟื้นฟูและดูแลผู้สูงอายุ"],
+                    "volume": 16,
+                    "issue": 2,
+                    "year_en": "2024",
+                    "year_th": 2567,
+                    "month_en": "July - December",
+                    "month_th": "กรกฎาคม - ธันวาคม",
+                    "pages": null,
+                    "doi": null,
+                    "isbn": null
+                }
+            ];
+
+            var resultsEl = document.getElementById('results');
+            var pass = 0, fail = 0;
+
+            function addResult(ok, title, detail) {
+                var div = document.createElement('div');
+                div.className = 'test ' + (ok ? 'pass' : 'fail');
+                div.innerHTML = '<strong>' + (ok ? 'ผ่าน' : 'ไม่ผ่าน') + '</strong>: ' + title + (detail ? '<pre>' + detail + '</pre>' : '');
+                resultsEl.appendChild(div);
+                if (ok) pass++; else fail++;
+            }
+
+            // Test 1: n8n root-level array → ใช้รายการแรก
+            var payload1 = window.normalizeAIResponsePayload(n8nResponse);
+            var ok1 = payload1 && payload1.title_th && payload1.journalname === 'Journal of Nursing and Health Science Research' && Array.isArray(payload1.authors_th) && payload1.authors_th.length === 5;
+            addResult(!!payload1, 'normalizeAIResponsePayload( array ) ได้ object รายการแรก', ok1 ? 'title_th, journalname, authors_th.length=5 ถูกต้อง' : JSON.stringify(payload1, null, 2));
+
+            if (!payload1) {
+                addResult(false, 'ไม่สามารถทดสอบ transform ได้ (payload เป็น null)', '');
+            } else {
+                var transformed = window.transformAIResponse(payload1);
+                var ok2 = transformed && transformed.title && transformed.authors && transformed.authors.length === 5 && transformed.source === 'Journal of Nursing and Health Science Research' && transformed.volume === 16;
+                addResult(!!transformed && ok2, 'transformAIResponse( payload ) ได้ฟิลด์สำหรับฟอร์ม', ok2 ? 'title, authors(5), source, volume ถูกต้อง' : JSON.stringify(transformed, null, 2));
+            }
+
+            // Test 2: รูปแบบ { output: [ item ] }
+            var wrapArray = { output: n8nResponse };
+            var payload2 = window.normalizeAIResponsePayload(wrapArray);
+            var ok3 = payload2 && payload2.title_th === n8nResponse[0].title_th;
+            addResult(!!payload2 && ok3, 'normalizeAIResponsePayload( { output: array } ) ใช้รายการแรก', ok3 ? 'ได้ object เดียวเท่ากับรายการแรก' : JSON.stringify(payload2, null, 2));
+
+            // Test 3: รูปแบบ { output: singleObject }
+            var single = { output: n8nResponse[0] };
+            var payload3 = window.normalizeAIResponsePayload(single);
+            var ok4 = payload3 && payload3.journalname === n8nResponse[0].journalname;
+            addResult(!!payload3 && ok4, 'normalizeAIResponsePayload( { output: object } ) ใช้ object นั้น', ok4 ? 'ได้ object เดียว' : JSON.stringify(payload3, null, 2));
+
+            // Test 4: array ว่าง → null
+            var payload4 = window.normalizeAIResponsePayload([]);
+            addResult(payload4 === null, 'normalizeAIResponsePayload( [] ) คืนค่า null', payload4 === null ? 'ถูกต้อง' : 'ได้: ' + JSON.stringify(payload4));
+
+            // สรุป
+            var summary = document.createElement('div');
+            summary.className = 'test ' + (fail === 0 ? 'pass' : 'fail');
+            summary.innerHTML = '<strong>สรุป:</strong> ผ่าน ' + pass + ' / ' + (pass + fail) + (fail === 0 ? ' — ทุกกรณีผ่าน' : ' — มีกรณีไม่ผ่าน');
+            resultsEl.appendChild(summary);
+        })();
+    </script>
+</body>
+</html>

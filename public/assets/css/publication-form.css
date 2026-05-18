@@ -1,0 +1,514 @@
+/* ========================================
+   Publication Form Styles - Fixed Version
+   ======================================== */
+
+/* -------------------- Base Transitions -------------------- */
+.field-transition {
+    transition: all 0.3s ease-in-out;
+}
+
+.field-hidden {
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+}
+
+.field-visible {
+    opacity: 1;
+    max-height: 200px;
+}
+
+/* -------------------- Publication Type Cards (FIXED) -------------------- */
+.publication-type-card {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 0.5rem;
+}
+
+.publication-type-card .type-card-inner {
+    border: 2px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    text-align: center;
+    transition: all 0.2s ease;
+    background: white;
+    min-height: 90px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.publication-type-card:hover .type-card-inner {
+    border-color: currentColor;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.publication-type-card.selected .type-card-inner {
+    border-color: currentColor;
+    background-color: rgba(59, 130, 246, 0.05);
+    box-shadow: 0 0 0 1px currentColor;
+}
+
+/* -------------------- Input Field Sizing (FIXED) -------------------- */
+input[type="text"],
+input[type="email"],
+input[type="number"],
+textarea,
+select {
+    padding: 0.5rem 0.75rem !important; /* Reduced padding */
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    transition: all 0.2s ease;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="number"]:focus,
+textarea:focus,
+select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* -------------------- Authors Container -------------------- */
+.authors-container {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    background: #f9fafb;
+    padding: 0.75rem;
+    z-index: 1; /* Changed from -1 */
+    position: relative; /* Add this to establish stacking context */
+}
+
+.authors-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.authors-container::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+.authors-container::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+.authors-container::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* -------------------- Author Rows -------------------- */
+.author-row {
+    position: relative;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    margin-bottom: 0.75rem;
+    padding: 0.75rem; /* Reduced padding */
+    transition: all 0.2s ease;
+}
+
+.author-row:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+}
+
+.author-row:last-child {
+    margin-bottom: 0;
+}
+
+/* -------------------- Input Groups -------------------- */
+.input-group {
+    position: relative;
+}
+
+.input-group input {
+    transition: all 0.2s ease;
+}
+
+.input-group input:focus {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(59, 130, 246, 0.1);
+}
+
+/* -------------------- Email Auto-Complete Styles -------------------- */
+.email-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-left: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    animation: fadeIn 0.2s ease-out;
+}
+
+/* Email Status Variants */
+.email-status.loading {
+    background: #eff6ff;
+    border: 1px solid #dbeafe;
+    color: #1e40af;
+}
+
+.email-status.success {
+    background: #ecfdf5;
+    border: 1px solid #d1fae5;
+    color: #065f46;
+}
+
+.email-status.not-found {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    color: #374151;
+}
+
+.email-status.error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+}
+
+/* Auto-filled Input Styling */
+input.auto-filled {
+    background-color: #f0fdf4;
+    border-color: #10b981;
+    transition: all 0.2s ease;
+}
+
+input.auto-filled:focus {
+    background-color: white;
+    border-color: #3b82f6;
+}
+
+/* Email Details Popup */
+.email-details {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    padding: 0.5rem;
+    margin-top: 0.25rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+    max-width: 300px;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.email-details small {
+    color: #6b7280;
+    font-size: 0.6875rem;
+    line-height: 1.2;
+}
+
+/* -------------------- Status Indicators -------------------- */
+.email-status.success::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    background: #10b981;
+    border-radius: 50%;
+    margin-right: 0.25rem;
+}
+
+.email-status.not-found::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    background: #6b7280;
+    border-radius: 50%;
+    margin-right: 0.25rem;
+}
+
+/* -------------------- Quick Fill Section -------------------- */
+.quick-fill-section {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.quick-fill-input {
+    flex: 1;
+    margin-right: 0;
+}
+
+/* -------------------- Form Sections -------------------- */
+.form-section {
+    margin-bottom: 2rem;
+}
+
+.section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 1rem;
+}
+
+.section-description {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-bottom: 1.5rem;
+}
+
+/* -------------------- Button Styles -------------------- */
+button {
+    font-size: 0.875rem !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 0.375rem;
+    transition: all 0.2s ease;
+}
+
+button:hover {
+    transform: translateY(-1px);
+}
+
+/* -------------------- Grid Responsive Fixes -------------------- */
+.grid {
+    gap: 0.75rem; /* Consistent gap */
+}
+
+/* -------------------- Animations -------------------- */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-2px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Author row enter animation */
+.author-row-enter {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+        max-height: 0;
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+        max-height: 200px;
+    }
+}
+
+/* -------------------- Focus States -------------------- */
+input.email-autocomplete-enabled:focus + .email-status {
+    border-color: #3b82f6;
+}
+
+.email-status:focus-within {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+/* -------------------- Hover Effects -------------------- */
+.email-status:hover {
+    opacity: 0.9;
+}
+
+.email-details:hover {
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* -------------------- Mobile Responsive -------------------- */
+@media (max-width: 768px) {
+    .authors-container {
+        max-height: 300px;
+    }
+    
+    .author-row .grid {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+    
+    .email-status {
+        display: block;
+        margin-left: 0;
+        margin-top: 0.25rem;
+        font-size: 0.6875rem;
+    }
+    
+    .email-details {
+        position: relative;
+        margin-top: 0.5rem;
+        max-width: 100%;
+    }
+    
+    /* Publication type cards on mobile */
+    .publication-type-card .type-card-inner {
+        min-height: 70px;
+        padding: 0.75rem;
+    }
+    
+    /* Smaller inputs on mobile */
+    input[type="text"],
+    input[type="email"],
+    input[type="number"],
+    textarea {
+        padding: 0.5rem !important;
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+}
+
+/* -------------------- Print Styles -------------------- */
+@media print {
+    .email-status,
+    .email-details {
+        display: none;
+    }
+    
+    input.auto-filled {
+        background-color: transparent;
+        border-color: #d1d5db;
+    }
+    
+    .authors-container {
+        max-height: none;
+        overflow: visible;
+        border: none;
+        background: transparent;
+    }
+    
+    .author-row {
+        break-inside: avoid;
+        margin-bottom: 0.5rem;
+    }
+    
+    .publication-type-card .type-card-inner {
+        border: 1px solid #000;
+    }
+}
+
+/* -------------------- Dark Mode Support -------------------- */
+@media (prefers-color-scheme: dark) {
+    .email-status.success {
+        background: #064e3b;
+        border-color: #065f46;
+        color: #6ee7b7;
+    }
+    
+    .email-status.loading {
+        background: #1e3a8a;
+        border-color: #3b82f6;
+        color: #93c5fd;
+    }
+    
+    .email-status.not-found {
+        background: #374151;
+        border-color: #4b5563;
+        color: #d1d5db;
+    }
+    
+    .email-status.error {
+        background: #7f1d1d;
+        border-color: #ef4444;
+        color: #fca5a5;
+    }
+    
+    input.auto-filled {
+        background-color: #064e3b;
+        border-color: #10b981;
+        color: white;
+    }
+}
+
+/* -------------------- Accessibility -------------------- */
+.email-status[role="status"] {
+    position: relative;
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+    .email-status {
+        border-width: 2px;
+    }
+    
+    .author-row {
+        border-width: 2px;
+    }
+    
+    .publication-type-card .type-card-inner {
+        border-width: 3px;
+    }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        transition-delay: 0ms !important;
+    }
+}
+
+/* -------------------- Additional Utility Classes -------------------- */
+.text-sm {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+}
+
+.font-medium {
+    font-weight: 500;
+}
+
+.font-semibold {
+    font-weight: 600;
+}
+
+.text-gray-700 {
+    color: #374151;
+}
+
+.text-gray-600 {
+    color: #4b5563;
+}
+
+.text-gray-500 {
+    color: #6b7280;
+}
+
+.bg-white {
+    background-color: white;
+}
+
+.border-gray-300 {
+    border-color: #d1d5db;
+}
+
+.rounded-md {
+    border-radius: 0.375rem;
+}
+
+.shadow-sm {
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* -------------------- Custom Styles for div.p-4.bg-orange-50.rounded-lg -------------------- */
+div.p-4.bg-orange-50.rounded-lg {
+    color: rgba(30, 64, 175, 1) !important;
+    background-color: rgba(147, 197, 253, 1) !important;
+}

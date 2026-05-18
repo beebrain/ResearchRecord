@@ -1,0 +1,211 @@
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Pdfgen</title>
+<script src="./build-vfs.js"></script>
+<script src="./build/pdfmake.min.js"></script>
+<script src="./build/vfs_fonts.js"></script>
+
+</head>
+
+<body>
+<div class="container">
+<button id = "make-pdf" onclick="makepdf()">xxx</button>
+
+<script>
+
+function makepdf() {
+    // Parse the input directly
+    const content = formatScientificTextForPDF("A^2ββ1^2+-1 °C");
+
+    // Create the PDF
+    const docDefinition = {
+        content: content,
+        defaultStyle: {
+            font: 'Roboto',
+            fontSize: 12
+        }
+    };
+
+    pdfMake.createPdf(docDefinition).download('scientific.pdf');
+}
+
+function formatScientificTextForPDF(text) {
+    if (!text) return text;
+    
+    // First convert any standard notations with ScientificInput formatter
+    // (Skip this if it's causing issues)
+    // let formattedText = ScientificInput.formatScientificNotation(text, 'combined');
+    // Instead, work directly with the input
+    let formattedText = text;
+    
+    // Process the string character by character
+    let result = [];
+    let i = 0;
+    let currentText = '';
+    
+    while (i < formattedText.length) {
+        // Check for superscript notation (^)
+        if (formattedText[i] === '^' && i + 1 < formattedText.length) {
+            // Add any pending regular text
+            if (currentText) {
+                result.push({ text: currentText });
+                currentText = '';
+            }
+            
+            // Extract the superscript content
+            let superscriptText = '';
+            i++; // Move past the ^
+            
+            // If it's a multi-digit/character superscript enclosed in parentheses
+            if (formattedText[i] === '(') {
+                i++; // Move past the (
+                while (i < formattedText.length && formattedText[i] !== ')') {
+                    superscriptText += formattedText[i];
+                    i++;
+                }
+                if (i < formattedText.length) i++; // Move past the )
+            } 
+            // Or just a single character/digit superscript
+            else {
+                superscriptText = formattedText[i];
+                i++;
+            }
+            
+            // Add the superscript with styling
+            result.push({
+                text: superscriptText,
+                fontSize: 5,
+                relativePosition: { y: -7 }
+            });
+        }
+        // Check for subscript notation (_)
+        else if (formattedText[i] === '_' && i + 1 < formattedText.length) {
+            // Add any pending regular text
+            if (currentText) {
+                result.push({ text: currentText });
+                currentText = '';
+            }
+            
+            // Extract the subscript content
+            let subscriptText = '';
+            i++; // Move past the _
+            
+            // If it's a multi-digit/character subscript enclosed in parentheses
+            if (formattedText[i] === '(') {
+                i++; // Move past the (
+                while (i < formattedText.length && formattedText[i] !== ')') {
+                    subscriptText += formattedText[i];
+                    i++;
+                }
+                if (i < formattedText.length) i++; // Move past the )
+            } 
+            // Or just a single character/digit subscript
+            else {
+                subscriptText = formattedText[i];
+                i++;
+            }
+            
+            // Add the subscript with styling
+            result.push({
+                text: subscriptText,
+                fontSize: 5,
+                relativePosition: { y: 3 }
+            });
+        }
+        // Handle Greek letters
+        else if (formattedText.substr(i, 5) === 'alpha') {
+            if (currentText) {
+                result.push({ text: currentText });
+                currentText = '';
+            }
+            result.push({ text: 'α' });
+            i += 5;
+        }
+        else if (formattedText.substr(i, 4) === 'beta') {
+            if (currentText) {
+                result.push({ text: currentText });
+                currentText = '';
+            }
+            result.push({ text: 'β' });
+            i += 4;
+        }
+        else if (formattedText.substr(i, 5) === 'gamma') {
+            if (currentText) {
+                result.push({ text: currentText });
+                currentText = '';
+            }
+            result.push({ text: 'γ' });
+            i += 5;
+        }
+        // ... other Greek letters
+        
+        // Special symbols
+        else if (formattedText.substr(i, 3) === 'deg') {
+            if (currentText) {
+                result.push({ text: currentText });
+                currentText = '';
+            }
+            result.push({ text: '°' });
+            i += 3;
+        }
+        // Directly use degree symbol 
+        else if (formattedText[i] === '°') {
+            if (currentText) {
+                result.push({ text: currentText });
+                currentText = '';
+            }
+            result.push({ text: '°' });
+            i++;
+        }
+        // Beta character
+        else if (formattedText[i] === 'β') {
+            if (currentText) {
+                result.push({ text: currentText });
+                currentText = '';
+            }
+            result.push({ text: 'β' });
+            i++;
+        }
+        // Handle plus/minus in superscript context
+        else if ((formattedText[i] === '+' || formattedText[i] === '-') && 
+                 i > 0 && /\d/.test(formattedText[i-1])) {
+            
+            // Check if previous character is part of a superscript
+            let isPreviousSuperscript = false;
+            for (let j = result.length - 1; j >= 0; j--) {
+                if (result[j].relativePosition && result[j].relativePosition.y < 0) {
+                    isPreviousSuperscript = true;
+                    break;
+                }
+            }
+            
+            if (isPreviousSuperscript) {
+                // Add as superscript
+                result.push({
+                    text: formattedText[i],
+                    fontSize: 5,
+                    relativePosition: { y: -7 }
+                });
+            } else {
+                currentText += formattedText[i];
+            }
+            i++;
+        }
+        // Regular character
+        else {
+            currentText += formattedText[i];
+            i++;
+        }
+    }
+    
+    // Add any remaining text
+    if (currentText) {
+        result.push({ text: currentText });
+    }
+    
+    return result;
+}
+</script>
+</body>
+</html>

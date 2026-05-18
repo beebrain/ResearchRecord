@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>Test PDF Functions</title>
+    <script>
+        // Log initial state
+        console.log('=== BEFORE LOADING SCRIPTS ===');
+        console.log('window.generateCurriculumReport:', typeof window.generateCurriculumReport);
+        console.log('window.generateCurriculumPDF:', typeof window.generateCurriculumPDF);
+        console.log('window.generatePDFDocument:', typeof window.generatePDFDocument);
+        console.log('window.loadThaiFont:', typeof window.loadThaiFont);
+    </script>
+    
+    <!-- PDFMake Library -->
+    <script src="assets/js/vendor/pdfmake.min.js"></script>
+    <script src="assets/js/vendor/vfs_fonts.min.js"></script>
+    
+    <!-- BASE_URL definition -->
+    <script>
+        window.BASE_URL = 'http://localhost/researchRecord';
+        console.log('BASE_URL set to:', window.BASE_URL);
+    </script>
+    
+    <!-- Publication Summary PDF Generation Script -->
+    <script src="assets/js/publication-summary-pdf.js"></script>
+    
+    <script>
+        // Log after loading scripts
+        console.log('=== AFTER LOADING SCRIPTS ===');
+        console.log('window.generateCurriculumReport:', typeof window.generateCurriculumReport);
+        console.log('window.generateCurriculumPDF:', typeof window.generateCurriculumPDF);
+        console.log('window.generatePDFDocument:', typeof window.generatePDFDocument);
+        console.log('window.loadThaiFont:', typeof window.loadThaiFont);
+        
+        // Test if they're actually functions
+        if (typeof window.generatePDFDocument === 'function') {
+            console.log('✓ generatePDFDocument is a function');
+        } else {
+            console.error('✗ generatePDFDocument is NOT a function!');
+        }
+        
+        if (typeof window.generateCurriculumReport === 'function') {
+            console.log('✓ generateCurriculumReport is a function');
+        } else {
+            console.error('✗ generateCurriculumReport is NOT a function!');
+        }
+    </script>
+</head>
+<body>
+    <h1>PDF Functions Test</h1>
+    <p>Open the browser console to see the test results.</p>
+    
+    <button onclick="console.log('Calling generateCurriculumReport...'); generateCurriculumReport();">
+        Test generateCurriculumReport()
+    </button>
+    
+    <div style="margin-top: 20px; padding: 10px; background: #f0f0f0;">
+        <h2>Status:</h2>
+        <div id="status"></div>
+    </div>
+    
+    <script>
+        // Wait for DOMContentLoaded and show status
+        window.addEventListener('DOMContentLoaded', function() {
+            const status = document.getElementById('status');
+            status.innerHTML = `
+                <p><strong>generateCurriculumReport:</strong> ${typeof window.generateCurriculumReport}</p>
+                <p><strong>generateCurriculumPDF:</strong> ${typeof window.generateCurriculumPDF}</p>
+                <p><strong>generatePDFDocument:</strong> ${typeof window.generatePDFDocument}</p>
+                <p><strong>loadThaiFont:</strong> ${typeof window.loadThaiFont}</p>
+            `;
+            
+            if (typeof window.generatePDFDocument !== 'function') {
+                status.innerHTML += '<p style="color: red; font-weight: bold;">ERROR: generatePDFDocument is not defined!</p>';
+            } else {
+                status.innerHTML += '<p style="color: green; font-weight: bold;">SUCCESS: All functions are loaded!</p>';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,236 @@
+/* ========================================
+   Author Name Search Dropdown Styles
+   ======================================== */
+
+/* -------------------- Container -------------------- */
+.name-search-container {
+    position: relative !important;
+    display: block !important;
+}
+/* -------------------- Dropdown Base -------------------- */
+.name-search-dropdown {
+    position: absolute !important;
+    top: 100% !important;
+    left: 0 !important;
+    right: 0 !important;
+ z-index: 9999 !important; 
+    margin: 0 !important;
+    padding: 0 !important;
+}
+/* -------------------- Dropdown Items -------------------- */
+.dropdown-item {
+    border-bottom: 1px solid #f3f4f6;
+    transition: background-color 0.15s ease;
+}
+
+.dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.dropdown-item > div {
+    padding: 0.75rem;
+    cursor: pointer;
+}
+
+.dropdown-item:hover > div,
+.dropdown-item.highlighted > div {
+    background-color: #f3f4f6;
+}
+
+.dropdown-item:active > div {
+    background-color: #e5e7eb;
+}
+
+/* -------------------- Item Content -------------------- */
+.dropdown-item .font-medium {
+    font-weight: 500;
+    color: #111827;
+    margin-bottom: 0.25rem;
+}
+
+.dropdown-item small {
+    color: #6b7280;
+    font-size: 0.75rem;
+    line-height: 1rem;
+}
+
+/* -------------------- Auto-filled Input Styling -------------------- */
+input.auto-filled {
+    background-color: #f0fdf4;
+    border-color: #10b981;
+    transition: all 0.2s ease;
+}
+
+input.auto-filled:focus {
+    background-color: white;
+    border-color: #3b82f6;
+}
+
+/* -------------------- Loading State -------------------- */
+.name-search-dropdown .flex {
+    display: flex;
+    align-items: center;
+}
+
+.name-search-dropdown .animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* -------------------- Scrollbar Styling -------------------- */
+.name-search-dropdown::-webkit-scrollbar {
+    width: 6px;
+}
+
+.name-search-dropdown::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.name-search-dropdown::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.name-search-dropdown::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* -------------------- Responsive Design -------------------- */
+@media (max-width: 768px) {
+    .name-search-dropdown {
+        max-height: 150px;
+        font-size: 0.875rem;
+    }
+    
+    .dropdown-item > div {
+        padding: 0.5rem;
+    }
+    
+    .dropdown-item small {
+        font-size: 0.6875rem;
+    }
+}
+
+/* -------------------- Focus States -------------------- */
+.name-search-container input:focus {
+    position: relative;
+    z-index: 1001;
+}
+
+/* -------------------- Animation -------------------- */
+.name-search-dropdown {
+    animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* -------------------- Error and Empty States -------------------- */
+.name-search-dropdown.error {
+    background-color: #fef2f2;
+    border-color: #fecaca;
+    color: #991b1b;
+}
+
+.name-search-dropdown.empty {
+    color: #6b7280;
+    font-style: italic;
+}
+
+/* -------------------- Utility Classes -------------------- */
+.text-gray-500 {
+    color: #6b7280;
+}
+
+.text-gray-900 {
+    color: #111827;
+}
+
+.text-green-600 {
+    color: #059669;
+}
+
+.text-blue-600 {
+    color: #2563eb;
+}
+
+/* -------------------- High Contrast Mode -------------------- */
+@media (prefers-contrast: high) {
+    .name-search-dropdown {
+        border-width: 2px;
+        border-color: #000;
+    }
+    
+    .dropdown-item:hover > div,
+    .dropdown-item.highlighted > div {
+        background-color: #000;
+        color: #fff;
+    }
+}
+
+/* -------------------- Reduced Motion -------------------- */
+@media (prefers-reduced-motion: reduce) {
+    .name-search-dropdown,
+    .dropdown-item,
+    input.auto-filled {
+        animation: none;
+        transition: none;
+    }
+}
+
+/* -------------------- Dark Mode Support -------------------- */
+@media (prefers-color-scheme: dark) {
+    .name-search-dropdown {
+        background: #1f2937;
+        border-color: #374151;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+    
+    .dropdown-item > div {
+        color: #f9fafb;
+    }
+    
+    .dropdown-item:hover > div,
+    .dropdown-item.highlighted > div {
+        background-color: #374151;
+    }
+    
+    .dropdown-item small {
+        color: #9ca3af;
+    }
+    
+    input.auto-filled {
+        background-color: #064e3b;
+        border-color: #10b981;
+        color: white;
+    }
+}
+
+/* -------------------- Print Styles -------------------- */
+@media print {
+    .name-search-dropdown {
+        display: none;
+    }
+    
+    input.auto-filled {
+        background-color: transparent;
+        border-color: #d1d5db;
+    }
+}
