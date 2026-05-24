@@ -294,6 +294,7 @@ $routes->group('api/public', ['filter' => ApiKeyFilter::class], function ($route
     $routes->get('cv-bundle-by-email', 'CvSyncApiController::getCvBundleByEmail');
     $routes->post('cv-bundle-by-email', 'CvSyncApiController::postCvBundleByEmail');
     $routes->get('publications-sync-bundle-by-email', 'CvSyncApiController::getPublicationsSyncBundleByEmail');
+    $routes->post('publications-sync-bundle-by-email', 'CvSyncApiController::postPublicationsSyncBundleByEmail');
 });
 
 // Legacy compatibility routes

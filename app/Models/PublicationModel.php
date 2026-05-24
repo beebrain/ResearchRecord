@@ -29,7 +29,12 @@ class PublicationModel extends Model
         'ref_url',
         'created_by',
         'approve',
-        'orcid_put_code'
+        'orcid_put_code',
+        'sync_external_key',
+        'ns_publication_id',
+        'sync_origin',
+        'last_synced_from',
+        'content_hash',
     ];
 
     /**
