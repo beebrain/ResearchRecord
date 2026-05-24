@@ -184,6 +184,14 @@ class CvSyncApiController extends ApiController
                     'publication_type'   => $pub['publication_type'] ?? null,
                     'source'             => $pub['source'] ?? null,
                     'doi'                => $doi !== '' ? $doi : null,
+                    'abstract'           => $pub['abstract'] ?? null,
+                    'publication_month'  => $pub['publication_month'] ?? null,
+                    'volume'             => $pub['volume'] ?? null,
+                    'pages'              => $pub['pages'] ?? null,
+                    'isbn'               => $pub['isbn'] ?? null,
+                    'keywords'           => $pub['keywords'] ?? null,
+                    'notes'              => $pub['notes'] ?? null,
+                    'ref_url'            => $pub['ref_url'] ?? null,
                     'contributors'       => $contributorsByPublication[$id] ?? [],
                     'metadata'           => [
                         'rr_publication_id' => $id,
@@ -383,6 +391,14 @@ class CvSyncApiController extends ApiController
             'source'           => trim((string) ($pub['source'] ?? '')) ?: null,
             'publication_year' => isset($pub['publication_year']) && $pub['publication_year'] !== '' ? (int) $pub['publication_year'] : null,
             'doi'              => trim((string) ($pub['doi'] ?? '')) ?: null,
+            'abstract'         => trim((string) ($pub['abstract'] ?? '')) ?: null,
+            'publication_month'=> isset($pub['publication_month']) && $pub['publication_month'] !== '' ? (int) $pub['publication_month'] : null,
+            'volume'           => trim((string) ($pub['volume'] ?? '')) ?: null,
+            'pages'            => trim((string) ($pub['pages'] ?? '')) ?: null,
+            'isbn'             => trim((string) ($pub['isbn'] ?? '')) ?: null,
+            'keywords'         => trim((string) ($pub['keywords'] ?? '')) ?: null,
+            'notes'            => trim((string) ($pub['notes'] ?? '')) ?: null,
+            'ref_url'          => trim((string) ($pub['ref_url'] ?? '')) ?: null,
             'created_by'       => $user['uid'] ?? null,
             'approve'          => 0,
         ];
@@ -590,6 +606,21 @@ class CvSyncApiController extends ApiController
      */
     private function publicationSyncContentHash(array $pub): string
     {
+        $biblio = [];
+        foreach (['abstract', 'publication_month', 'volume', 'pages', 'isbn', 'keywords', 'notes', 'ref_url'] as $key) {
+            if (! array_key_exists($key, $pub)) {
+                continue;
+            }
+            $val = $pub[$key];
+            if ($val === null || $val === '') {
+                continue;
+            }
+            $biblio[$key] = is_string($val) ? mb_strtolower(trim($val)) : $val;
+        }
+        if (isset($pub['publication_month']) && $pub['publication_month'] !== '' && $pub['publication_month'] !== null) {
+            $biblio['publication_month'] = (int) $pub['publication_month'];
+        }
+
         return hash('sha256', json_encode([
             'title'        => mb_strtolower(trim((string) ($pub['title'] ?? ''))),
             'year'         => $pub['publication_year'] ?? null,
@@ -597,6 +628,7 @@ class CvSyncApiController extends ApiController
             'source'       => mb_strtolower(trim((string) ($pub['source'] ?? ''))),
             'doi'          => strtolower(trim((string) ($pub['doi'] ?? ''))),
             'contributors' => $pub['contributors'] ?? [],
+            'biblio'       => $biblio,
         ], JSON_UNESCAPED_UNICODE));
     }
 

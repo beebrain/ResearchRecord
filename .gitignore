@@ -132,3 +132,7 @@ nul
 *.csv
 *.csv.utf8
 *.log
+
+# Deployment secrets and local rollback backups
+/scripts/ftp_rr.env
+/deploy-backups/
