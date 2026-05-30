@@ -129,6 +129,11 @@ download_remote() {
   curl_ftp "$(remote_url_for "${rel}")" --output "${dest}"
 }
 
+remote_file_exists() {
+  local rel="$1"
+  curl_ftp --head "$(remote_url_for "${rel}")" >/dev/null 2>&1
+}
+
 upload_file() {
   local src="$1"
   local rel="$2"
@@ -174,13 +179,20 @@ deploy_one() {
   fi
 
   echo "Deploy ${rel}"
-  echo "  Downloading current remote file..."
-  download_remote "${rel}" "${backup_file}"
-  echo "  [OK] Local backup: ${backup_file}"
+  if remote_file_exists "${rel}"; then
+    echo "  Downloading current remote file..."
+    download_remote "${rel}" "${backup_file}"
+    echo "  [OK] Local backup: ${backup_file}"
 
-  echo "  Creating remote backup: ${remote_backup_rel}"
-  upload_file "${backup_file}" "${remote_backup_rel}"
-  verify_upload "${backup_file}" "${remote_backup_rel}"
+    echo "  Creating remote backup: ${remote_backup_rel}"
+    upload_file "${backup_file}" "${remote_backup_rel}"
+    verify_upload "${backup_file}" "${remote_backup_rel}"
+  else
+    echo "  [NEW] No remote file yet — skipping remote backup"
+    mkdir -p "$(dirname "${backup_file}")"
+    cp "${local_file}" "${backup_file}"
+    echo "  [OK] Local snapshot: ${backup_file}"
+  fi
 
   echo "  Uploading new file..."
   upload_file "${local_file}" "${rel}"

@@ -2,6 +2,8 @@
 
 namespace App\Helpers;
 
+use App\Libraries\UserIdentity;
+
 /**
  * RoleHelper
  *
@@ -223,6 +225,9 @@ class RoleHelper
 
     /**
      * Check if user can access a specific user record
+     *
+     * Faculty admin: target is in scope if their user.faculty_id is managed, or their
+     * primary curriculum belongs to a managed faculty.
      */
     public static function canAccessUser($user, int $targetUserId, $userModel): bool
     {
@@ -232,10 +237,21 @@ class RoleHelper
 
         if (self::isFacultyAdmin($user)) {
             $targetUser = $userModel->find($targetUserId);
-            if ($targetUser && !empty($targetUser['curriculum_id'])) {
-                $curriculumModel = new \App\Models\CurriculumModel();
-                return self::canAccessCurriculum($user, $targetUser['curriculum_id'], $curriculumModel);
+            if (!$targetUser) {
+                return false;
             }
+            // Primary: user's home faculty (ผู้แต่งสังกัดคณะ)
+            if (!empty($targetUser['faculty_id']) && self::canAccessFaculty($user, (int) $targetUser['faculty_id'])) {
+                return true;
+            }
+            // Secondary: primary curriculum under a managed faculty
+            if (!empty($targetUser['curriculum_id'])) {
+                $curriculumModel = new \App\Models\CurriculumModel();
+
+                return self::canAccessCurriculum($user, (int) $targetUser['curriculum_id'], $curriculumModel);
+            }
+
+            return false;
         }
 
         // Regular users can only access themselves
@@ -248,6 +264,10 @@ class RoleHelper
 
     /**
      * Check if user can access a specific publication
+     *
+     * Faculty admin: may edit when the record creator is in scope, or when any
+     * publication author (uid / authors.user_uid / resolvable author_email) is in scope.
+     * This keeps edit rights after listing stopped treating created_by-only as "their work".
      */
     public static function canAccessPublication($user, int $publicationId, $publicationModel): bool
     {
@@ -261,16 +281,71 @@ class RoleHelper
         }
 
         if (self::isFacultyAdmin($user)) {
-            // Check if publication creator belongs to managed faculty
-            if (!empty($publication['created_by'])) {
-                $userModel = new \App\Models\UserModel();
-                return self::canAccessUser($user, $publication['created_by'], $userModel);
+            $userModel = new \App\Models\UserModel();
+            if (!empty($publication['created_by']) && self::canAccessUser($user, (int) $publication['created_by'], $userModel)) {
+                return true;
             }
+
+            return self::publicationHasAuthorInManagedScope($user, $publicationId, $userModel);
         }
 
         // Regular users can only access their own publications
         if (is_array($user) && isset($user['uid'])) {
             return $publication['created_by'] == $user['uid'];
+        }
+
+        return false;
+    }
+
+    /**
+     * True if any author row on this publication maps to a user the faculty admin may manage.
+     */
+    private static function publicationHasAuthorInManagedScope($user, int $publicationId, \App\Models\UserModel $userModel): bool
+    {
+        $db = \Config\Database::connect();
+        $rows = $db->table('publication_authors pa')
+            ->select('pa.uid AS pa_uid, a.user_uid AS author_user_uid, pa.author_email')
+            ->join('authors a', 'a.id = pa.author_id', 'left')
+            ->where('pa.publication_id', $publicationId)
+            ->get()
+            ->getResultArray();
+
+        $checkedUids = [];
+        foreach ($rows as $row) {
+            $uid = (int) ($row['pa_uid'] ?? 0);
+            if ($uid <= 0) {
+                $uid = (int) ($row['author_user_uid'] ?? 0);
+            }
+
+            if ($uid > 0) {
+                if (isset($checkedUids[$uid])) {
+                    continue;
+                }
+                $checkedUids[$uid] = true;
+                if (self::canAccessUser($user, $uid, $userModel)) {
+                    return true;
+                }
+
+                continue;
+            }
+
+            $email = UserIdentity::normalizeEmail((string) ($row['author_email'] ?? ''));
+            if ($email === '') {
+                continue;
+            }
+
+            $target = $userModel->getUserByEmail($email);
+            if (!is_array($target) || empty($target['uid'])) {
+                continue;
+            }
+            $tuid = (int) $target['uid'];
+            if (isset($checkedUids[$tuid])) {
+                continue;
+            }
+            $checkedUids[$tuid] = true;
+            if (self::canAccessUser($user, $tuid, $userModel)) {
+                return true;
+            }
         }
 
         return false;

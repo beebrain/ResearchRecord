@@ -570,9 +570,221 @@ class ApiController extends Controller
             log_message('error', 'ApiController::apiGetFacultyPersonnel error: ' . $e->getMessage());
             return $this->response->setStatusCode(500)->setJSON([
                 'success' => false,
-                'error' => 'SERVER_ERROR',
-                'message' => 'An error occurred while processing the request'
+                'error'   => 'SERVER_ERROR',
+                'message' => 'An error occurred while processing the request',
             ]);
         }
+    }
+
+    /**
+     * Curriculum detail by name (partial search). Token auth via CurriculumApiTokenFilter.
+     * Returns up to 5 responsible teachers and their approved publications.
+     *
+     * Route: GET /api/curriculum-detail-by-name?curriculum_name=...
+     */
+    public function apiGetCurriculumDetailByName()
+    {
+        $this->response->setHeader('Access-Control-Allow-Origin', '*');
+        $this->response->setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        $this->response->setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Curriculum-Api-Token, Authorization');
+
+        if ($this->request->getMethod() === 'options') {
+            return $this->response->setStatusCode(200);
+        }
+
+        try {
+            $curriculumName = trim((string) ($this->request->getGet('curriculum_name') ?? ''));
+            $facultyId      = $this->request->getGet('faculty_id');
+            $facultyId      = ($facultyId !== null && $facultyId !== '') ? (int) $facultyId : null;
+
+            if ($curriculumName === '') {
+                return $this->response->setStatusCode(400)->setJSON([
+                    'success' => false,
+                    'error'   => 'MISSING_PARAMETER',
+                    'message' => 'curriculum_name parameter is required',
+                ]);
+            }
+
+            $matches = $this->curriculumModel->searchActiveByNamePartial($curriculumName, $facultyId);
+
+            if ($matches === []) {
+                return $this->response->setStatusCode(404)->setJSON([
+                    'success' => false,
+                    'error'   => 'CURRICULUM_NOT_FOUND',
+                    'message' => 'No active curriculum matched the given name',
+                ]);
+            }
+
+            if (count($matches) > 1) {
+                $candidates = array_map(static function (array $row): array {
+                    return [
+                        'id'           => (int) ($row['id'] ?? 0),
+                        'name'         => $row['name'] ?? '',
+                        'code'         => $row['code'] ?? '',
+                        'faculty_id'   => (int) ($row['faculty_id'] ?? 0),
+                        'faculty_name' => $row['faculty_name'] ?? '',
+                        'faculty_code' => $row['faculty_code'] ?? '',
+                    ];
+                }, $matches);
+
+                return $this->response->setStatusCode(409)->setJSON([
+                    'success'    => false,
+                    'error'      => 'AMBIGUOUS_CURRICULUM',
+                    'message'    => 'Multiple curricula matched; pass faculty_id to disambiguate',
+                    'candidates' => $candidates,
+                ]);
+            }
+
+            $curriculum = $this->curriculumModel->getDetailWithFacultyAndChair((int) $matches[0]['id']);
+            if ($curriculum === null) {
+                return $this->response->setStatusCode(404)->setJSON([
+                    'success' => false,
+                    'error'   => 'CURRICULUM_NOT_FOUND',
+                    'message' => 'Curriculum not found or inactive',
+                ]);
+            }
+
+            $chairId   = ! empty($curriculum['chair_id']) ? (int) $curriculum['chair_id'] : null;
+            $teachers  = $this->userModel->getCurriculumResponsibleTeachers((int) $curriculum['id'], $chairId, 5);
+            $personnel = [];
+            $allPubIds = [];
+            $totalPubs = 0;
+
+            foreach ($teachers as $index => $teacher) {
+                $uid      = (int) ($teacher['uid'] ?? 0);
+                $email    = (string) ($teacher['email'] ?? '');
+                $isChair  = $chairId !== null && $uid === $chairId;
+                $role     = (string) ($teacher['role'] ?? 'instructor');
+                $pubs     = $email !== ''
+                    ? $this->publicationModel->getApprovedPublicationsByCanonicalEmail($email)
+                    : [];
+
+                $formattedPubs = array_map(fn (array $pub): array => $this->formatPublicationForApi($pub), $pubs);
+
+                foreach ($formattedPubs as $pub) {
+                    $allPubIds[(int) ($pub['id'] ?? 0)] = true;
+                }
+                $totalPubs += count($formattedPubs);
+
+                $personnel[] = [
+                    'order'            => $index + 1,
+                    'uid'              => $uid,
+                    'email'            => $email,
+                    'name_thai'        => $this->formatTeacherNameThai($teacher),
+                    'name_english'     => $this->formatTeacherNameEnglish($teacher),
+                    'role'             => $role,
+                    'position'         => $this->responsibleRoleLabel($role, $isChair),
+                    'is_chair'         => $isChair,
+                    'publication_count'=> count($formattedPubs),
+                    'publications'     => $formattedPubs,
+                ];
+            }
+
+            $chairPayload = null;
+            if (! empty($curriculum['chair']) && is_array($curriculum['chair'])) {
+                $c = $curriculum['chair'];
+                $chairPayload = [
+                    'uid'          => (int) ($c['uid'] ?? 0),
+                    'email'        => $c['email'] ?? '',
+                    'name_thai'    => $this->formatTeacherNameThai($c),
+                    'name_english' => $this->formatTeacherNameEnglish($c),
+                ];
+            }
+
+            return $this->response->setJSON([
+                'success' => true,
+                'curriculum' => [
+                    'id'           => (int) $curriculum['id'],
+                    'name'         => $curriculum['name'] ?? '',
+                    'code'         => $curriculum['code'] ?? '',
+                    'degree_level' => $curriculum['degree_level'] ?? '',
+                    'faculty'      => [
+                        'id'   => (int) ($curriculum['faculty_id'] ?? 0),
+                        'name' => $curriculum['faculty_name'] ?? '',
+                        'code' => $curriculum['faculty_code'] ?? '',
+                    ],
+                    'chair' => $chairPayload,
+                ],
+                'responsible_teachers' => $personnel,
+                'summary' => [
+                    'responsible_count'    => count($personnel),
+                    'total_publications'   => $totalPubs,
+                    'unique_publications'  => count($allPubIds),
+                    'publications_filter'  => 'approved_only',
+                ],
+                'retrieved_at' => date('Y-m-d H:i:s'),
+            ]);
+        } catch (\Exception $e) {
+            log_message('error', 'ApiController::apiGetCurriculumDetailByName ' . $e->getMessage());
+
+            return $this->response->setStatusCode(500)->setJSON([
+                'success' => false,
+                'error'   => 'SERVER_ERROR',
+                'message' => 'An error occurred while processing the request',
+            ]);
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $teacher
+     */
+    private function formatTeacherNameThai(array $teacher): string
+    {
+        $thai = trim(($teacher['titleThai'] ?? '') . ' ' . ($teacher['thai_name'] ?? '') . ' ' . ($teacher['thai_lastname'] ?? ''));
+        if ($thai !== '') {
+            return $thai;
+        }
+
+        return $this->formatTeacherNameEnglish($teacher);
+    }
+
+    /**
+     * @param array<string,mixed> $teacher
+     */
+    private function formatTeacherNameEnglish(array $teacher): string
+    {
+        return trim(($teacher['title'] ?? '') . ' ' . ($teacher['gf_name'] ?? '') . ' ' . ($teacher['gl_name'] ?? ''));
+    }
+
+    private function responsibleRoleLabel(string $role, bool $isChair): string
+    {
+        if ($isChair || $role === 'chair') {
+            return 'ประธานหลักสูตร';
+        }
+
+        return match ($role) {
+            'coordinator' => 'ผู้ประสานงานหลักสูตร',
+            'assistant'   => 'ผู้ช่วยผู้รับผิดชอบหลักสูตร',
+            default       => 'อาจารย์ผู้รับผิดชอบหลักสูตร',
+        };
+    }
+
+    /**
+     * @param array<string,mixed> $pub
+     *
+     * @return array<string,mixed>
+     */
+    private function formatPublicationForApi(array $pub): array
+    {
+        return [
+            'id'                  => $pub['id'],
+            'title'               => $pub['title'],
+            'abstract'            => $pub['abstract'] ?? null,
+            'publication_type'    => $pub['publication_type'],
+            'source'              => $pub['source'],
+            'publication_year'    => $pub['publication_year'],
+            'publication_year_be' => $pub['publication_year'] ? (int) $pub['publication_year'] + 543 : null,
+            'publication_month'   => $pub['publication_month'],
+            'volume'              => $pub['volume'] ?? null,
+            'pages'               => $pub['pages'] ?? null,
+            'doi'                 => $pub['doi'] ?? null,
+            'isbn'                => $pub['isbn'] ?? null,
+            'keywords'            => $pub['keywords'] ?? null,
+            'authors'             => $pub['authors'] ?? $pub['authors_names_thai'] ?? $pub['authors_names_en'] ?? null,
+            'authors_thai'        => $pub['authors_names_thai'] ?? null,
+            'authors_english'     => $pub['authors_names_en'] ?? null,
+            'approve'             => (int) ($pub['approve'] ?? 0),
+            'created_at'          => $pub['created_at'],
+        ];
     }
 }

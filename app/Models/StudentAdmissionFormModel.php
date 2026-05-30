@@ -337,7 +337,7 @@ class StudentAdmissionFormModel extends Model
      * Uses the same matching logic as PublicationModel::getPublicationsByAuthor()
      * PRIMARY: Match by author_email from publication_authors
      * SECONDARY: Match by UID (pa.uid or authors.user_uid)
-     * ALSO includes publications where user is the creator (created_by = userId)
+     * Does not include publications by created_by alone (data entry ≠ author).
      */
     public function getTeacherPublications(int $formId)
     {
@@ -438,28 +438,12 @@ class StudentAdmissionFormModel extends Model
             'publication_ids' => $ids
         ], JSON_UNESCAPED_UNICODE));
 
-        // Step 2b: ALSO get publications where teachers are the creators (created_by = userId)
-        $createdByIds = $db->table('publications')
-            ->select('id')
-            ->whereIn('created_by', $userIds)
-            ->get()
-            ->getResultArray();
-
-        $createdIds = array_column($createdByIds, 'id');
-
-        $log->info("getTeacherPublications: Found publications by creator match - " . json_encode([
-            'form_id' => $formId,
-            'publication_count' => count($createdIds),
-            'publication_ids' => $createdIds
-        ], JSON_UNESCAPED_UNICODE));
-
-        // Merge both arrays and get unique IDs
-        $allIds = array_unique(array_merge($ids, $createdIds));
+        $allIds = array_values(array_unique(array_map('intval', $ids)));
 
         $log->info("getTeacherPublications: Total unique publication IDs - " . json_encode([
             'form_id' => $formId,
             'total_count' => count($allIds),
-            'all_ids' => array_values($allIds)
+            'all_ids' => $allIds
         ], JSON_UNESCAPED_UNICODE));
 
         if (empty($allIds)) {

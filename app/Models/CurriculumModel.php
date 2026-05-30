@@ -209,4 +209,79 @@ class CurriculumModel extends Model
 
         return $result;
     }
+
+    /**
+     * Find active curricula by name: exact match first, then partial (LIKE).
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function searchActiveByNamePartial(string $name, ?int $facultyId = null): array
+    {
+        $name = trim($name);
+        if ($name === '') {
+            return [];
+        }
+
+        $normalized = mb_strtolower($name);
+        $db         = $this->db;
+        $select     = 'curriculum.*, faculties.name as faculty_name, faculties.code as faculty_code';
+
+        $applyFacultyFilter = static function ($builder) use ($facultyId) {
+            if ($facultyId !== null && $facultyId > 0) {
+                $builder->where('curriculum.faculty_id', $facultyId);
+            }
+
+            return $builder;
+        };
+
+        $exactBuilder = $applyFacultyFilter(
+            $db->table('curriculum')
+                ->select($select)
+                ->join('faculties', 'faculties.id = curriculum.faculty_id')
+                ->where('curriculum.status', 1)
+                ->where('LOWER(curriculum.name)', $normalized)
+        );
+        $exact = $exactBuilder->orderBy('curriculum.name', 'ASC')->get()->getResultArray();
+
+        if ($exact !== []) {
+            return $exact;
+        }
+
+        $partialBuilder = $applyFacultyFilter(
+            $db->table('curriculum')
+                ->select($select)
+                ->join('faculties', 'faculties.id = curriculum.faculty_id')
+                ->where('curriculum.status', 1)
+                ->like('curriculum.name', $name, 'both')
+        );
+
+        return $partialBuilder->orderBy('curriculum.name', 'ASC')->get()->getResultArray();
+    }
+
+    /**
+     * @return array<string,mixed>|null
+     */
+    public function getDetailWithFacultyAndChair(int $id): ?array
+    {
+        $row = $this->select('curriculum.*, faculties.name as faculty_name, faculties.code as faculty_code')
+            ->join('faculties', 'faculties.id = curriculum.faculty_id')
+            ->where('curriculum.id', $id)
+            ->where('curriculum.status', 1)
+            ->first();
+
+        if ($row === null) {
+            return null;
+        }
+
+        $row['chair'] = null;
+        if (! empty($row['chair_id'])) {
+            $userModel = new UserModel();
+            $chair = $userModel->find($row['chair_id']);
+            if (is_array($chair)) {
+                $row['chair'] = $chair;
+            }
+        }
+
+        return $row;
+    }
 }

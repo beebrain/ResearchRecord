@@ -528,6 +528,81 @@ class UserModel extends Model
     }
 
     /**
+     * อาจารย์ผู้รับผิดชอบหลักสูตร (สูงสุด 5 คน) จาก teacher_curriculum + ประธานหลักสูตร
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function getCurriculumResponsibleTeachers(int $curriculumId, ?int $chairId = null, int $limit = 5): array
+    {
+        if ($limit < 1) {
+            return [];
+        }
+
+        $rows = $this->db->table('teacher_curriculum tc')
+            ->select('tc.role, tc.is_primary, u.uid, u.email, u.title, u.titleThai,
+                      u.gf_name, u.gl_name, u.thai_name, u.thai_lastname, u.faculty_id')
+            ->join('user u', 'u.uid = tc.teacher_uid', 'inner')
+            ->where('tc.curriculum_id', $curriculumId)
+            ->where('tc.status', 1)
+            ->where('u.active', 1)
+            ->where('u.user_type', 'TEACHER')
+            ->get()
+            ->getResultArray();
+
+        $chairInList = false;
+        if ($chairId !== null && $chairId > 0) {
+            foreach ($rows as $row) {
+                if ((int) ($row['uid'] ?? 0) === (int) $chairId) {
+                    $chairInList = true;
+                    break;
+                }
+            }
+
+            if (! $chairInList) {
+                $chair = $this->find($chairId);
+                if (is_array($chair) && (int) ($chair['active'] ?? 0) === 1) {
+                    array_unshift($rows, [
+                        'uid'          => $chair['uid'],
+                        'email'        => $chair['email'] ?? '',
+                        'title'        => $chair['title'] ?? '',
+                        'titleThai'    => $chair['titleThai'] ?? '',
+                        'gf_name'      => $chair['gf_name'] ?? '',
+                        'gl_name'      => $chair['gl_name'] ?? '',
+                        'thai_name'    => $chair['thai_name'] ?? '',
+                        'thai_lastname'=> $chair['thai_lastname'] ?? '',
+                        'faculty_id'   => $chair['faculty_id'] ?? null,
+                        'role'         => 'chair',
+                        'is_primary'   => 1,
+                    ]);
+                }
+            }
+        }
+
+        $roleOrder = ['chair' => 0, 'coordinator' => 1, 'instructor' => 2, 'assistant' => 3];
+
+        usort($rows, static function (array $a, array $b) use ($chairId, $roleOrder): int {
+            $aIsChair = $chairId !== null && (int) ($a['uid'] ?? 0) === (int) $chairId;
+            $bIsChair = $chairId !== null && (int) ($b['uid'] ?? 0) === (int) $chairId;
+            if ($aIsChair !== $bIsChair) {
+                return $aIsChair ? -1 : 1;
+            }
+
+            $aRole = $roleOrder[$a['role'] ?? 'instructor'] ?? 9;
+            $bRole = $roleOrder[$b['role'] ?? 'instructor'] ?? 9;
+            if ($aRole !== $bRole) {
+                return $aRole <=> $bRole;
+            }
+
+            $aName = trim(($a['thai_name'] ?? '') . ' ' . ($a['thai_lastname'] ?? ''));
+            $bName = trim(($b['thai_name'] ?? '') . ' ' . ($b['thai_lastname'] ?? ''));
+
+            return strcmp($aName, $bName);
+        });
+
+        return array_slice($rows, 0, $limit);
+    }
+
+    /**
      * Get cross-faculty teaching assignments
      * Teachers teaching in curriculums outside their home faculty
      *

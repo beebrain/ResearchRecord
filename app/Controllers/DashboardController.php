@@ -11,6 +11,7 @@ use App\Models\CvSectionModel;
 use App\Models\CvEntryModel;
 use App\Models\PublicationAuthorModel;
 use App\Helpers\RoleHelper;
+use App\Libraries\UserIdentity;
 
 class DashboardController extends Controller
 {
@@ -35,6 +36,57 @@ class DashboardController extends Controller
         $this->publicationAuthorModel = new PublicationAuthorModel();
         $this->session = session();
         $this->db = \Config\Database::connect();
+    }
+
+    private function currentUserEmail(array $userData): string
+    {
+        $email = UserIdentity::normalizeEmail((string) ($userData['email'] ?? ''));
+        if ($email !== '') {
+            return $email;
+        }
+
+        $uid = $userData['uid'] ?? null;
+        if ($uid === null || $uid === '') {
+            return '';
+        }
+
+        $row = $this->userModel->find($uid);
+
+        return UserIdentity::normalizeEmail((string) ($row['email'] ?? ''));
+    }
+
+    private function applyCvOwnerFilter($model, $userUid, string $email)
+    {
+        if ($email !== '' && $this->db->fieldExists('owner_email_norm', 'cv_sections')) {
+            return $model->groupStart()
+                ->where('owner_email_norm', $email)
+                ->orWhere('user_uid', $userUid)
+                ->groupEnd();
+        }
+
+        return $model->where('user_uid', $userUid);
+    }
+
+    private function sectionBelongsToUser(?array $section, $userUid, string $email): bool
+    {
+        if (!$section) {
+            return false;
+        }
+
+        if ($email !== '' && !empty($section['owner_email_norm'])) {
+            return UserIdentity::normalizeEmail((string) $section['owner_email_norm']) === $email;
+        }
+
+        return (string) ($section['user_uid'] ?? '') === (string) $userUid;
+    }
+
+    private function withCvOwnerEmail(array $data, string $email): array
+    {
+        if ($email !== '' && $this->db->fieldExists('owner_email_norm', 'cv_sections')) {
+            $data['owner_email_norm'] = $email;
+        }
+
+        return $data;
     }
 
     /**
@@ -63,10 +115,12 @@ class DashboardController extends Controller
 
         $userData = $this->session->get('user_data');
         $userId = $userData['uid'];
-        $userEmail = $userData['email'] ?? null;
+        $ownerEmail = $this->currentUserEmail($userData);
 
         // Get user's publications with statistics - Using Email only as requested
-        $publications = $this->publicationModel->getPublicationsByEmail($userEmail);
+        $publications = $ownerEmail !== ''
+            ? $this->publicationModel->getPublicationsByCanonicalEmail($ownerEmail)
+            : $this->publicationModel->getPublicationsByAuthor($userId);
         $totalPublications = count($publications);
 
         // Calculate statistics
@@ -117,8 +171,7 @@ class DashboardController extends Controller
         $userProfile = $this->userProfileModel->getOrCreate($userId);
 
         // Get CV sections with entries for dashboard display
-        $cvSections = $this->cvSectionModel
-            ->where('user_uid', $userId)
+        $cvSections = $this->applyCvOwnerFilter($this->cvSectionModel, $userId, $ownerEmail)
             ->orderBy('sort_order', 'ASC')
             ->findAll();
 
@@ -256,8 +309,7 @@ class DashboardController extends Controller
         ]);
 
         // Get CV sections with entries for display
-        $cvSections = $this->cvSectionModel
-            ->where('user_uid', $userId)
+        $cvSections = $this->applyCvOwnerFilter($this->cvSectionModel, $userId, $ownerEmail)
             ->orderBy('sort_order', 'ASC')
             ->findAll();
 
@@ -300,6 +352,7 @@ class DashboardController extends Controller
         }
 
         $userData = $this->session->get('user_data') ?? [];
+        $ownerEmail = $this->currentUserEmail($userData);
 
         // Get user profile data from user_profile table
         $userProfile = $this->userProfileModel->getOrCreate($userData['uid']);
@@ -340,8 +393,7 @@ class DashboardController extends Controller
         // No longer auto-creating default sections - users create their own or import from ORCID
 
         // Get CV sections with entries
-        $cvSections = $this->cvSectionModel
-            ->where('user_uid', $userData['uid'])
+        $cvSections = $this->applyCvOwnerFilter($this->cvSectionModel, $userData['uid'], $ownerEmail)
             ->orderBy('sort_order', 'ASC')
             ->orderBy('id', 'ASC')
             ->findAll();
@@ -428,14 +480,14 @@ class DashboardController extends Controller
 
         $isAjax = $this->request->isAJAX();
 
-        $sectionData = [
+        $sectionData = $this->withCvOwnerEmail([
             'user_uid' => $userData['uid'],
             'type' => $type,
             'title' => $title,
             'description' => $description ?: null,
             'sort_order' => $sortOrder,
             'is_default' => $type === 'custom' ? 0 : 1
-        ];
+        ], $this->currentUserEmail($userData));
 
         $this->cvSectionModel->insert($sectionData);
 
@@ -464,6 +516,7 @@ class DashboardController extends Controller
         try {
             $userData = $this->session->get('user_data');
             $userUid = $userData['uid'];
+            $ownerEmail = $this->currentUserEmail($userData);
 
             $orderJson = $this->request->getPost('order');
             $order = json_decode($orderJson, true);
@@ -478,7 +531,7 @@ class DashboardController extends Controller
 
                 // Verify ownership
                 $section = $this->cvSectionModel->find($sectionId);
-                if ($section && $section['user_uid'] === $userUid) {
+                if ($this->sectionBelongsToUser($section, $userUid, $ownerEmail)) {
                     $this->cvSectionModel->update($sectionId, ['sort_order' => $sortOrder]);
                 }
             }
@@ -508,6 +561,7 @@ class DashboardController extends Controller
         try {
             $userData = $this->session->get('user_data');
             $userUid = $userData['uid'];
+            $ownerEmail = $this->currentUserEmail($userData);
 
             $section = $this->cvSectionModel->find($sectionId);
 
@@ -519,7 +573,7 @@ class DashboardController extends Controller
             }
 
             // Use == for loose comparison (handles string/int mismatch)
-            if ($section['user_uid'] != $userUid) {
+            if (!$this->sectionBelongsToUser($section, $userUid, $ownerEmail)) {
                 return $this->response->setJSON(['success' => false, 'message' => 'ไม่พบหัวข้อ (permission)']);
             }
 
@@ -554,6 +608,7 @@ class DashboardController extends Controller
         try {
             $userData = $this->session->get('user_data');
             $userUid = $userData['uid'];
+            $ownerEmail = $this->currentUserEmail($userData);
 
             $sectionId = $this->request->getPost('section_id');
             $orderJson = $this->request->getPost('order');
@@ -565,7 +620,7 @@ class DashboardController extends Controller
 
             // Verify section ownership
             $section = $this->cvSectionModel->find($sectionId);
-            if (!$section || $section['user_uid'] !== $userUid) {
+            if (!$this->sectionBelongsToUser($section, $userUid, $ownerEmail)) {
                 return $this->response->setJSON(['success' => false, 'message' => 'ไม่มีสิทธิ์']);
             }
 
@@ -605,6 +660,7 @@ class DashboardController extends Controller
         $userData = $this->session->get('user_data');
         $entryId = $this->request->getPost('entry_id');
         $sectionId = $this->request->getPost('section_id');
+        $ownerEmail = $this->currentUserEmail($userData);
 
         if (!$sectionId) {
             return redirect()->back()->with('error', 'ไม่พบหัวข้อที่ต้องการบันทึก');
@@ -612,7 +668,7 @@ class DashboardController extends Controller
 
         $section = $this->cvSectionModel->find($sectionId);
         $userId = $userData['uid'];
-        if (!$section || $section['user_uid'] !== $userId) {
+        if (!$this->sectionBelongsToUser($section, $userId, $ownerEmail)) {
             return redirect()->back()->with('error', 'ไม่สามารถเข้าถึงหัวข้อได้');
         }
 
@@ -656,7 +712,7 @@ class DashboardController extends Controller
             // Ensure ownership
             $existingSection = $this->cvSectionModel->find($existingEntry['section_id']);
             $userId = $userData['uid'];
-            if (!$existingSection || $existingSection['user_uid'] !== $userId) {
+            if (!$this->sectionBelongsToUser($existingSection, $userId, $ownerEmail)) {
                 return redirect()->back()->with('error', 'ไม่สามารถแก้ไขรายการนี้ได้');
             }
 
@@ -698,6 +754,7 @@ class DashboardController extends Controller
         }
 
         $userData = $this->session->get('user_data');
+        $ownerEmail = $this->currentUserEmail($userData);
         $entry = $this->cvEntryModel->find($entryId);
 
         if (!$entry) {
@@ -709,7 +766,7 @@ class DashboardController extends Controller
 
         $section = $this->cvSectionModel->find($entry['section_id']);
         $userId = $userData['uid'];
-        if (!$section || $section['user_uid'] !== $userId) {
+        if (!$this->sectionBelongsToUser($section, $userId, $ownerEmail)) {
             if ($this->request->isAJAX()) {
                 return $this->response->setJSON(['success' => false, 'message' => 'Access denied']);
             }
@@ -748,6 +805,7 @@ class DashboardController extends Controller
         }
 
         $userData = $this->session->get('user_data');
+        $ownerEmail = $this->currentUserEmail($userData);
         $entry = $this->cvEntryModel->find($entryId);
         if (!$entry) {
             return redirect()->back()->with('error', 'ไม่พบรายการที่ต้องการลบ');
@@ -755,7 +813,7 @@ class DashboardController extends Controller
 
         $section = $this->cvSectionModel->find($entry['section_id']);
         $userId = $userData['uid'];
-        if (!$section || $section['user_uid'] !== $userId) {
+        if (!$this->sectionBelongsToUser($section, $userId, $ownerEmail)) {
             return redirect()->back()->with('error', 'ไม่สามารถลบรายการนี้ได้');
         }
 
@@ -2449,38 +2507,34 @@ class DashboardController extends Controller
             log_message('info', 'saveOrcidCv - Employment items: ' . count($employment));
 
             // Ensure education section exists (the only mandatory default)
-            $this->ensureDefaultCvSections($userUid);
+            $this->ensureDefaultCvSections($userUid, $ownerEmail);
 
             // Get education section
-            $educationSection = $this->cvSectionModel
-                ->where('user_uid', $userUid)
+            $educationSection = $this->applyCvOwnerFilter($this->cvSectionModel, $userUid, $ownerEmail)
                 ->where('type', 'education')
                 ->first();
 
             // Get or create 'work' section if employment data exists
-            $employmentSection = $this->cvSectionModel
-                ->where('user_uid', $userUid)
+            $employmentSection = $this->applyCvOwnerFilter($this->cvSectionModel, $userUid, $ownerEmail)
                 ->where('type', 'work')
                 ->first();
 
             // Auto-create work section if we have employment data from ORCID
             if (!$employmentSection && !empty($employment)) {
-                $maxOrder = $this->cvSectionModel
-                    ->where('user_uid', $userUid)
+                $maxOrder = $this->applyCvOwnerFilter($this->cvSectionModel, $userUid, $ownerEmail)
                     ->selectMax('sort_order')
                     ->first();
                 $newOrder = ($maxOrder['sort_order'] ?? 0) + 1;
 
-                $this->cvSectionModel->insert([
+                $this->cvSectionModel->insert($this->withCvOwnerEmail([
                     'user_uid' => $userUid,
                     'type' => 'work',
                     'title' => 'Work Experience',
                     'sort_order' => $newOrder,
                     'is_default' => 0 // Not a default section, created from ORCID data
-                ]);
+                ], $ownerEmail));
 
-                $employmentSection = $this->cvSectionModel
-                    ->where('user_uid', $userUid)
+                $employmentSection = $this->applyCvOwnerFilter($this->cvSectionModel, $userUid, $ownerEmail)
                     ->where('type', 'work')
                     ->first();
 
@@ -3194,7 +3248,7 @@ class DashboardController extends Controller
      * Ensure default CV sections exist for user
      * Only Education is required, other sections can be deleted
      */
-    private function ensureDefaultCvSections($userUid)
+    private function ensureDefaultCvSections($userUid, string $ownerEmail = '')
     {
         // Only Education is mandatory - others can be deleted by user
         $defaults = [
@@ -3202,19 +3256,18 @@ class DashboardController extends Controller
         ];
 
         foreach ($defaults as $index => $default) {
-            $existing = $this->cvSectionModel
-                ->where('user_uid', $userUid)
+            $existing = $this->applyCvOwnerFilter($this->cvSectionModel, $userUid, $ownerEmail)
                 ->where('type', $default['type'])
                 ->first();
 
             if (!$existing) {
-                $this->cvSectionModel->insert([
+                $this->cvSectionModel->insert($this->withCvOwnerEmail([
                     'user_uid' => $userUid,
                     'type' => $default['type'],
                     'title' => $default['title'],
                     'sort_order' => $index + 1,
                     'is_default' => 1
-                ]);
+                ], $ownerEmail));
             }
         }
     }

@@ -17,6 +17,8 @@ All public API routes are under: **`/api/public/...`**
 
 Public API routes use the **`apikey`** filter. You must send a valid API key with every request.
 
+Curriculum detail API uses a **separate token** — see [CURRICULUM_DETAIL_API.md](./CURRICULUM_DETAIL_API.md) (`CURRICULUM_API_TOKEN`, header `X-Curriculum-Api-Token`).
+
 | Method | Header / Source |
 |--------|------------------|
 | **Header** | `X-API-KEY: <your-api-key>` |
@@ -241,6 +243,18 @@ These use **ApiController** but are **not** under `api/public` and do **not** us
 | `/faculty-search/curricula`    | GET | Curricula list |
 
 They are intended for the faculty-search UI and internal AJAX; external systems should use the **`/api/public/...`** endpoints with the **X-API-KEY** header.
+
+---
+
+## Internal API (session login required)
+
+For RR-internal use (logged-in users only):
+
+| Route | Method | Description | Documentation |
+|-------|--------|-------------|---------------|
+| `/docs` | GET | **Swagger UI** (interactive, like FastAPI) | [CURRICULUM_DETAIL_API.md](./CURRICULUM_DETAIL_API.md) |
+| `/api/openapi.json` | GET | OpenAPI 3.0 JSON spec | — |
+| `/api/curriculum-detail-by-name` | GET | Curriculum detail (token auth) | [CURRICULUM_DETAIL_API.md](./CURRICULUM_DETAIL_API.md) |
 
 ---
 

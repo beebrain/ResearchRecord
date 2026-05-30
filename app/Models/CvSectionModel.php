@@ -14,6 +14,7 @@ class CvSectionModel extends Model
 
     protected $allowedFields = [
         'user_uid',
+        'owner_email_norm',
         'type',
         'title',
         'description',

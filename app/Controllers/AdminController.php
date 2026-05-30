@@ -34,6 +34,47 @@ class AdminController extends Controller
     }
 
     /**
+     * Faculty admin: allow load/mutate only if creator or any author is in a managed faculty.
+     * Super admin / god / backdoor session: no restriction here.
+     *
+     * @return \CodeIgniter\HTTP\ResponseInterface|null JSON 403 or null to continue
+     */
+    protected function facultyAdminPublicationForbiddenResponse(int $publicationId): ?\CodeIgniter\HTTP\ResponseInterface
+    {
+        if ($this->session->get('god_mode') === true
+            || $this->session->get('backdoor_session') === true
+            || $this->session->get('backdoor_admin_auth') === true) {
+            return null;
+        }
+        $userData = $this->session->get('user_data') ?? [];
+        if (($userData['role'] ?? '') !== 'faculty_admin') {
+            return null;
+        }
+        $uid = (int) ($userData['uid'] ?? 0);
+        if ($uid <= 0) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'ไม่ได้รับอนุญาต',
+            ])->setStatusCode(403);
+        }
+        $user = $this->userModel->find($uid);
+        if (!is_array($user)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'ไม่ได้รับอนุญาต',
+            ])->setStatusCode(403);
+        }
+        if (!RoleHelper::canAccessPublication($user, $publicationId, $this->publicationModel)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'ไม่มีสิทธิ์: ผลงานนี้ไม่มีผู้แต่งหรือผู้แต่งร่วมในคณะที่คุณดูแล',
+            ])->setStatusCode(403);
+        }
+
+        return null;
+    }
+
+    /**
      * Admin Dashboard
      */
     public function index()
@@ -256,6 +297,11 @@ class AdminController extends Controller
             ]);
         }
 
+        $denied = $this->facultyAdminPublicationForbiddenResponse((int) $id);
+        if ($denied !== null) {
+            return $denied;
+        }
+
         try {
             // Delete authors first
             $this->publicationModel->deletePublicationAuthors($id);
@@ -310,6 +356,11 @@ class AdminController extends Controller
                     'success' => false,
                     'message' => 'Publication not found'
                 ]);
+            }
+
+            $denied = $this->facultyAdminPublicationForbiddenResponse((int) $id);
+            if ($denied !== null) {
+                return $denied;
             }
 
             // Get authors for this publication with user info
@@ -429,6 +480,11 @@ class AdminController extends Controller
                 ]);
             }
 
+            $denied = $this->facultyAdminPublicationForbiddenResponse((int) $id);
+            if ($denied !== null) {
+                return $denied;
+            }
+
             // Get status text for logging
             $statusText = match ($approvalStatus) {
                 1 => 'Approved (Meets กพอ Criteria)',
@@ -499,6 +555,11 @@ class AdminController extends Controller
                 ]);
             }
 
+            $denied = $this->facultyAdminPublicationForbiddenResponse((int) $id);
+            if ($denied !== null) {
+                return $denied;
+            }
+
             // Update approval status to 1 (approved)
             $this->publicationModel->update($id, [
                 'approve' => 1
@@ -546,6 +607,11 @@ class AdminController extends Controller
                     'success' => false,
                     'message' => 'Publication not found'
                 ]);
+            }
+
+            $denied = $this->facultyAdminPublicationForbiddenResponse((int) $id);
+            if ($denied !== null) {
+                return $denied;
             }
 
             $this->db->transStart();

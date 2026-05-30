@@ -4,6 +4,7 @@ namespace App\Controllers;
 
 use App\Controllers\ApiController;
 use App\Libraries\ResearchSyncHmac;
+use App\Libraries\UserIdentity;
 use App\Models\CvEntryModel;
 use App\Models\CvSectionModel;
 use App\Models\UserModel;
@@ -40,8 +41,7 @@ class CvSyncApiController extends ApiController
                 ]);
             }
 
-            $userModel = new UserModel();
-            $user      = $userModel->where('email', $v['email'])->first();
+            $user = UserIdentity::resolveUserByEmail((string) $v['email']);
 
             if (!$user) {
                 return $this->response->setStatusCode(404)->setJSON([
@@ -99,8 +99,7 @@ class CvSyncApiController extends ApiController
                 ]);
             }
 
-            $userModel = new UserModel();
-            $user      = $userModel->where('email', $v['email'])->first();
+            $user = UserIdentity::resolveUserByEmail((string) $v['email']);
             if (!$user) {
                 return $this->response->setStatusCode(404)->setJSON([
                     'success' => false,
@@ -109,7 +108,7 @@ class CvSyncApiController extends ApiController
             }
 
             $uid = (string) ($user['uid'] ?? '');
-            $this->replaceCvFromBundle($uid, $bundle);
+            $this->replaceCvFromBundle($uid, (string) $v['email'], $bundle);
 
             if (!empty($bundle['orcid_id'])) {
                 $profileModel = new UserProfileModel();
@@ -154,8 +153,7 @@ class CvSyncApiController extends ApiController
                 ]);
             }
 
-            $userModel = new UserModel();
-            $user      = $userModel->where('email', $v['email'])->first();
+            $user = UserIdentity::resolveUserByEmail((string) $v['email']);
             if (!$user) {
                 return $this->response->setStatusCode(404)->setJSON([
                     'success' => false,
@@ -163,7 +161,7 @@ class CvSyncApiController extends ApiController
                 ]);
             }
 
-            $publications = $this->publicationModel->getPublicationsByAuthor($user['uid']);
+            $publications = $this->publicationModel->getPublicationsByCanonicalEmail((string) $v['email']);
             $publicationIds = array_values(array_filter(array_map(
                 static fn (array $pub): int => (int) ($pub['id'] ?? 0),
                 $publications
@@ -647,6 +645,29 @@ class CvSyncApiController extends ApiController
         $this->response->setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-KEY');
     }
 
+    private function applyCvOwnerFilter($model, string $userUid, string $email)
+    {
+        $db = \Config\Database::connect();
+        if ($email !== '' && $db->fieldExists('owner_email_norm', 'cv_sections')) {
+            return $model->groupStart()
+                ->where('owner_email_norm', $email)
+                ->orWhere('user_uid', $userUid)
+                ->groupEnd();
+        }
+
+        return $model->where('user_uid', $userUid);
+    }
+
+    private function withCvOwnerEmail(array $data, string $email): array
+    {
+        $db = \Config\Database::connect();
+        if ($email !== '' && $db->fieldExists('owner_email_norm', 'cv_sections')) {
+            $data['owner_email_norm'] = $email;
+        }
+
+        return $data;
+    }
+
     /**
      * @return array<string,mixed>
      */
@@ -656,6 +677,7 @@ class CvSyncApiController extends ApiController
         $entryModel   = new CvEntryModel();
         $profileModel = new UserProfileModel();
         $profile      = $profileModel->getByUserUid($userUid);
+        $ownerEmail   = UserIdentity::normalizeEmail($canonicalEmail);
 
         $orcidId = $profile['orcid_id'] ?? null;
         if ($orcidId === null && !empty($profile['orcid'])) {
@@ -664,7 +686,7 @@ class CvSyncApiController extends ApiController
             }
         }
 
-        $sections = $sectionModel->where('user_uid', $userUid)
+        $sections = $this->applyCvOwnerFilter($sectionModel, $userUid, $ownerEmail)
             ->orderBy('sort_order', 'ASC')
             ->orderBy('id', 'ASC')
             ->findAll();
@@ -759,15 +781,16 @@ class CvSyncApiController extends ApiController
     /**
      * @param array<string,mixed> $bundle
      */
-    private function replaceCvFromBundle(string $userUid, array $bundle): void
+    private function replaceCvFromBundle(string $userUid, string $canonicalEmail, array $bundle): void
     {
         $db            = \Config\Database::connect();
         $sectionModel  = new CvSectionModel();
         $entryModel    = new CvEntryModel();
+        $ownerEmail    = UserIdentity::normalizeEmail($canonicalEmail);
 
         $db->transStart();
 
-        $existing = $sectionModel->where('user_uid', $userUid)->findAll();
+        $existing = $this->applyCvOwnerFilter($sectionModel, $userUid, $ownerEmail)->findAll();
         foreach ($existing as $ex) {
             $entryModel->where('section_id', (int) $ex['id'])->delete();
             $sectionModel->delete((int) $ex['id']);
@@ -779,14 +802,14 @@ class CvSyncApiController extends ApiController
                 continue;
             }
             $order++;
-            $sectionModel->insert([
+            $sectionModel->insert($this->withCvOwnerEmail([
                 'user_uid'     => $userUid,
                 'type'         => (string) ($sec['type'] ?? 'custom'),
                 'title'        => mb_substr((string) ($sec['title'] ?? ''), 0, 255),
                 'description'  => $sec['description'] ?? null,
                 'sort_order'   => (int) ($sec['sort_order'] ?? $order),
                 'is_default'   => 0,
-            ]);
+            ], $ownerEmail));
             $sid = (int) $sectionModel->getInsertID();
             $eOrder = 0;
             foreach ($sec['entries'] ?? [] as $en) {

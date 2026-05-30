@@ -20,6 +20,14 @@ $routes->get('login', 'AuthenController::login');
 $routes->get('oauth', 'AuthenController::callback');
 $routes->get('logout', 'AuthenController::logout');
 
+// Interactive API docs (Swagger UI — คล้าย FastAPI /docs, ไม่ต้อง login)
+$routes->get('docs', 'ApiDocsController::index');
+$routes->get('docs/', 'ApiDocsController::index');
+$routes->get('api/openapi.json', 'ApiDocsController::openapi');
+
+// Curriculum detail API — token only (CURRICULUM_API_TOKEN), ไม่ใช้ session login
+$routes->get('api/curriculum-detail-by-name', 'ApiController::apiGetCurriculumDetailByName', ['filter' => 'curriculumapitoken']);
+
 // Protected Dashboard Routes (requires auth)
 $routes->group('dashboard', ['filter' => 'auth'], function ($routes) {
     $routes->get('/', 'DashboardController::index');
