@@ -409,7 +409,7 @@
                                     '<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">' +
                                         '<div class="min-w-0">' +
                                             '<div class="font-medium text-slate-900">' + esc(p.title || '') + '</div>' +
-                                            (authors ? '<div class="text-sm text-slate-700 mt-1">' + esc(authors) + '</div>' : '') +
+                                            (authors ? '<div class="pub-authors-text text-sm text-slate-700 mt-1">' + esc(authors) + '</div>' : '') +
                                             (creator ? '<div class="text-xs text-slate-600 mt-1">บันทึกโดย: <span class="font-medium text-slate-800">' + esc(creator) + '</span></div>' : '') +
                                             '<div class="text-xs text-slate-600 mt-2">' +
                                                 chip(type) +
@@ -492,6 +492,8 @@
                             var found = [];
                             list.forEach(function (email) { if (teacherMap[email]) found.push(email); });
                             if (!found.length) return;
+                            var authorsText = it.querySelector('.pub-authors-text');
+                            if (authorsText) authorsText.classList.add('hidden');
                             var row = document.createElement('div');
                             row.className = 'pub-teacher-chips mt-2 flex flex-wrap gap-2';
                             row.innerHTML = found.map(function (email) {

@@ -224,7 +224,7 @@
                                         <?= esc($p['title'] ?? '') ?>
                                     </div>
                                     <?php if ($authors !== ''): ?>
-                                        <div class="text-sm text-slate-700 mt-1">
+                                        <div class="pub-authors-text text-sm text-slate-700 mt-1">
                                             <?= esc($authors) ?>
                                         </div>
                                     <?php endif; ?>
@@ -387,11 +387,13 @@
             pubItems.forEach(function (it) {
                 var chipRow = it.querySelector('.pub-teacher-chips');
                 if (!chipRow) return;
+                var authorsText = it.querySelector('.pub-authors-text');
                 var list = String(it.getAttribute('data-author-emails') || '').split(',').map(function (x) { return String(x || '').trim(); }).filter(Boolean);
                 var found = [];
                 list.forEach(function (email) { if (teacherMap[email]) found.push(email); });
                 if (!found.length) return;
                 chipRow.classList.remove('hidden');
+                if (authorsText) authorsText.classList.add('hidden');
                 chipRow.innerHTML = found.map(function (email) {
                     var t = teacherMap[email];
                     return '<span class="' + t.cls + ' rr-chip"><span class="rr-chipDot" aria-hidden="true"></span>' + String(t.name || email).replace(/[&<>"']/g, function (ch) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',\"'\":'&#39;'}[ch]); }) + '</span>';
