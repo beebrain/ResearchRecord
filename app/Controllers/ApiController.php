@@ -47,8 +47,8 @@ class ApiController extends Controller
             // Build query to get active teachers
             $builder = $this->db->table('user u');
             $builder->select('
-                u.uid,
                 u.email,
+                u.email as uid,
                 u.title,
                 u.titleThai,
                 u.gf_name,
@@ -63,7 +63,7 @@ class ApiController extends Controller
                 c.name as curriculum_name,
                 (SELECT COUNT(DISTINCT pa.publication_id) 
                  FROM publication_authors pa 
-                 WHERE pa.author_email = u.email OR pa.uid = u.uid) as publication_count
+                 WHERE pa.author_email = u.email) as publication_count
             ')
             ->join('curriculum c', 'u.curriculum_id = c.id', 'left')
             ->join('faculties f', 'c.faculty_id = f.id', 'left')
@@ -99,7 +99,7 @@ class ApiController extends Controller
                 $engFullName = trim(($teacher['title'] ?? '') . ' ' . ($teacher['gf_name'] ?? '') . ' ' . ($teacher['gl_name'] ?? ''));
                 
                 return [
-                    'uid' => $teacher['uid'],
+                    'uid' => $teacher['email'],
                     'email' => $teacher['email'],
                     'name_thai' => !empty(trim($thaiFullName)) ? $thaiFullName : $engFullName,
                     'name_english' => $engFullName,
@@ -169,7 +169,7 @@ class ApiController extends Controller
             return $this->response->setJSON([
                 'success' => true,
                 'teacher' => [
-                    'uid' => $teacher['uid'],
+                    'uid' => $teacher['email'],
                     'email' => $teacher['email'],
                     'name_thai' => !empty(trim($thaiFullName)) ? $thaiFullName : $engFullName,
                     'name_english' => $engFullName,
@@ -289,8 +289,8 @@ class ApiController extends Controller
                     ->get()
                     ->getRowArray();
 
-                if ($author && !empty($author['user_uid'])) {
-                    $user = $this->userModel->find($author['user_uid']);
+                if ($author && !empty($author['user_email'])) {
+                    $user = $this->userModel->find($author['user_email']);
                 }
             }
 
@@ -303,7 +303,7 @@ class ApiController extends Controller
             }
 
             // Get publications for this user
-            $publications = $this->publicationModel->getPublicationsByAuthor($user['uid']);
+            $publications = $this->publicationModel->getPublicationsByAuthor($user['email']);
 
             // Get curriculum and faculty info
             $curriculum = null;
@@ -343,7 +343,7 @@ class ApiController extends Controller
             return $this->response->setJSON([
                 'success' => true,
                 'teacher' => [
-                    'uid' => $user['uid'],
+                    'uid' => $user['email'],
                     'email' => $user['email'],
                     'name_thai' => !empty(trim($thaiFullName)) ? $thaiFullName : $engFullName,
                     'name_english' => $engFullName,
@@ -395,8 +395,8 @@ class ApiController extends Controller
 
             $builder = $this->db->table('user u');
             $builder->select('
-                u.uid,
                 u.email,
+                u.email as uid,
                 u.title,
                 u.titleThai,
                 u.gf_name,
@@ -426,7 +426,7 @@ class ApiController extends Controller
                 $engFullName = trim(($teacher['title'] ?? '') . ' ' . ($teacher['gf_name'] ?? '') . ' ' . ($teacher['gl_name'] ?? ''));
                 
                 return [
-                    'uid' => $teacher['uid'],
+                    'uid' => $teacher['email'],
                     'email' => $teacher['email'],
                     'name_thai' => !empty(trim($thaiFullName)) ? $thaiFullName : $engFullName,
                     'name_english' => $engFullName,
@@ -500,11 +500,11 @@ class ApiController extends Controller
             $curricula = $this->curriculumModel->where('faculty_id', $facultyId)->where('status', 1)->findAll();
             $chairsMap = [];
             foreach ($curricula as $cur) {
-                if (!empty($cur['chair_id'])) {
-                    if (!isset($chairsMap[$cur['chair_id']])) {
-                        $chairsMap[$cur['chair_id']] = [];
+                if (!empty($cur['chair_email'])) {
+                    if (!isset($chairsMap[$cur['chair_email']])) {
+                        $chairsMap[$cur['chair_email']] = [];
                     }
-                    $chairsMap[$cur['chair_id']][] = $cur['name'];
+                    $chairsMap[$cur['chair_email']][] = $cur['name'];
                 }
             }
 
@@ -525,12 +525,12 @@ class ApiController extends Controller
             foreach ($teachers as $teacher) {
                 $positions = [];
                 
-                if ($teacher['uid'] == $faculty['dean_id']) {
+                if (!empty($teacher['email']) && $teacher['email'] === ($faculty['dean_email'] ?? '')) {
                     $positions[] = 'คณบดี' . (empty($faculty['name']) ? '' : $faculty['name']);
                 }
 
-                if (isset($chairsMap[$teacher['uid']])) {
-                    foreach ($chairsMap[$teacher['uid']] as $curName) {
+                if (isset($chairsMap[$teacher['email']])) {
+                    foreach ($chairsMap[$teacher['email']] as $curName) {
                         $positions[] = 'ประธานหลักสูตร' . $curName;
                     }
                 }
@@ -543,7 +543,7 @@ class ApiController extends Controller
                 $engFullName = trim(($teacher['title'] ?? '') . ' ' . ($teacher['gf_name'] ?? '') . ' ' . ($teacher['gl_name'] ?? ''));
 
                 $personnel[] = [
-                    'uid' => $teacher['uid'],
+                    'uid' => $teacher['email'],
                     'email' => $teacher['email'],
                     'name_thai' => !empty(trim($thaiFullName)) ? $thaiFullName : $engFullName,
                     'name_english' => $engFullName,
@@ -644,18 +644,23 @@ class ApiController extends Controller
                 ]);
             }
 
-            $chairId   = ! empty($curriculum['chair_id']) ? (int) $curriculum['chair_id'] : null;
-            $teachers  = $this->userModel->getCurriculumResponsibleTeachers((int) $curriculum['id'], $chairId, 5);
+            $chairEmail = ! empty($curriculum['chair_email'])
+                ? (string) $curriculum['chair_email']
+                : (! empty($curriculum['chair']['email']) ? (string) $curriculum['chair']['email'] : null);
+            $chairEmail = $chairEmail !== null && $chairEmail !== ''
+                ? \App\Libraries\UserIdentity::normalizeEmail($chairEmail)
+                : null;
+
+            $teachers  = $this->userModel->getCurriculumResponsibleTeachers((int) $curriculum['id'], $chairEmail, 5);
             $personnel = [];
             $allPubIds = [];
             $totalPubs = 0;
 
             foreach ($teachers as $index => $teacher) {
-                $uid      = (int) ($teacher['uid'] ?? 0);
-                $email    = (string) ($teacher['email'] ?? '');
-                $isChair  = $chairId !== null && $uid === $chairId;
-                $role     = (string) ($teacher['role'] ?? 'instructor');
-                $pubs     = $email !== ''
+                $email   = \App\Libraries\UserIdentity::normalizeEmail((string) ($teacher['email'] ?? ''));
+                $isChair = $chairEmail !== null && $email === $chairEmail;
+                $role    = (string) ($teacher['role'] ?? 'instructor');
+                $pubs    = $email !== ''
                     ? $this->publicationModel->getApprovedPublicationsByCanonicalEmail($email)
                     : [];
 
@@ -667,16 +672,15 @@ class ApiController extends Controller
                 $totalPubs += count($formattedPubs);
 
                 $personnel[] = [
-                    'order'            => $index + 1,
-                    'uid'              => $uid,
-                    'email'            => $email,
-                    'name_thai'        => $this->formatTeacherNameThai($teacher),
-                    'name_english'     => $this->formatTeacherNameEnglish($teacher),
-                    'role'             => $role,
-                    'position'         => $this->responsibleRoleLabel($role, $isChair),
-                    'is_chair'         => $isChair,
-                    'publication_count'=> count($formattedPubs),
-                    'publications'     => $formattedPubs,
+                    'order'             => $index + 1,
+                    'email'             => $email,
+                    'name_thai'         => $this->formatTeacherNameThai($teacher),
+                    'name_english'      => $this->formatTeacherNameEnglish($teacher),
+                    'role'              => $role,
+                    'position'          => $this->responsibleRoleLabel($role, $isChair),
+                    'is_chair'          => $isChair,
+                    'publication_count' => count($formattedPubs),
+                    'publications'      => $formattedPubs,
                 ];
             }
 
@@ -684,7 +688,6 @@ class ApiController extends Controller
             if (! empty($curriculum['chair']) && is_array($curriculum['chair'])) {
                 $c = $curriculum['chair'];
                 $chairPayload = [
-                    'uid'          => (int) ($c['uid'] ?? 0),
                     'email'        => $c['email'] ?? '',
                     'name_thai'    => $this->formatTeacherNameThai($c),
                     'name_english' => $this->formatTeacherNameEnglish($c),

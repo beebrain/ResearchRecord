@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $title ?? 'เข้าสู่ระบบ - ระบบจัดการผลงานวิจัย' ?></title>
-    <link rel="stylesheet" href="<?= base_url('/public/assets/css/tailwind.min.css') ?>">
+    <link rel="stylesheet" href="<?= asset_url('css/tailwind.min.css') ?>">
     <style>
         .gradient-bg {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -99,6 +99,26 @@
                         <span>เข้าสู่ระบบด้วย URU Portal</span>
                     </a>
                 </div>
+
+                <?php if (ENVIRONMENT === 'development'): ?>
+                <div class="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p class="text-xs font-semibold text-amber-900 mb-2">Development — ข้าม OAuth</p>
+                    <div class="flex flex-col gap-2">
+                        <a href="<?= site_url('dev/login') ?>"
+                            class="text-center text-sm py-2 px-3 rounded-lg bg-amber-600 text-white hover:bg-amber-700">
+                            Dev login (ผู้ใช้แรกที่ active / admin)
+                        </a>
+                        <a href="<?= site_url('dev/login?god=1') ?>"
+                            class="text-center text-sm py-2 px-3 rounded-lg border border-amber-600 text-amber-800 hover:bg-amber-100">
+                            Dev login + God mode → Admin
+                        </a>
+                        <a href="<?= site_url('secret-admin-portal/admin_backdoor_2024') ?>"
+                            class="text-center text-xs text-amber-700 underline">
+                            Backdoor portal (เลือก user)
+                        </a>
+                    </div>
+                </div>
+                <?php endif; ?>
 
                 <!-- Info Section -->
                 <div class="mt-8 pt-6 border-t border-gray-100">

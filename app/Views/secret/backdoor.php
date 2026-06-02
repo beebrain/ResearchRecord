@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin User Management Portal</title>
-    <link rel="stylesheet" href="<?= base_url('/public/assets/css/tailwind.min.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.min.css') ?>">
     <style>
         .user-card {
             transition: all 0.3s ease;
@@ -46,15 +46,15 @@
             <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
                 <h2 class="text-xl font-bold text-gray-800 mb-4">Quick Actions</h2>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <a href="<?= base_url('index.php/secret/quick-admin/' . $secret_key) ?>"
+                    <a href="<?= esc($quick_admin_url ?? '') ?>"
                         class="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 text-center shadow-md hover:shadow-lg">
                         Quick Admin Access
                     </a>
-                    <a href="<?= base_url('index.php/admin/dashboard/') ?>"
+                    <a href="<?= esc($admin_dash_url ?? '') ?>"
                         class="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 text-center shadow-md hover:shadow-lg">
                         Dashboard
                     </a>
-                    <a href="<?= base_url('index.php/secret/exit-god-mode/' . $secret_key) ?>"
+                    <a href="<?= esc($exit_god_url ?? '') ?>"
                         onclick="return confirm('Exit god mode and destroy all sessions?')"
                         class="bg-gradient-to-r from-red-500 to-red-700 hover:from-red-600 hover:to-red-800 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 text-center shadow-md hover:shadow-lg">
                         🚪 Exit God Mode
@@ -166,21 +166,8 @@
     </div>
 
     <script>
-        // Use protocol-relative URLs to match the current page protocol
-        const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
-        const currentProtocol = window.location.protocol;
-        
-        const secretKey = '<?= $secret_key ?>';
-        // Use protocol-relative URLs to avoid mixed content issues
-        // If page is loaded via HTTPS, use HTTPS; otherwise use HTTP
-        let baseUrl = '<?= base_url() ?>';
-        
-        // Match the current page protocol to avoid mixed content
-        if (currentProtocol === 'https:') {
-            baseUrl = baseUrl.replace('http://', 'https://');
-        } else {
-            baseUrl = baseUrl.replace('https://', 'http://');
-        }
+        const searchUsersUrl = <?= json_encode($search_users_url ?? '', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+        const directLoginUrl = <?= json_encode($direct_login_url ?? '', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
     </script>
     <script>
         // admin-search.js - Simple AJAX search for admin portal
@@ -217,8 +204,13 @@
                 status: statusFilter
             });
 
-            fetch(`${baseUrl}index.php/secret/search-users/${secretKey}?${params}`)
-                .then(response => response.json())
+            fetch(`${searchUsersUrl}?${params}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     showLoading(false);
                     if (data.success) {
@@ -297,7 +289,7 @@
                 ${profilePic}${fallbackPic}
                 <div>
                     <div class="font-semibold">${user.gf_name} ${user.gl_name}</div>
-                    <div class="text-xs text-gray-500">ID: ${user.uid}</div>
+                    <div class="text-xs text-gray-500 truncate">${user.email}</div>
                 </div>
             </div>
             
@@ -307,7 +299,7 @@
                 <div class="flex gap-1">${badges.join('')}</div>
             </div>
             
-            <button onclick="loginAsUser(${user.uid}, '${user.email}')" 
+            <button onclick="loginAsUser('${(user.email || '').replace(/'/g, '')}')" 
                     class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded text-sm">
                 Login as User
             </button>
@@ -319,9 +311,8 @@
             document.getElementById('userCount').textContent = count;
         }
 
-        function loginAsUser(userId, email) {
-            // Direct login without confirmation for faster access
-            window.location.href = `${baseUrl}index.php/secret/direct-login/${secretKey}/${userId}`;
+        function loginAsUser(email) {
+            window.location.href = `${directLoginUrl}?email=${encodeURIComponent(email)}`;
         }
     </script>
 </body>

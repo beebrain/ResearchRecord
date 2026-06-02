@@ -19,7 +19,7 @@ class CurriculumModel extends Model
         'code',
         'degree_level',
         'status',
-        'chair_id'
+        'chair_email',
     ];
 
     protected $useTimestamps = true;
@@ -274,9 +274,15 @@ class CurriculumModel extends Model
         }
 
         $row['chair'] = null;
-        if (! empty($row['chair_id'])) {
+        if (! empty($row['chair_email'])) {
             $userModel = new UserModel();
-            $chair = $userModel->find($row['chair_id']);
+            $chair = $userModel->find($row['chair_email']);
+            if (is_array($chair)) {
+                $row['chair'] = $chair;
+            }
+        } elseif (! empty($row['chair_id'])) {
+            $userModel = new UserModel();
+            $chair = $userModel->find((int) $row['chair_id']);
             if (is_array($chair)) {
                 $row['chair'] = $chair;
             }

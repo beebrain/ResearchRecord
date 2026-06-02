@@ -7,6 +7,7 @@ use App\Models\UserModel;
 use App\Models\AuthorModel;
 use App\Models\PublicationModel;
 use App\Models\PublicationAuthorModel;
+use App\Libraries\UserIdentity;
 
 class PublicationController extends Controller
 {
@@ -30,6 +31,40 @@ class PublicationController extends Controller
         helper('year');
     }
 
+    private function sessionUserEmail(?array $userData = null): string
+    {
+        $userData = $userData ?? $this->session->get('user_data') ?? [];
+        $email    = UserIdentity::sessionEmail();
+        if ($email !== '') {
+            return $email;
+        }
+
+        return UserIdentity::normalizeEmail((string) ($userData['email'] ?? ''));
+    }
+
+    private function userEmailsForAccess(?array $userData = null): array
+    {
+        $email = $this->sessionUserEmail($userData);
+        if ($email === '') {
+            return [];
+        }
+
+        $emails = [$email];
+        $extra  = $this->authorModel->where('user_email', $email)
+            ->where('email IS NOT NULL')
+            ->where('email !=', '')
+            ->findColumn('email') ?? [];
+
+        foreach ($extra as $rowEmail) {
+            $normalized = UserIdentity::normalizeEmail((string) $rowEmail);
+            if ($normalized !== '' && ! in_array($normalized, $emails, true)) {
+                $emails[] = $normalized;
+            }
+        }
+
+        return $emails;
+    }
+
     /**
      * Publications list page
      * Route: GET /publications
@@ -43,7 +78,7 @@ class PublicationController extends Controller
 
         $data = [
             'title' => 'Publications',
-            'user' => $userData,
+            'user' => array_merge($userData, ['email' => UserIdentity::normalizeEmail((string) ($userData['email'] ?? UserIdentity::sessionEmail()))]),
             'is_admin' => $this->isAdmin()
         ];
 
@@ -97,7 +132,7 @@ class PublicationController extends Controller
         try {
             // Get current user
             $userData = $this->session->get('user_data');
-            $userId = $userData['uid'] ?? 00;
+            $userEmail = $this->sessionUserEmail($userData);
 
             // Prepare publication data
             // Normalize year to CE (ค.ศ.) for database storage
@@ -118,7 +153,7 @@ class PublicationController extends Controller
                 'keywords' => $this->request->getPost('keywords'),
                 'notes' => $this->request->getPost('notes'),
                 'ref_url' => $this->request->getPost('ref_url'), // Store file reference or external URL
-                'created_by' => $userId
+                'created_by_email' => $userEmail
             ];
 
             // Save publication
@@ -157,7 +192,6 @@ class PublicationController extends Controller
                                         $authorData['autor_name'] = $existingAuthor['name'];
                                         $authorData['author_affiliation'] = $existingAuthor['affiliation'];
                                         $authorData['author_email'] = $existingAuthor['email'];
-                                        $authorData['uid'] = $existingAuthor['user_id'];
                                     }
                                     // If no existing author found, just use input data without author_id
                                 }
@@ -231,6 +265,8 @@ class PublicationController extends Controller
             $publicationYear = $this->request->getPost('publication_year');
             $publicationYear = normalize_year_to_ce($publicationYear);
 
+            $userEmail = $this->sessionUserEmail($userData);
+
             // Create publication
             $publicationData = [
                 'title' => $this->request->getPost('title'),
@@ -243,7 +279,7 @@ class PublicationController extends Controller
                 'doi' => $this->request->getPost('doi') ?: null,
                 'abstract' => $this->request->getPost('abstract') ?: null,
                 'keywords' => $this->request->getPost('keywords') ?: null,
-                'created_by' => $userData['uid']
+                'created_by_email' => $this->sessionUserEmail($userData)
             ];
 
             $publicationId = $this->publicationModel->insert($publicationData);
@@ -257,7 +293,7 @@ class PublicationController extends Controller
             if (!empty($authorsJson)) {
                 $authors = json_decode($authorsJson, true);
                 if (is_array($authors) && !empty($authors)) {
-                    $this->addAuthors($publicationId, $authors, $userData['uid']);
+                    $this->addAuthors($publicationId, $authors, $userEmail);
                 }
             }
 
@@ -307,9 +343,18 @@ class PublicationController extends Controller
             return redirect()->to('publications')->with('error', 'Publication not found');
         }
 
-        // Check access
-        $userId = $userData['uid'];
-        if (!$this->isAdmin() && $publication['created_by'] != $userId) {
+        $userEmail = $this->sessionUserEmail($userData);
+        $creator   = UserIdentity::normalizeEmail((string) ($publication['created_by_email'] ?? ''));
+        if (! $this->isAdmin() && $creator !== '' && $creator !== $userEmail) {
+            $emails = $this->userEmailsForAccess($userData);
+            $isAuthor = ! empty($emails) && $this->publicationAuthorModel
+                ->where('publication_id', $id)
+                ->whereIn('author_email', $emails)
+                ->countAllResults() > 0;
+            if (! $isAuthor) {
+                return redirect()->to('publications')->with('error', 'Access denied');
+            }
+        } elseif (! $this->isAdmin() && $creator === '') {
             return redirect()->to('publications')->with('error', 'Access denied');
         }
 
@@ -448,15 +493,11 @@ class PublicationController extends Controller
                             'email' => $authorInput['email'] ?? null,
                             'affiliation' => $authorInput['affiliation'] ?? null,
                             'author_id' => null,
-                            'uid' => null,
                             'corresponding' => isset($authorInput['corresponding']) && $authorInput['corresponding'] == '1' ? 1 : 0
                         ];
 
-                        // Priority 1: Use uid if provided from autocomplete
-                        if (!empty($authorInput['uid'])) {
-                            $authorData['uid'] = $authorInput['uid'];
-
-                            // Verify author_id exists before using it
+                        $linkedEmail = UserIdentity::normalizeEmail((string) ($authorInput['user_uid'] ?? $authorInput['uid'] ?? ''));
+                        if ($linkedEmail !== '') {
                             if (!empty($authorInput['author_id'])) {
                                 $authorExists = $this->db->table('authors')
                                     ->where('id', $authorInput['author_id'])
@@ -465,13 +506,14 @@ class PublicationController extends Controller
                                     $authorData['author_id'] = $authorInput['author_id'];
                                 }
                             }
-                        }
-                        // Priority 2: Try to find existing author by email
-                        elseif (!empty($authorInput['email'])) {
+                            if (empty($authorData['email'])) {
+                                $authorData['email'] = $linkedEmail;
+                            }
+                        } elseif (!empty($authorInput['email'])) {
                             $existingAuthor = $this->authorModel->getAuthorlinkUser($authorInput['email']);
                             if ($existingAuthor) {
                                 $authorData['author_id'] = $existingAuthor['id'];
-                                $authorData['uid'] = $existingAuthor['user_id'];
+                                $authorData['email'] = $existingAuthor['email'] ?? $authorInput['email'];
                             }
                         }
 
@@ -589,8 +631,8 @@ class PublicationController extends Controller
             return $this->response->setJSON(['success' => false, 'message' => 'Unauthorized']);
         }
 
-        $userId = $userData['uid'] ?? null;
-        log_message('info', 'Delete Publication - User ID: ' . ($userId ?? 'NULL'));
+        $userEmail = $this->sessionUserEmail($userData);
+        log_message('info', 'Delete Publication - User email: ' . ($userEmail ?: 'NULL'));
 
         // Get publication
         $publication = $this->publicationModel->find($id);
@@ -604,18 +646,18 @@ class PublicationController extends Controller
         log_message('info', 'Delete Publication - Publication Data: ' . json_encode([
             'id' => $publication['id'] ?? 'N/A',
             'title' => substr($publication['title'] ?? 'N/A', 0, 50),
-            'created_by' => $publication['created_by'] ?? 'N/A'
+            'created_by_email' => $publication['created_by_email'] ?? 'N/A'
         ]));
 
         // Check permissions
         $canDelete = $this->canDelete($publication, $userData);
         log_message('info', 'Delete Publication - Can Delete: ' . ($canDelete ? 'YES' : 'NO'));
         log_message('info', 'Delete Publication - Is Admin: ' . ($this->isAdmin() ? 'YES' : 'NO'));
-        log_message('info', 'Delete Publication - Publication created_by: ' . ($publication['created_by'] ?? 'NULL'));
-        log_message('info', 'Delete Publication - User uid: ' . ($userId ?? 'NULL'));
+        log_message('info', 'Delete Publication - Publication created_by_email: ' . ($publication['created_by_email'] ?? 'NULL'));
+        log_message('info', 'Delete Publication - User email: ' . ($userEmail ?: 'NULL'));
 
         if (!$canDelete) {
-            log_message('warning', 'Delete Publication - Access denied for user: ' . ($userId ?? 'unknown'));
+            log_message('warning', 'Delete Publication - Access denied for user: ' . ($userEmail ?: 'unknown'));
             return $this->response->setJSON(['success' => false, 'message' => 'Access denied']);
         }
 
@@ -716,7 +758,7 @@ class PublicationController extends Controller
             $result = [];
             foreach ($users as $user) {
                 $result[] = [
-                    'uid' => $user['uid'],
+                    'uid' => $user['email'],
                     'name' => trim($user['gf_name'] . ' ' . $user['gl_name']),
                     'email' => $user['email'],
                     'major' => $user['major'] ?? ''
@@ -748,17 +790,15 @@ class PublicationController extends Controller
 
         try {
             $authorId = $this->request->getPost('author_id');
-            $userId = $this->request->getPost('user_id');
-
+            $userEmail = UserIdentity::normalizeEmail((string) $this->request->getPost('user_id'));
             $author = $this->authorModel->find($authorId);
-            $user = $this->userModel->find($userId);
+            $user = $this->userModel->find($userEmail);
 
             if (!$author || !$user) {
                 return $this->response->setJSON(['success' => false, 'message' => 'Author or user not found']);
             }
 
-            // Link author to user
-            $this->authorModel->update($authorId, ['user_uid' => $userId]);
+            $this->authorModel->update($authorId, ['user_email' => $userEmail]);
 
             return $this->response->setJSON([
                 'success' => true,
@@ -809,12 +849,11 @@ class PublicationController extends Controller
 
             $users = $builder
                 ->select('
-                uid,
+                email,
                 gf_name,
                 gl_name,
                 thai_name,
                 thai_lastname,
-                email,
                 major,
                 title,
                 titleThai
@@ -843,8 +882,8 @@ class PublicationController extends Controller
                 $displayName = !empty($thaiName) ? $thaiName : $englishName;
 
                 return [
-                    'id' => $user['uid'],
-                    'uid' => $user['uid'],
+                    'id' => $user['email'],
+                    'uid' => $user['email'],
                     'name' => $displayName,
                     'display_name' => $displayName,
                     'english_name' => $englishName,
@@ -911,7 +950,7 @@ class PublicationController extends Controller
             if (!$author) {
                 // Search in user table by email (partial match)
                 $user = $this->userModel->builder()
-                    ->select('uid, email, thai_name, thai_lastname, gf_name, gl_name, titleThai')
+                    ->select('email, thai_name, thai_lastname, gf_name, gl_name, titleThai')
                     ->where('active', 1)
                     ->like('email', $email)
                     ->limit(1)
@@ -925,7 +964,7 @@ class PublicationController extends Controller
                         'id' => null,
                         'name' => !empty($thaiName) ? $thaiName : trim($user['gf_name'] . ' ' . $user['gl_name']),
                         'email' => $user['email'],
-                        'user_uid' => $user['uid'],
+                        'user_uid' => $user['email'],
                         'is_linked' => true,
                         'affiliation' => 'มหาวิทยาลัยราชภัฏอุตรดิตถ์'
                     ];
@@ -942,7 +981,7 @@ class PublicationController extends Controller
                         'name' => $author['name'],
                         'email' => $author['email'],
                         'affiliation' => 'มหาวิทยาลัยราชภัฏอุตรดิตถ์',
-                        'user_uid' => $author['user_uid']
+                        'user_uid' => $author['user_email'] ?? ''
                     ]
                 ];
 
@@ -956,7 +995,7 @@ class PublicationController extends Controller
 
                     // Optional: Get other emails for this user (if needed)
                     if (method_exists($this, 'getAuthorEmailsByUser')) {
-                        $userEmails = $this->getAuthorEmailsByUser($author['user_uid']);
+                        $userEmails = $this->getAuthorEmailsByUser($author['user_email'] ?? '');
                         if (count($userEmails) > 1) {
                             $response['other_emails'] = array_filter($userEmails, function ($e) use ($email) {
                                 return $e !== $email;
@@ -986,13 +1025,11 @@ class PublicationController extends Controller
     /**
      * Helper method to get all author emails for a specific user
      */
-    private function getAuthorEmailsByUser($userUid)
+    private function getAuthorEmailsByUser($userEmail)
     {
-        $authors = $this->authorModel->where('user_uid', $userUid)
-            ->where('email IS NOT NULL')
-            ->findAll();
+        $userEmail = UserIdentity::normalizeEmail((string) $userEmail);
 
-        return array_column($authors, 'email');
+        return $this->authorModel->getAuthorEmailsByUser($userEmail);
     }
 
 
@@ -1097,9 +1134,9 @@ class PublicationController extends Controller
                           u2.thai_name as author_user_thai_name,
                           u2.thai_lastname as author_user_thai_lastname,
                           u2.titleThai as author_user_title_thai')
-                ->join('user u1', 'pa.uid = u1.uid', 'left')
+                ->join('user u1', 'pa.author_email = u1.email', 'left')
                 ->join('authors a', 'pa.author_id = a.id', 'left')
-                ->join('user u2', 'a.user_uid = u2.uid', 'left')
+                ->join('user u2', 'a.user_email = u2.email', 'left')
                 ->where('pa.publication_id', $id)
                 ->orderBy('pa.author_order', 'ASC')
                 ->get()
@@ -1108,8 +1145,8 @@ class PublicationController extends Controller
             // Process authors to get proper names (without titleThai for edit form)
             foreach ($authors as &$author) {
                 // Priority: uid from user table > author_id from authors+user > name from publication_authors
-                if (!empty($author['uid']) && !empty($author['user_thai_name'])) {
-                    // Use user table Thai name (direct link via uid) - WITHOUT titleThai
+                if (!empty($author['author_email']) && !empty($author['user_thai_name'])) {
+                    // Use user table Thai name (direct link via author_email) - WITHOUT titleThai
                     $fullName = trim($author['user_thai_name'] . ' ' . ($author['user_thai_lastname'] ?? ''));
                     // Do NOT include titleThai in author_name for edit form
                     $author['author_name'] = $fullName;
@@ -1176,7 +1213,7 @@ class PublicationController extends Controller
     private function getPublicationAuthors($publicationId)
     {
         return $this->db->table('publication_authors pa')
-            ->select('pa.*, a.user_uid, a.id as author_id')
+            ->select('pa.*, a.user_email, a.id as author_id')
             ->join('authors a', 'pa.author_id = a.id', 'left')
             ->where('pa.publication_id', $publicationId)
             ->orderBy('pa.author_order')
@@ -1189,142 +1226,34 @@ class PublicationController extends Controller
      */
     private function canEdit($publication, $userData)
     {
-        $userId = $userData['uid'] ?? null;
-        if (!$userId) return false;
-
-        // Admin can always edit
         if ($this->isAdmin()) {
             return true;
         }
 
-        // Check if user created the publication
-        if (isset($publication['created_by']) && $publication['created_by'] == $userId) {
+        $email = $this->sessionUserEmail($userData);
+        if ($email === '') {
+            return false;
+        }
+
+        $creator = UserIdentity::normalizeEmail((string) ($publication['created_by_email'] ?? ''));
+        if ($creator !== '' && $creator === $email) {
             return true;
         }
 
-        // Check if user is an author (by author_email)
-        // Similar logic to canDelete
-        $userEmails = [];
-        if (!empty($userData['email'])) {
-            $userEmails[] = $userData['email'];
-        }
+        $emails = $this->userEmailsForAccess($userData);
 
-        // Get all emails from authors table for this user
-        $authorEmails = $this->authorModel->where('user_uid', $userId)
-            ->where('email IS NOT NULL')
-            ->where('email !=', '')
-            ->findColumn('email');
-
-        if ($authorEmails) {
-            foreach ($authorEmails as $email) {
-                if (!in_array($email, $userEmails)) {
-                    $userEmails[] = $email;
-                }
-            }
-        }
-
-        // Check if user is an author by email
-        if (!empty($userEmails)) {
-            $isAuthor = $this->publicationAuthorModel
-                ->where('publication_id', $publication['id'])
-                ->whereIn('author_email', $userEmails)
-                ->countAllResults() > 0;
-
-            if ($isAuthor) {
-                return true;
-            }
-        }
-
-        // Also check by UID in publication_authors
-        $isAuthorByUid = $this->publicationAuthorModel
+        return $emails !== [] && $this->publicationAuthorModel
             ->where('publication_id', $publication['id'])
-            ->where('uid', $userId)
+            ->whereIn('author_email', $emails)
             ->countAllResults() > 0;
-
-        if ($isAuthorByUid) {
-            return true;
-        }
-
-        return false;
     }
 
     /**
      * Check if user can delete publication
-     * User can delete if:
-     * 1. User is admin, OR
-     * 2. User created the publication (created_by), OR
-     * 3. User is an author of the publication (check by author_email from publication_authors)
      */
     private function canDelete($publication, $userData)
     {
-        $userId = $userData['uid'] ?? null;
-        log_message('info', 'canDelete - Checking permissions for user: ' . ($userId ?? 'NULL') . ', publication: ' . ($publication['id'] ?? 'NULL'));
-
-        // Admin can always delete
-        if ($this->isAdmin()) {
-            log_message('info', 'canDelete - User is admin, can delete');
-            return true;
-        }
-
-        // Check if user created the publication
-        if (isset($publication['created_by']) && $publication['created_by'] == $userId) {
-            log_message('info', 'canDelete - User created the publication, can delete');
-            return true;
-        }
-
-        // Check if user is an author (by author_email)
-        // Get all user emails
-        $userEmails = [];
-        if (!empty($userData['email'])) {
-            $userEmails[] = $userData['email'];
-        }
-
-        // Get all emails from authors table for this user
-        $authorEmails = $this->authorModel->where('user_uid', $userId)
-            ->where('email IS NOT NULL')
-            ->where('email !=', '')
-            ->findColumn('email');
-
-        if ($authorEmails) {
-            foreach ($authorEmails as $email) {
-                if (!in_array($email, $userEmails)) {
-                    $userEmails[] = $email;
-                }
-            }
-        }
-
-        log_message('info', 'canDelete - User emails to check: ' . json_encode($userEmails));
-
-        // Check if user is an author by email
-        if (!empty($userEmails)) {
-            $isAuthor = $this->publicationAuthorModel
-                ->where('publication_id', $publication['id'])
-                ->whereIn('author_email', $userEmails)
-                ->countAllResults() > 0;
-
-            log_message('info', 'canDelete - Is author by email: ' . ($isAuthor ? 'YES' : 'NO'));
-
-            if ($isAuthor) {
-                log_message('info', 'canDelete - User is author (by email), can delete');
-                return true;
-            }
-        }
-
-        // Also check by UID
-        $isAuthorByUid = $this->publicationAuthorModel
-            ->where('publication_id', $publication['id'])
-            ->where('uid', $userId)
-            ->countAllResults() > 0;
-
-        log_message('info', 'canDelete - Is author by uid: ' . ($isAuthorByUid ? 'YES' : 'NO'));
-
-        if ($isAuthorByUid) {
-            log_message('info', 'canDelete - User is author (by uid), can delete');
-            return true;
-        }
-
-        log_message('warning', 'canDelete - User cannot delete: not admin, not creator, not author');
-        return false;
+        return $this->canEdit($publication, $userData);
     }
 
     /**

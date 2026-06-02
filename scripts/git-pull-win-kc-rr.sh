@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# git pull Research Record บน win-kc (C:\inetpub\ResearchRecord) ผ่าน Tailscale SSH
+#
+# Usage:
+#   WIN_KC_PASS='...' ./scripts/git-pull-win-kc-rr.sh
+#   WIN_KC_PASS='...' ./scripts/git-pull-win-kc-rr.sh --init   # clone ครั้งแรก
+#   WIN_KC_BRANCH=feature/rr-email-identity WIN_KC_PASS='...' ./scripts/git-pull-win-kc-rr.sh
+#
+set -euo pipefail
+
+HOST="${WIN_KC_HOST:-100.74.66.65}"
+USER="${WIN_KC_USER:-Administrator}"
+REPO="${WIN_KC_RR_REPO:-C:/inetpub/ResearchRecord}"
+BRANCH="${WIN_KC_BRANCH:-master}"
+REPO_URL="${WIN_KC_RR_GIT:-https://github.com/beebrain/ResearchRecord.git}"
+IIS_APP="${WIN_KC_IIS_APP:-recordresearch}"
+IIS_SITE="${WIN_KC_IIS_SITE:-sci.uru.ac.th}"
+IIS_APPPOOL="${WIN_KC_IIS_APPPOOL:-DefaultAppPool}"
+PASS="${SSHPASS:-${WIN_KC_PASS:-${FTP_PASS:-}}}"
+INIT=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --init) INIT=1; shift ;;
+    -h|--help)
+      echo "Usage: WIN_KC_PASS='...' $0 [--init]"
+      exit 0
+      ;;
+    *) echo "Unknown: $1" >&2; exit 2 ;;
+  esac
+done
+
+if [[ -z "$PASS" ]]; then
+  echo "ตั้งรหัสผ่าน: WIN_KC_PASS='...' ./scripts/git-pull-win-kc-rr.sh" >&2
+  exit 1
+fi
+
+if ! command -v tailscale >/dev/null 2>&1; then
+  echo "ไม่พบ tailscale CLI" >&2
+  exit 1
+fi
+
+if ! tailscale status 2>/dev/null | grep -q '100.74.66.65'; then
+  echo "win-kc (100.74.66.65) ไม่อยู่ใน tailnet — เปิด Tailscale ก่อน" >&2
+  exit 1
+fi
+
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || { echo "Missing command: $1" >&2; exit 2; }
+}
+require_cmd sshpass
+
+mkdir -p ~/.ssh
+ssh-keyscan -t ed25519,rsa,ecdsa -H "$HOST" win-kc49a7sh1gd.tail08d9fa.ts.net 2>/dev/null >> ~/.ssh/known_hosts || true
+
+export SSHPASS="$PASS"
+REPO_WIN="${REPO//\//\\\\}"
+
+SSH_BASE=(
+  sshpass -e ssh
+  -F /dev/null
+  -o StrictHostKeyChecking=accept-new
+  -o UserKnownHostsFile="${HOME}/.ssh/known_hosts"
+  -o PubkeyAuthentication=no
+  -o PreferredAuthentications=password,keyboard-interactive
+  -o ProxyCommand="tailscale nc %h 22"
+  -o ConnectTimeout=30
+  "${USER}@${HOST}"
+)
+
+if [[ "$INIT" -eq 1 ]]; then
+  echo "=== init: clone + IIS (ครั้งแรก) ==="
+  INIT_PS="Import-Module WebAdministration; \
+\$root='${REPO_WIN}'; \$pub=\"\$root\\public\"; \
+if (-not (Test-Path \$root)) { git clone --branch ${BRANCH} ${REPO_URL} \$root }; \
+if (-not (Test-Path \"\$root\\.env\") -and (Test-Path \"\$root\\.env.production.example\")) { Copy-Item \"\$root\\.env.production.example\" \"\$root\\.env\" }; \
+if (-not (Get-WebApplication -Site '${IIS_SITE}' -Name '${IIS_APP}' -ErrorAction SilentlyContinue)) { \
+  New-WebApplication -Site '${IIS_SITE}' -Name '${IIS_APP}' -PhysicalPath \$pub -ApplicationPool '${IIS_APPPOOL}' }; \
+\$stub='C:\\inetpub\\newscience\\public\\recordresearch'; \
+if (Test-Path \$stub) { Rename-Item \$stub (\"\$stub.bak.\" + (Get-Date -Format 'yyyyMMdd_HHmmss')) }"
+  "${SSH_BASE[@]}" "powershell -NoProfile -Command \"${INIT_PS}\""
+fi
+
+REMOTE_PULL="cd /d ${REPO_WIN} && git rev-parse --short HEAD && git fetch origin && git checkout ${BRANCH} && git pull origin ${BRANCH} && git rev-parse --short HEAD && git log -1 --oneline"
+
+echo "=== git pull RR บน ${USER}@${HOST} (${REPO} branch ${BRANCH}) ==="
+"${SSH_BASE[@]}" "${REMOTE_PULL}"
+
+echo "=== composer + cache + migrate ==="
+"${SSH_BASE[@]}" "cd /d ${REPO_WIN} && (composer install --no-dev --no-interaction 2>nul || echo skip-composer) && (php spark cache:clear 2>nul || echo skip-cache) && (php spark migrate --all 2>nul || echo skip-migrate)"
+
+echo "=== verify URL (จาก Mac) ==="
+curl -sS -o /dev/null -w "ResearchRecord HTTP %{http_code}\n" --max-time 15 -L "https://sci.uru.ac.th/${IIS_APP}/index.php/auth/login" || true
+
+echo "=== done ==="

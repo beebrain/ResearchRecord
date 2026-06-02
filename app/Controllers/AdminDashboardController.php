@@ -8,6 +8,7 @@ use App\Models\FacultyModel;
 use App\Models\CurriculumModel;
 use App\Models\PublicationModel;
 use App\Helpers\RoleHelper;
+use App\Libraries\UserIdentity;
 
 /**
  * AdminDashboardController
@@ -40,17 +41,17 @@ class AdminDashboardController extends Controller
      */
     private function getUserContext()
     {
-        $userId = $this->session->get('user_id');
-        if (!$userId) {
-            $userData = $this->session->get('user_data');
-            $userId = $userData['uid'] ?? null;
+        $email = UserIdentity::sessionEmail();
+        if ($email === '') {
+            $userData = $this->session->get('user_data') ?? [];
+            $email    = UserIdentity::normalizeEmail((string) ($userData['email'] ?? ''));
         }
 
-        if (!$userId) {
+        if ($email === '') {
             return null;
         }
 
-        $user = $this->userModel->find($userId);
+        $user = $this->userModel->find($email);
         if (!$user) {
             return null;
         }
@@ -71,7 +72,8 @@ class AdminDashboardController extends Controller
 
         return [
             'user' => $user,
-            'userId' => $userId,
+            'userEmail' => $email,
+            'userId' => $email,
             'isSuperAdmin' => $isSuperAdmin,
             'isFacultyAdmin' => $isFacultyAdmin,
             'facultyIds' => $facultyIds
@@ -385,7 +387,7 @@ class AdminDashboardController extends Controller
             f.id as faculty_id,
             f.name as faculty_name,
             f.code as faculty_code,
-            (SELECT COUNT(DISTINCT tc2.teacher_uid) 
+            (SELECT COUNT(DISTINCT tc2.teacher_email) 
              FROM teacher_curriculum tc2 
              WHERE tc2.curriculum_id = c.id AND tc2.status = 1) as teacher_count
         ");
@@ -730,15 +732,14 @@ class AdminDashboardController extends Controller
         if (empty($facultyIds)) {
             // Super Admin: Count all authors
             $authorQuery = $this->db->query("
-                SELECT COUNT(DISTINCT u.uid) as count
+                SELECT COUNT(DISTINCT u.email) as count
                 FROM user u
-                INNER JOIN teacher_curriculum tc ON tc.teacher_uid = u.uid AND tc.status = 1
+                INNER JOIN teacher_curriculum tc ON tc.teacher_email = u.email AND tc.status = 1
                 INNER JOIN publication_authors pa ON (
-                    pa.uid = u.uid 
-                    OR pa.author_email = u.email
+                    pa.author_email = u.email
                     OR EXISTS (
                         SELECT 1 FROM authors a 
-                        WHERE a.id = pa.author_id AND a.user_uid = u.uid
+                        WHERE a.id = pa.author_id AND a.user_email = u.email
                     )
                 )
                 WHERE u.active = 1
@@ -747,16 +748,15 @@ class AdminDashboardController extends Controller
             // Faculty Admin: Filter by managed faculties (same as AdminController::getStatsByFaculties)
             $facultyIdsStr = implode(',', array_map('intval', $facultyIds));
             $authorQuery = $this->db->query("
-                SELECT COUNT(DISTINCT u.uid) as count
+                SELECT COUNT(DISTINCT u.email) as count
                 FROM user u
-                INNER JOIN teacher_curriculum tc ON tc.teacher_uid = u.uid AND tc.status = 1
+                INNER JOIN teacher_curriculum tc ON tc.teacher_email = u.email AND tc.status = 1
                 INNER JOIN curriculum c ON c.id = tc.curriculum_id AND c.faculty_id IN ({$facultyIdsStr})
                 INNER JOIN publication_authors pa ON (
-                    pa.uid = u.uid 
-                    OR pa.author_email = u.email
+                    pa.author_email = u.email
                     OR EXISTS (
                         SELECT 1 FROM authors a 
-                        WHERE a.id = pa.author_id AND a.user_uid = u.uid
+                        WHERE a.id = pa.author_id AND a.user_email = u.email
                     )
                 )
                 INNER JOIN publication_view pv ON pv.id = pa.publication_id AND pv.faculty_id IN ({$facultyIdsStr})
@@ -860,8 +860,8 @@ class AdminDashboardController extends Controller
     {
         // Count total teachers
         $userBuilder = $this->db->table('user u');
-        $userBuilder->select('u.uid');
-        $userBuilder->join('teacher_curriculum tc', 'tc.teacher_uid = u.uid AND tc.status = 1', 'inner');
+        $userBuilder->select('u.email');
+        $userBuilder->join('teacher_curriculum tc', 'tc.teacher_email = u.email AND tc.status = 1', 'inner');
         $userBuilder->where('u.active', 1);
         $userBuilder->distinct();
 
@@ -874,9 +874,9 @@ class AdminDashboardController extends Controller
 
         // Count teachers with education entries
         $eduBuilder = $this->db->table('user u');
-        $eduBuilder->select('u.uid');
-        $eduBuilder->join('teacher_curriculum tc', 'tc.teacher_uid = u.uid AND tc.status = 1', 'inner');
-        $eduBuilder->join('cv_sections cs', "cs.user_uid = u.uid AND cs.type = 'education'", 'inner');
+        $eduBuilder->select('u.email');
+        $eduBuilder->join('teacher_curriculum tc', 'tc.teacher_email = u.email AND tc.status = 1', 'inner');
+        $eduBuilder->join('cv_sections cs', "cs.owner_email_norm = u.email AND cs.type = 'education'", 'inner');
         $eduBuilder->join('cv_entries ce', 'ce.section_id = cs.id', 'inner');
         $eduBuilder->where('u.active', 1);
         $eduBuilder->distinct();
@@ -969,7 +969,7 @@ class AdminDashboardController extends Controller
             f.name,
             f.code,
             (SELECT COUNT(*) FROM curriculum c WHERE c.faculty_id = f.id AND c.status = 1) as curricula_count,
-            (SELECT COUNT(DISTINCT tc.teacher_uid) FROM teacher_curriculum tc 
+            (SELECT COUNT(DISTINCT tc.teacher_email) FROM teacher_curriculum tc 
              INNER JOIN curriculum c ON c.id = tc.curriculum_id 
              WHERE c.faculty_id = f.id AND tc.status = 1) as teachers_count,
             (SELECT COUNT(DISTINCT pv.id) FROM publication_view pv 
@@ -1023,48 +1023,39 @@ class AdminDashboardController extends Controller
         try {
             $limit = $this->request->getGet('limit') ?? 1000; // Default to 1000 for DataTables
 
-            // Get user data from session
-            $userData = $this->session->get('user_data');
+            $userData = $this->session->get('user_data') ?? [];
+            $userEmail = UserIdentity::sessionEmail();
+            if ($userEmail === '') {
+                $userEmail = UserIdentity::normalizeEmail((string) ($userData['email'] ?? ''));
+            }
 
-            // Debug logging
             log_message('debug', 'getDashboardPublications - user_data: ' . json_encode($userData));
 
-            if (!$userData) {
-                log_message('error', 'getDashboardPublications - No user_data in session');
+            if ($userEmail === '') {
+                log_message('error', 'getDashboardPublications - No user email in session');
                 return $this->response->setJSON([
                     'success' => false,
                     'message' => 'User not authenticated'
                 ]);
             }
 
-            $userId = $userData['uid'] ?? null;
+            log_message('debug', 'getDashboardPublications - userEmail: ' . $userEmail);
 
-            log_message('debug', 'getDashboardPublications - userId: ' . $userId);
-
-            if (!$userId) {
-                log_message('error', 'getDashboardPublications - No UID in user_data');
-                return $this->response->setJSON([
-                    'success' => false,
-                    'message' => 'User ID not found'
-                ]);
-            }
-
-            // Check if filter_user_id parameter is provided
-            // If provided, always filter by publications where that user is an author (for "My Publications" page)
-            // This works even in God mode - shows only publications where the user is listed as author
+            // filter_user_id may be email (new PK) or legacy numeric id from old clients
             $filterUserId = $this->request->getGet('filter_user_id');
         if (!empty($filterUserId)) {
-            // Validate that the filter_user_id is numeric
-            $filterUserId = (int)$filterUserId;
-            log_message('debug', 'getDashboardPublications - Filtering by author user ID: ' . $filterUserId . ' (forced filter by email)');
-            
-            // Get user's email for strict matching
-            $targetUser = $this->userModel->find($filterUserId);
-            $targetEmail = $targetUser['email'] ?? '';
-            
-            // Get publications where user is an author (by email match)
+            $filterKey = (string) $filterUserId;
+            if (str_contains($filterKey, '@')) {
+                $targetEmail = UserIdentity::normalizeEmail($filterKey);
+            } else {
+                $targetUser  = $this->userModel->find($filterKey);
+                $targetEmail = UserIdentity::normalizeEmail((string) ($targetUser['email'] ?? ''));
+            }
+
+            log_message('debug', 'getDashboardPublications - Filtering by author email: ' . $targetEmail);
+
             $publications = $this->publicationModel->getPublicationsByEmail($targetEmail, $limit);
-            
+
             log_message('debug', 'getDashboardPublications - Returning ' . count($publications) . ' publications where user is author by email: ' . $targetEmail);
             return $this->response->setJSON([
                 'success' => true,
@@ -1073,7 +1064,7 @@ class AdminDashboardController extends Controller
         }
 
             // Get user from database
-            $user = $this->userModel->find($userId);
+            $user = $this->userModel->find($userEmail);
             if (!$user) {
                 return $this->response->setJSON([
                     'success' => false,
@@ -1084,15 +1075,16 @@ class AdminDashboardController extends Controller
             // Check user role - check both role field and is_admin flag
             $userRole = $user['role'] ?? null;
             $isAdmin = ($user['admin'] ?? 0) == 1 || ($user['is_admin'] ?? 0) == 1;
+            $isGodMode = $this->session->get('god_mode') === true;
 
-            $isSuperAdmin = ($userRole === 'super_admin') || ($isAdmin && $userRole === null);
+            $isSuperAdmin = $isGodMode || ($userRole === 'super_admin') || ($isAdmin && $userRole === null);
             $isFacultyAdmin = ($userRole === 'faculty_admin');
             $isDean = RoleHelper::isDean($user);
             $isChair = RoleHelper::isChair($user);
             $isRegularUser = !$isSuperAdmin && !$isFacultyAdmin && !$isDean && !$isChair;
 
             // Log for debugging
-            log_message('debug', 'getDashboardPublications - User ID: ' . $userId);
+            log_message('debug', 'getDashboardPublications - User email: ' . $userEmail);
             log_message('debug', 'getDashboardPublications - Role: ' . ($userRole ?? 'null'));
             log_message('debug', 'getDashboardPublications - isAdmin: ' . ($isAdmin ? 'true' : 'false'));
             log_message('debug', 'getDashboardPublications - isSuperAdmin: ' . ($isSuperAdmin ? 'true' : 'false'));
@@ -1105,7 +1097,7 @@ class AdminDashboardController extends Controller
             // IMPORTANT: Regular users ALWAYS see only their own publications (by author_email)
             if ($isRegularUser) {
                 // Regular users see only publications where they are authors (using author_email match)
-                log_message('debug', 'getDashboardPublications - Loading user publications by email for user: ' . $userId);
+                log_message('debug', 'getDashboardPublications - Loading user publications by email for user: ' . $userEmail);
                 $publications = $this->publicationModel->getPublicationsByEmail($user['email'] ?? '', $limit);
             } elseif ($isSuperAdmin) {
                 // Super admin sees all publications
@@ -1250,60 +1242,48 @@ class AdminDashboardController extends Controller
                 }
             } else {
                 // Regular users see only their own publications (by author_email)
-                // Get all user emails first
-                $userEmails = [];
-                if ($user && !empty($user['email'])) {
-                    $userEmails[] = $user['email'];
-                }
+                $userEmail = UserIdentity::normalizeEmail((string) ($user['email'] ?? ''));
+                $userEmails = $userEmail !== '' ? [$userEmail] : [];
 
-                // Get all emails from authors table for this user
                 $authorEmails = $this->db->table('authors')
                     ->select('email')
-                    ->where('user_uid', $userId)
+                    ->where('user_email', $userEmail)
                     ->where('email IS NOT NULL')
                     ->where('email !=', '')
                     ->get()
                     ->getResultArray();
 
                 foreach ($authorEmails as $authorEmail) {
-                    if (!empty($authorEmail['email']) && !in_array($authorEmail['email'], $userEmails)) {
-                        $userEmails[] = $authorEmail['email'];
+                    $normalized = UserIdentity::normalizeEmail((string) ($authorEmail['email'] ?? ''));
+                    if ($normalized !== '' && !in_array($normalized, $userEmails, true)) {
+                        $userEmails[] = $normalized;
                     }
                 }
 
-                // Get publication IDs using author_email as PRIMARY condition
                 $publicationIds = $this->db->table('publication_authors pa')
                     ->select('pa.publication_id')
                     ->distinct()
-                    ->join('authors a', 'pa.author_id = a.id', 'left')
-                    ->join('user u', 'pa.uid = u.uid', 'left');
+                    ->join('authors a', 'pa.author_id = a.id', 'left');
 
                 if (!empty($userEmails)) {
                     $publicationIds->groupStart()
                         ->whereIn('pa.author_email', $userEmails)
                         ->orWhereIn('a.email', $userEmails)
-                        ->orWhereIn('u.email', $userEmails)
-                        ->orWhere('pa.uid', $userId)
-                        ->orWhere('a.user_uid', $userId)
+                        ->orWhereIn('a.user_email', $userEmails)
                         ->groupEnd();
                 } else {
-                    $publicationIds->groupStart()
-                        ->where('pa.uid', $userId)
-                        ->orWhere('a.user_uid', $userId)
-                        ->groupEnd();
+                    $publicationIds->where('1=0', null, false);
                 }
 
                 $ids = array_column($publicationIds->get()->getResultArray(), 'publication_id');
 
-                // Filter by publication IDs (from author_email match) or created_by (fallback)
                 if (!empty($ids)) {
                     $builder->groupStart()
                         ->whereIn('id', $ids)
-                        ->orWhere('created_by', $userId) // Keep created_by as fallback
+                        ->orWhere('created_by_email', $userEmail)
                         ->groupEnd();
                 } else {
-                    // Fallback: If no emails found, use created_by
-                    $builder->where('created_by', $userId);
+                    $builder->where('created_by_email', $userEmail);
                 }
             }
 

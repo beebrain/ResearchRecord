@@ -43,6 +43,7 @@ $RECYCLE.BIN/
 # as it poses a security risk.
 .env
 .envserver
+.env.win-kc
 .vagrant
 Vagrantfile
 
@@ -86,6 +87,11 @@ phpunit
 # Composer
 #-------------------------
 vendor/
+
+#-------------------------
+# Deploy artifacts
+#-------------------------
+deploy/*.tgz
 
 #-------------------------
 # IDE / Development Files
@@ -137,3 +143,10 @@ nul
 # Deployment secrets and local rollback backups
 /scripts/ftp_rr.env
 /deploy-backups/
+
+# Playwright E2E
+/node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

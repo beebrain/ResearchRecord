@@ -5,6 +5,8 @@ namespace App\Filters;
 use CodeIgniter\Filters\FilterInterface;
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
+use Config\NewsciencePortal;
+use Config\UruPortalOAuth;
 
 class AuthFilter implements FilterInterface
 {
@@ -14,7 +16,13 @@ class AuthFilter implements FilterInterface
 
         // Check if user is logged in
         if (!$session->get('logged_in')) {
-            return redirect()->to('/login');
+            $oauth = config(UruPortalOAuth::class);
+            if (! $oauth->enabled) {
+                // ข้าม /auth/login (ลด redirect วน) — ไป NS โดยตรง
+                return redirect()->to(config(NewsciencePortal::class)->researchRecordLoginUrl());
+            }
+
+            return redirect()->to('/auth/login');
         }
     }
 

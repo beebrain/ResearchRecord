@@ -11,9 +11,24 @@
 // Ensure BASE_URL is available (fallback to window.BASE_URL or empty string)
 const _BASE_URL = (typeof BASE_URL !== 'undefined') ? BASE_URL : (window.BASE_URL || '');
 
+function appRoute(path) {
+    if (window.API_ENDPOINTS) {
+        const keyMap = {
+            'publications/search-user-names': 'searchUserNames',
+            'publications/search-author-email': 'searchAuthorEmail',
+        };
+        const key = keyMap[path.replace(/^\//, '')];
+        if (key && window.API_ENDPOINTS[key]) {
+            return window.API_ENDPOINTS[key];
+        }
+    }
+    const base = _BASE_URL.replace(/\/+$/, '');
+    return `${base}/index.php?/${path.replace(/^\//, '')}`;
+}
+
 const AuthorNameSearch = {
     config: {
-        searchEndpoint: _BASE_URL + '/index.php/publications/search-user-names',
+        searchEndpoint: appRoute('publications/search-user-names'),
         minSearchLength: 2,
         debounceDelay: 300,
         maxResults: 10,

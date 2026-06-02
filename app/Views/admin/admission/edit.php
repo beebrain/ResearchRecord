@@ -5,11 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>แก้ไขแบบฟอร์มขอเปิดรับนักศึกษาใหม่ - <?= esc($form['curriculum_name_display'] ?? '') ?></title>
-    <link rel="stylesheet" href="<?= base_url('/public/assets/css/tailwind.min.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/vendor/sarabun.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/admin-common.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.min.css') ?>">
+    <link rel="stylesheet" href="<?= asset_url('css/sarabun.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/admin-common.css') ?>">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
-    <script src="<?= base_url('public/assets/js/vendor/jquery-3.6.0.min.js') ?>"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         body {
@@ -52,7 +52,7 @@
                     <p class="text-gray-600">คณะ<?= esc($form['faculty_name'] ?? '-') ?> | หลักสูตร<?= esc($form['curriculum_name_display'] ?? '-') ?></p>
                 </div>
                 <div class="flex gap-2">
-                    <a href="<?= base_url('index.php/admin/admission') ?>" class="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg">← กลับ</a>
+                    <a href="<?= site_url('admin/admission') ?>" class="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg">← กลับ</a>
                     <button type="button" onclick="saveForm()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">💾 บันทึก</button>
                     <button type="button" onclick="saveAndSubmit()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg">📤 บันทึกและส่ง</button>
                 </div>
@@ -505,7 +505,7 @@
 
             <!-- Footer Actions -->
             <div class="bg-white rounded-lg shadow-sm p-4 mt-4 flex justify-end gap-2">
-                <a href="<?= base_url('index.php/admin/admission') ?>" class="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg">← กลับ</a>
+                <a href="<?= site_url('admin/admission') ?>" class="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg">← กลับ</a>
                 <button type="button" onclick="saveForm()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium">💾 บันทึก</button>
                 <button type="button" onclick="saveAndSubmit()" class="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium">📤 บันทึกและส่ง</button>
             </div>
@@ -514,6 +514,9 @@
 
     <script>
         const BASE_URL = '<?= rtrim(base_url(), '/') ?>';
+    </script>
+    <script src="<?= base_url('assets/js/app-routes.js') ?>?v=<?= @filemtime(FCPATH . 'assets/js/app-routes.js') ?: time() ?>"></script>
+    <script>
         const FORM_ID = <?= $form['id'] ?>;
 
         // Toggle incomplete fields visibility
@@ -704,7 +707,7 @@
             }
 
             try {
-                const response = await fetch(`${BASE_URL}/index.php/admin/admission/save/${FORM_ID}`, {
+                const response = await fetch(appRoute('admin/admission/save/' + FORM_ID), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'

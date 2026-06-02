@@ -55,16 +55,29 @@ class DashboardController extends Controller
         return UserIdentity::normalizeEmail((string) ($row['email'] ?? ''));
     }
 
-    private function applyCvOwnerFilter($model, $userUid, string $email)
+    private function sessionOwnerEmail(?array $userData = null): string
     {
-        if ($email !== '' && $this->db->fieldExists('owner_email_norm', 'cv_sections')) {
-            return $model->groupStart()
-                ->where('owner_email_norm', $email)
-                ->orWhere('user_uid', $userUid)
-                ->groupEnd();
+        $userData = $userData ?? $this->session->get('user_data') ?? [];
+
+        $email = $this->currentUserEmail($userData);
+        if ($email !== '') {
+            return $email;
         }
 
-        return $model->where('user_uid', $userUid);
+        return UserIdentity::sessionEmail();
+    }
+
+    private function applyCvOwnerFilter($model, $userUid, string $email)
+    {
+        $email = UserIdentity::normalizeEmail($email);
+        if ($email !== '' && $this->db->fieldExists('owner_email', 'cv_sections')) {
+            return $model->where('owner_email', $email);
+        }
+        if ($email !== '' && $this->db->fieldExists('owner_email_norm', 'cv_sections')) {
+            return $model->where('owner_email_norm', $email);
+        }
+
+        return $model->where('1=0', null, false);
     }
 
     private function sectionBelongsToUser(?array $section, $userUid, string $email): bool
@@ -113,14 +126,14 @@ class DashboardController extends Controller
             return redirect()->to('/login');
         }
 
-        $userData = $this->session->get('user_data');
-        $userId = $userData['uid'];
-        $ownerEmail = $this->currentUserEmail($userData);
+        $userData   = $this->session->get('user_data') ?? [];
+        $ownerEmail = $this->currentUserEmail($userData) ?: UserIdentity::sessionEmail();
+        $userId     = $ownerEmail;
 
-        // Get user's publications with statistics - Using Email only as requested
+        // Get user's publications with statistics - email identity only
         $publications = $ownerEmail !== ''
             ? $this->publicationModel->getPublicationsByCanonicalEmail($ownerEmail)
-            : $this->publicationModel->getPublicationsByAuthor($userId);
+            : [];
         $totalPublications = count($publications);
 
         // Calculate statistics
@@ -168,7 +181,7 @@ class DashboardController extends Controller
         }
 
         // Get user profile data
-        $userProfile = $this->userProfileModel->getOrCreate($userId);
+        $userProfile = $this->userProfileModel->getOrCreate($ownerEmail) ?? [];
 
         // Get CV sections with entries for dashboard display
         $cvSections = $this->applyCvOwnerFilter($this->cvSectionModel, $userId, $ownerEmail)
@@ -258,14 +271,14 @@ class DashboardController extends Controller
             return redirect()->to('/login');
         }
 
-        $userData = $this->session->get('user_data');
-        $userId = $userData['uid'];
+        $userData = $this->session->get('user_data') ?? [];
+        $ownerEmail = $this->sessionOwnerEmail($userData);
 
         // Use getPublicationsByAuthor to match by author_email (same condition as publications/index page)
-        $publications = $this->publicationModel->getPublicationsByAuthor($userId);
+        $publications = $this->publicationModel->getPublicationsByAuthor($ownerEmail);
         $totalPublications = count($publications);
 
-        $uniqueAuthors = $this->authorModel->getUserUniqueAuthors($userId) ?? [];
+        $uniqueAuthors = $this->authorModel->getUserUniqueAuthors($ownerEmail) ?? [];
         $recentPublications = array_slice($publications, 0, 6);
         $featuredPublications = array_slice($publications, 0, 3);
 
@@ -293,7 +306,7 @@ class DashboardController extends Controller
         }
 
         // Get user profile data from user_profile table
-        $userProfile = $this->userProfileModel->getOrCreate($userData['uid']);
+        $userProfile = $this->userProfileModel->getOrCreate($ownerEmail) ?? [];
 
         $expertise = [];
         if (!empty($userProfile['expertise'])) {
@@ -309,7 +322,7 @@ class DashboardController extends Controller
         ]);
 
         // Get CV sections with entries for display
-        $cvSections = $this->applyCvOwnerFilter($this->cvSectionModel, $userId, $ownerEmail)
+        $cvSections = $this->applyCvOwnerFilter($this->cvSectionModel, $ownerEmail, $ownerEmail)
             ->orderBy('sort_order', 'ASC')
             ->findAll();
 
@@ -352,10 +365,10 @@ class DashboardController extends Controller
         }
 
         $userData = $this->session->get('user_data') ?? [];
-        $ownerEmail = $this->currentUserEmail($userData);
+        $ownerEmail = $this->sessionOwnerEmail($userData);
 
         // Get user profile data from user_profile table
-        $userProfile = $this->userProfileModel->getOrCreate($userData['uid']);
+        $userProfile = $this->userProfileModel->getOrCreate($ownerEmail) ?? [];
 
         $socialLinks = [
             'google_scholar' => $userProfile['google_scholar'] ?? '',
@@ -389,11 +402,12 @@ class DashboardController extends Controller
         }
 
         $userData = $this->session->get('user_data') ?? [];
+        $ownerEmail = $this->sessionOwnerEmail($userData);
 
         // No longer auto-creating default sections - users create their own or import from ORCID
 
         // Get CV sections with entries
-        $cvSections = $this->applyCvOwnerFilter($this->cvSectionModel, $userData['uid'], $ownerEmail)
+        $cvSections = $this->applyCvOwnerFilter($this->cvSectionModel, $ownerEmail, $ownerEmail)
             ->orderBy('sort_order', 'ASC')
             ->orderBy('id', 'ASC')
             ->findAll();
@@ -436,12 +450,13 @@ class DashboardController extends Controller
         }
 
         $userData = $this->session->get('user_data') ?? [];
+        $ownerEmail = $this->sessionOwnerEmail($userData);
 
         // Get user profile data
-        $userProfile = $this->userProfileModel->getOrCreate($userData['uid']);
+        $userProfile = $this->userProfileModel->getOrCreate($ownerEmail) ?? [];
 
         // Get publications count
-        $publications = $this->publicationModel->getPublicationsByAuthor($userData['uid']);
+        $publications = $this->publicationModel->getPublicationsByAuthor($ownerEmail);
 
         $data = [
             'title' => 'ORCID Sync',
@@ -481,7 +496,6 @@ class DashboardController extends Controller
         $isAjax = $this->request->isAJAX();
 
         $sectionData = $this->withCvOwnerEmail([
-            'user_uid' => $userData['uid'],
             'type' => $type,
             'title' => $title,
             'description' => $description ?: null,
@@ -515,8 +529,7 @@ class DashboardController extends Controller
 
         try {
             $userData = $this->session->get('user_data');
-            $userUid = $userData['uid'];
-            $ownerEmail = $this->currentUserEmail($userData);
+            $ownerEmail = $this->sessionOwnerEmail($userData);
 
             $orderJson = $this->request->getPost('order');
             $order = json_decode($orderJson, true);
@@ -531,7 +544,7 @@ class DashboardController extends Controller
 
                 // Verify ownership
                 $section = $this->cvSectionModel->find($sectionId);
-                if ($this->sectionBelongsToUser($section, $userUid, $ownerEmail)) {
+                if ($this->sectionBelongsToUser($section, $ownerEmail, $ownerEmail)) {
                     $this->cvSectionModel->update($sectionId, ['sort_order' => $sortOrder]);
                 }
             }
@@ -559,21 +572,16 @@ class DashboardController extends Controller
         }
 
         try {
-            $userData = $this->session->get('user_data');
-            $userUid = $userData['uid'];
-            $ownerEmail = $this->currentUserEmail($userData);
+            $userData = $this->session->get('user_data') ?? [];
+            $ownerEmail = $this->sessionOwnerEmail($userData);
 
             $section = $this->cvSectionModel->find($sectionId);
-
-            // Debug logging
-            log_message('debug', "deleteCvSection: sectionId=$sectionId, userUid=$userUid, section_user_uid=" . ($section['user_uid'] ?? 'null'));
 
             if (!$section) {
                 return $this->response->setJSON(['success' => false, 'message' => 'ไม่พบหัวข้อ (not found)']);
             }
 
-            // Use == for loose comparison (handles string/int mismatch)
-            if (!$this->sectionBelongsToUser($section, $userUid, $ownerEmail)) {
+            if (!$this->sectionBelongsToUser($section, $ownerEmail, $ownerEmail)) {
                 return $this->response->setJSON(['success' => false, 'message' => 'ไม่พบหัวข้อ (permission)']);
             }
 
@@ -606,9 +614,8 @@ class DashboardController extends Controller
         }
 
         try {
-            $userData = $this->session->get('user_data');
-            $userUid = $userData['uid'];
-            $ownerEmail = $this->currentUserEmail($userData);
+            $userData = $this->session->get('user_data') ?? [];
+            $ownerEmail = $this->sessionOwnerEmail($userData);
 
             $sectionId = $this->request->getPost('section_id');
             $orderJson = $this->request->getPost('order');
@@ -620,7 +627,7 @@ class DashboardController extends Controller
 
             // Verify section ownership
             $section = $this->cvSectionModel->find($sectionId);
-            if (!$this->sectionBelongsToUser($section, $userUid, $ownerEmail)) {
+            if (!$this->sectionBelongsToUser($section, $ownerEmail, $ownerEmail)) {
                 return $this->response->setJSON(['success' => false, 'message' => 'ไม่มีสิทธิ์']);
             }
 
@@ -657,18 +664,17 @@ class DashboardController extends Controller
             return redirect()->to('/login');
         }
 
-        $userData = $this->session->get('user_data');
+        $userData = $this->session->get('user_data') ?? [];
+        $ownerEmail = $this->sessionOwnerEmail($userData);
         $entryId = $this->request->getPost('entry_id');
         $sectionId = $this->request->getPost('section_id');
-        $ownerEmail = $this->currentUserEmail($userData);
 
         if (!$sectionId) {
             return redirect()->back()->with('error', 'ไม่พบหัวข้อที่ต้องการบันทึก');
         }
 
         $section = $this->cvSectionModel->find($sectionId);
-        $userId = $userData['uid'];
-        if (!$this->sectionBelongsToUser($section, $userId, $ownerEmail)) {
+        if (!$this->sectionBelongsToUser($section, $ownerEmail, $ownerEmail)) {
             return redirect()->back()->with('error', 'ไม่สามารถเข้าถึงหัวข้อได้');
         }
 
@@ -711,8 +717,7 @@ class DashboardController extends Controller
 
             // Ensure ownership
             $existingSection = $this->cvSectionModel->find($existingEntry['section_id']);
-            $userId = $userData['uid'];
-            if (!$this->sectionBelongsToUser($existingSection, $userId, $ownerEmail)) {
+            if (!$this->sectionBelongsToUser($existingSection, '', $ownerEmail)) {
                 return redirect()->back()->with('error', 'ไม่สามารถแก้ไขรายการนี้ได้');
             }
 
@@ -765,8 +770,7 @@ class DashboardController extends Controller
         }
 
         $section = $this->cvSectionModel->find($entry['section_id']);
-        $userId = $userData['uid'];
-        if (!$this->sectionBelongsToUser($section, $userId, $ownerEmail)) {
+        if (!$this->sectionBelongsToUser($section, '', $ownerEmail)) {
             if ($this->request->isAJAX()) {
                 return $this->response->setJSON(['success' => false, 'message' => 'Access denied']);
             }
@@ -812,8 +816,7 @@ class DashboardController extends Controller
         }
 
         $section = $this->cvSectionModel->find($entry['section_id']);
-        $userId = $userData['uid'];
-        if (!$this->sectionBelongsToUser($section, $userId, $ownerEmail)) {
+        if (!$this->sectionBelongsToUser($section, '', $ownerEmail)) {
             return redirect()->back()->with('error', 'ไม่สามารถลบรายการนี้ได้');
         }
 
@@ -838,7 +841,8 @@ class DashboardController extends Controller
             return redirect()->to('/login');
         }
 
-        $userData = $this->session->get('user_data');
+        $userData = $this->session->get('user_data') ?? [];
+        $ownerEmail = $this->sessionOwnerEmail($userData);
 
         $bio = trim($this->request->getPost('bio') ?? '');
         $expertise = trim($this->request->getPost('expertise') ?? '');
@@ -848,7 +852,7 @@ class DashboardController extends Controller
             'expertise' => $expertise
         ];
 
-        $this->userProfileModel->updateByUserUid($userData['uid'], $updateData);
+        $this->userProfileModel->updateByUserEmail($ownerEmail, $updateData);
 
         // Update session data if needed (optional, for backward compatibility)
         if (isset($userData['bio'])) {
@@ -879,7 +883,8 @@ class DashboardController extends Controller
             return redirect()->to('/login');
         }
 
-        $userData = $this->session->get('user_data');
+        $userData = $this->session->get('user_data') ?? [];
+        $ownerEmail = $this->sessionOwnerEmail($userData);
 
         $updateData = [
             'phone' => trim($this->request->getPost('phone') ?? ''),
@@ -891,7 +896,7 @@ class DashboardController extends Controller
             'linkedin' => trim($this->request->getPost('linkedin') ?? ''),
         ];
 
-        $this->userProfileModel->updateByUserUid($userData['uid'], $updateData);
+        $this->userProfileModel->updateByUserEmail($ownerEmail, $updateData);
 
         // Update session data if needed (optional, for backward compatibility)
         foreach ($updateData as $key => $value) {
@@ -1018,10 +1023,10 @@ class DashboardController extends Controller
             $educationsGroup = array_filter($orcidItems, fn($item) => ($item['category'] ?? '') === 'education');
 
             // Save ORCID data to user profile
-            $userData = $this->session->get('user_data');
-            $userId = $userData['uid'] ?? null;
+            $userData = $this->session->get('user_data') ?? [];
+            $ownerEmail = $this->sessionOwnerEmail($userData);
 
-            if ($userId) {
+            if ($ownerEmail !== '') {
                 $profileData = [
                     'orcid' => 'https://orcid.org/' . $orcidId,
                     'orcid_id' => $orcidId,
@@ -1033,9 +1038,9 @@ class DashboardController extends Controller
                     $profileData['institution'] = $currentEmployment;
                 }
 
-                $this->userProfileModel->updateByUserUid($userId, $profileData);
+                $this->userProfileModel->updateByUserEmail($ownerEmail, $profileData);
 
-                log_message('info', 'ORCID data synced for user: ' . $userId . ' ORCID: ' . $orcidId);
+                log_message('info', 'ORCID data synced for user: ' . $ownerEmail . ' ORCID: ' . $orcidId);
             }
 
             // Process and import publications (check for duplicates using put_code)
@@ -1043,7 +1048,7 @@ class DashboardController extends Controller
             $skippedCount = 0;
             $errorCount = 0;
 
-            if ($userId && !empty($works)) {
+            if ($ownerEmail !== '' && !empty($works)) {
                 foreach ($works as $work) {
                     $workUrl = $work['url'] ?? '';
                     $workTitle = $work['title'] ?? '';
@@ -1122,7 +1127,7 @@ class DashboardController extends Controller
                             'publication_year' => $workYear,
                             'doi' => $doi ?: null,
                             'ref_url' => $workUrl ?: null,
-                            'created_by' => $userId,
+                            'created_by_email' => $ownerEmail,
                             'approve' => 0, // Pending approval
                             'notes' => 'Imported from ORCID iD: ' . $orcidId,
                             'orcid_put_code' => $putCode
@@ -1132,17 +1137,16 @@ class DashboardController extends Controller
 
                         if ($publicationId) {
                             // Add user as author
-                            $user = $this->userModel->find($userId);
+                            $user = $this->userModel->find($ownerEmail);
                             if ($user && !empty($user['email'])) {
                                 // Check if author exists
                                 $author = $this->authorModel->where('email', $user['email'])->first();
 
                                 if (!$author) {
-                                    // Create author record - authors table only has: email, user_uid, created_by
                                     $authorData = [
                                         'email' => $user['email'],
-                                        'user_uid' => $userId,
-                                        'created_by' => $userId
+                                        'user_email' => $ownerEmail,
+                                        'created_by_email' => $ownerEmail,
                                     ];
                                     $authorId = $this->authorModel->insert($authorData);
                                 } else {
@@ -1165,7 +1169,6 @@ class DashboardController extends Controller
                                         'author_name' => $authorName,
                                         'author_email' => $user['email'],
                                         'author_order' => 1,
-                                        'uid' => $userId
                                     ]);
                                 }
                             }
@@ -1507,8 +1510,8 @@ class DashboardController extends Controller
                 $existingAuthor = $this->authorModel->where('email', $authorEmail)->first();
                 if ($existingAuthor) {
                     $authorId = $existingAuthor['id'];
-                    if (!empty($existingAuthor['user_uid'])) {
-                        $matchedUser = $this->userModel->find($existingAuthor['user_uid']);
+                    if (!empty($existingAuthor['user_email'])) {
+                        $matchedUser = $this->userModel->find($existingAuthor['user_email']);
                     }
                 }
 
@@ -1522,16 +1525,16 @@ class DashboardController extends Controller
                             // Create new author record with email
                             $authorData = [
                                 'email' => $authorEmail,
-                                'user_uid' => $matchedUser['uid'],
-                                'created_by' => $matchedUser['uid']
+                                'user_email' => $matchedUser['email'],
+                                'created_by_email' => $matchedUser['email']
                             ];
                             $authorId = $this->authorModel->insert($authorData);
                             log_message('info', "Created author record from matched user email: {$authorEmail}, uid={$matchedUser['uid']}");
                         } else {
                             // Update existing author record with user_uid if not set
-                            if (empty($existingAuthor['user_uid'])) {
+                            if (empty($existingAuthor['user_email'])) {
                                 $this->authorModel->update($authorId, [
-                                    'user_uid' => $matchedUser['uid']
+                                    'user_email' => $matchedUser['email']
                                 ]);
                                 log_message('info', "Updated author record with user_uid: email={$authorEmail}, uid={$matchedUser['uid']}");
                             }
@@ -1544,7 +1547,7 @@ class DashboardController extends Controller
             if (!$matchedUser && !empty($authorOrcid)) {
                 $orcidProfile = $this->userProfileModel->where('orcid_id', $authorOrcid)->first();
                 if ($orcidProfile) {
-                    $matchedUser = $this->userModel->find($orcidProfile['user_uid']);
+                    $matchedUser = $this->userModel->find($orcidProfile['user_email']);
                 }
             }
 
@@ -1569,15 +1572,15 @@ class DashboardController extends Controller
                         if ($existingAuthor) {
                             $authorId = $existingAuthor['id'];
                             // Update user_uid if not set
-                            if (empty($existingAuthor['user_uid'])) {
-                                $this->authorModel->update($authorId, ['user_uid' => $matchedUser['uid']]);
+                            if (empty($existingAuthor['user_email'])) {
+                                $this->authorModel->update($authorId, ['user_email' => $matchedUser['email']]);
                             }
                         } else {
                             // Create author record with user's email
                             $authorData = [
                                 'email' => $userEmail,
-                                'user_uid' => $matchedUser['uid'],
-                                'created_by' => $matchedUser['uid']
+                                'user_email' => $matchedUser['email'],
+                                'created_by_email' => $matchedUser['email']
                             ];
                             $authorId = $this->authorModel->insert($authorData);
                             log_message('info', "Created author record from Thai name match: email={$userEmail}, uid={$matchedUser['uid']}");
@@ -1611,15 +1614,15 @@ class DashboardController extends Controller
                         if ($existingAuthor) {
                             $authorId = $existingAuthor['id'];
                             // Update user_uid if not set
-                            if (empty($existingAuthor['user_uid'])) {
-                                $this->authorModel->update($authorId, ['user_uid' => $matchedUser['uid']]);
+                            if (empty($existingAuthor['user_email'])) {
+                                $this->authorModel->update($authorId, ['user_email' => $matchedUser['email']]);
                             }
                         } else {
                             // Create author record with user's email
                             $authorData = [
                                 'email' => $userEmail,
-                                'user_uid' => $matchedUser['uid'],
-                                'created_by' => $matchedUser['uid']
+                                'user_email' => $matchedUser['email'],
+                                'created_by_email' => $matchedUser['email']
                             ];
                             $authorId = $this->authorModel->insert($authorData);
                             log_message('info', "Created author record from English name match: email={$userEmail}, uid={$matchedUser['uid']}");
@@ -1661,15 +1664,15 @@ class DashboardController extends Controller
                         if ($existingAuthor) {
                             $authorId = $existingAuthor['id'];
                             // Update user_uid if not set
-                            if (empty($existingAuthor['user_uid'])) {
-                                $this->authorModel->update($authorId, ['user_uid' => $matchedUser['uid']]);
+                            if (empty($existingAuthor['user_email'])) {
+                                $this->authorModel->update($authorId, ['user_email' => $matchedUser['email']]);
                             }
                         } else {
                             // Create author record with user's email
                             $authorData = [
                                 'email' => $userEmail,
-                                'user_uid' => $matchedUser['uid'],
-                                'created_by' => $matchedUser['uid']
+                                'user_email' => $matchedUser['email'],
+                                'created_by_email' => $matchedUser['email']
                             ];
                             $authorId = $this->authorModel->insert($authorData);
                             log_message('info', "Created author record from generic name match: email={$userEmail}, uid={$matchedUser['uid']}");
@@ -1691,17 +1694,17 @@ class DashboardController extends Controller
                 if ($existingAuthor) {
                     $authorId = $existingAuthor['id'];
                     // Update user_uid if we found a match and it's not set
-                    if ($matchedUser && empty($existingAuthor['user_uid'])) {
+                    if ($matchedUser && empty($existingAuthor['user_email'])) {
                         $this->authorModel->update($authorId, [
-                            'user_uid' => $matchedUser['uid']
+                            'user_email' => $matchedUser['email']
                         ]);
                     }
                 } else {
                     // Create new author record with email
                     $authorData = [
                         'email' => $authorEmail,
-                        'user_uid' => $matchedUser['uid'] ?? null,
-                        'created_by' => $matchedUser['uid'] ?? $this->session->get('user_data')['uid'] ?? null
+                        'user_email' => $matchedUser['email'] ?? null,
+                        'created_by_email' => $matchedUser['email'] ?? $this->sessionOwnerEmail()
                     ];
                     $authorId = $this->authorModel->insert($authorData);
                     log_message('info', "Created new author record: email={$authorEmail}, user_uid=" . ($matchedUser['uid'] ?? 'NULL'));
@@ -1717,8 +1720,8 @@ class DashboardController extends Controller
                     // Create author record with user's email
                     $authorData = [
                         'email' => $userEmail,
-                        'user_uid' => $matchedUser['uid'],
-                        'created_by' => $matchedUser['uid']
+                        'user_email' => $matchedUser['email'],
+                        'created_by_email' => $matchedUser['email']
                     ];
                     $authorId = $this->authorModel->insert($authorData);
                     log_message('info', "Created author record from matched user: email={$userEmail}, uid={$matchedUser['uid']}");
@@ -1778,8 +1781,8 @@ class DashboardController extends Controller
                 ]);
             }
 
-            $userData = $this->session->get('user_data');
-            $userId = $userData['uid'] ?? null;
+            $userData = $this->session->get('user_data') ?? [];
+            $ownerEmail = $this->sessionOwnerEmail($userData);
 
             // Call ngrok ORCID API to get works list
             $apiUrl = "https://sweetmeal-loamless-wendy.ngrok-free.dev/webhook/sync-orcid?orcid_id=" . urlencode($orcidId);
@@ -1926,7 +1929,7 @@ class DashboardController extends Controller
                     $profileData['expertise'] = $keywords;
                 }
                 if (!empty($profileData)) {
-                    $this->userProfileModel->updateByUserUid($userId, $profileData);
+                    $this->userProfileModel->updateByUserEmail($ownerEmail, $profileData);
                     log_message('info', 'ORCID Sync: Updated user profile with bio and keywords');
                 }
             }
@@ -1979,7 +1982,7 @@ class DashboardController extends Controller
                         'volume' => $pubDetails['volume'] ?? '',
                         'pages' => $pubDetails['pages'] ?? '',
                         'keywords' => is_array($pubDetails['keywords'] ?? null) ? implode(', ', $pubDetails['keywords']) : ($pubDetails['keywords'] ?? ''),
-                        'created_by' => $userId,
+                        'created_by_email' => $ownerEmail,
                         'approve' => 0,
                         'notes' => 'Imported from ORCID iD: ' . $orcidId . ' (with DOI details)',
                         'orcid_put_code' => $putCode
@@ -1996,7 +1999,7 @@ class DashboardController extends Controller
                         'publication_year' => $work['pub_year'] ?? null,
                         'doi' => $doi,
                         'ref_url' => $workUrl,
-                        'created_by' => $userId,
+                        'created_by_email' => $ownerEmail,
                         'approve' => 0,
                         'notes' => 'Imported from ORCID iD: ' . $orcidId,
                         'orcid_put_code' => $putCode
@@ -2032,7 +2035,7 @@ class DashboardController extends Controller
                         }
                     } else {
                         // Add current user as author fallback
-                        $user = $this->userModel->find($userId);
+                        $user = $this->userModel->find($ownerEmail);
                         if ($user) {
                             $author = $this->authorModel->where('email', $user['email'])->first();
                             $authorId = $author ? $author['id'] : null;
@@ -2040,8 +2043,8 @@ class DashboardController extends Controller
                             if (!$authorId) {
                                 $authorId = $this->authorModel->insert([
                                     'email' => $user['email'],
-                                    'user_uid' => $userId,
-                                    'created_by' => $userId
+                                    'user_email' => $user['email'],
+                                    'created_by_email' => $ownerEmail
                                 ]);
                             }
 
@@ -2051,7 +2054,6 @@ class DashboardController extends Controller
                                 'email' => $user['email'],
                                 'affiliation' => null,
                                 'author_id' => $authorId,
-                                'uid' => $userId,
                                 'corresponding' => 0
                             ];
                         }
@@ -2131,8 +2133,8 @@ class DashboardController extends Controller
         try {
             $input = $this->request->getJSON(true);
 
-            $userData = $this->session->get('user_data');
-            $userId = $userData['uid'] ?? null;
+            $userData = $this->session->get('user_data') ?? [];
+            $ownerEmail = $this->sessionOwnerEmail($userData);
 
             $title = $input['title'] ?? '';
             $doi = $input['doi'] ?? '';
@@ -2143,7 +2145,7 @@ class DashboardController extends Controller
             log_message('info', '=== SaveOrcidPublication ===');
             log_message('info', 'Title: ' . $title);
             log_message('info', 'DOI: ' . $doi);
-            log_message('info', 'User: ' . $userId);
+            log_message('info', 'User: ' . $ownerEmail);
 
             // Check if publication already exists by DOI, put_code, or ref_url
             $existingPub = null;
@@ -2184,7 +2186,7 @@ class DashboardController extends Controller
                 log_message('info', 'Publication exists (ID: ' . $publicationId . '), updating...');
 
                 // Don't overwrite certain fields
-                unset($pubData['created_by']);
+                unset($pubData['created_by'], $pubData['created_by_email']);
                 $pubData['updated_at'] = date('Y-m-d H:i:s');
 
                 $this->publicationModel->update($publicationId, $pubData);
@@ -2195,7 +2197,7 @@ class DashboardController extends Controller
                 log_message('info', 'Publication updated, old authors removed for re-matching');
             } else {
                 // INSERT new publication
-                $pubData['created_by'] = $userId;
+                $pubData['created_by_email'] = $ownerEmail;
                 $pubData['approve'] = 0;
 
                 $publicationId = $this->publicationModel->insert($pubData);
@@ -2235,8 +2237,8 @@ class DashboardController extends Controller
                     $matchMethod = null;
 
                     if ($preMatchedUid) {
-                        // UID already matched by JavaScript via AJAX search
-                        $matchedUser = $this->userModel->find($preMatchedUid);
+                        // Email already matched by JavaScript via AJAX search
+                        $matchedUser = $this->userModel->find(UserIdentity::normalizeEmail((string) $preMatchedUid));
                         if ($matchedUser) {
                             $matchMethod = 'pre_matched_by_ajax';
                             log_message('info', "  ✓ Pre-matched by AJAX: uid={$preMatchedUid}");
@@ -2249,8 +2251,8 @@ class DashboardController extends Controller
                         $existingAuthor = $this->authorModel->getAuthorlinkUser($authorEmail);
                         if ($existingAuthor) {
                             $authorId = $existingAuthor['id'];
-                            if (!empty($existingAuthor['user_uid'])) {
-                                $matchedUser = $this->userModel->find($existingAuthor['user_uid']);
+                            if (!empty($existingAuthor['user_email'])) {
+                                $matchedUser = $this->userModel->find($existingAuthor['user_email']);
                                 if ($matchedUser) {
                                     $matchMethod = 'email_via_author';
                                     log_message('info', "  ✓ Matched via author email: {$authorEmail} → uid={$matchedUser['uid']}");
@@ -2272,14 +2274,14 @@ class DashboardController extends Controller
                                         $authorId = $existingAuthorByEmail['id'];
                                         // Update user_uid if not set
                                         if (empty($existingAuthorByEmail['user_uid'])) {
-                                            $this->authorModel->update($authorId, ['user_uid' => $matchedUser['uid']]);
+                                            $this->authorModel->update($authorId, ['user_email' => $matchedUser['email']]);
                                         }
                                     } else {
                                         // Create new author record
                                         $authorId = $this->authorModel->insert([
                                             'email' => $authorEmail,
-                                            'user_uid' => $matchedUser['uid'],
-                                            'created_by' => $matchedUser['uid']
+                                            'user_email' => $matchedUser['email'],
+                                            'created_by_email' => $matchedUser['email']
                                         ]);
                                         log_message('info', "Created author record from email match: email={$authorEmail}, uid={$matchedUser['uid']}");
                                     }
@@ -2291,7 +2293,7 @@ class DashboardController extends Controller
                     // Fallback: Try name search if not matched yet
                     if (!$matchedUser && !empty($authorNameTh)) {
                         $matchedUser = $this->userModel->builder()
-                            ->select('uid, email, thai_name, thai_lastname, gf_name, gl_name')
+                            ->select('email, thai_name, thai_lastname, gf_name, gl_name')
                             ->where('active', 1)
                             ->like("CONCAT(thai_name, ' ', thai_lastname)", trim($authorNameTh))
                             ->limit(1)
@@ -2308,13 +2310,13 @@ class DashboardController extends Controller
                                 if ($existingAuthorByName) {
                                     $authorId = $existingAuthorByName['id'];
                                     if (empty($existingAuthorByName['user_uid'])) {
-                                        $this->authorModel->update($authorId, ['user_uid' => $matchedUser['uid']]);
+                                        $this->authorModel->update($authorId, ['user_email' => $matchedUser['email']]);
                                     }
                                 } else {
                                     $authorId = $this->authorModel->insert([
                                         'email' => $userEmail,
-                                        'user_uid' => $matchedUser['uid'],
-                                        'created_by' => $matchedUser['uid']
+                                        'user_email' => $matchedUser['email'],
+                                        'created_by_email' => $matchedUser['email']
                                     ]);
                                     log_message('info', "Created author record from Thai name match: email={$userEmail}, uid={$matchedUser['uid']}");
                                 }
@@ -2324,7 +2326,7 @@ class DashboardController extends Controller
 
                     if (!$matchedUser && !empty($authorNameEn)) {
                         $matchedUser = $this->userModel->builder()
-                            ->select('uid, email, thai_name, thai_lastname, gf_name, gl_name')
+                            ->select('email, thai_name, thai_lastname, gf_name, gl_name')
                             ->where('active', 1)
                             ->like("CONCAT(gf_name, ' ', gl_name)", trim($authorNameEn))
                             ->limit(1)
@@ -2341,13 +2343,13 @@ class DashboardController extends Controller
                                 if ($existingAuthorByName) {
                                     $authorId = $existingAuthorByName['id'];
                                     if (empty($existingAuthorByName['user_uid'])) {
-                                        $this->authorModel->update($authorId, ['user_uid' => $matchedUser['uid']]);
+                                        $this->authorModel->update($authorId, ['user_email' => $matchedUser['email']]);
                                     }
                                 } else {
                                     $authorId = $this->authorModel->insert([
                                         'email' => $userEmail,
-                                        'user_uid' => $matchedUser['uid'],
-                                        'created_by' => $matchedUser['uid']
+                                        'user_email' => $matchedUser['email'],
+                                        'created_by_email' => $matchedUser['email']
                                     ]);
                                     log_message('info', "Created author record from English name match: email={$userEmail}, uid={$matchedUser['uid']}");
                                 }
@@ -2428,7 +2430,7 @@ class DashboardController extends Controller
                 }
             } else {
                 // No authors from AI, add current user as author
-                $user = $this->userModel->find($userId);
+                $user = $this->userModel->find($ownerEmail);
                 if ($user) {
                     $author = $this->authorModel->where('email', $user['email'])->first();
                     $authorId = $author ? $author['id'] : null;
@@ -2436,8 +2438,8 @@ class DashboardController extends Controller
                     if (!$authorId) {
                         $authorId = $this->authorModel->insert([
                             'email' => $user['email'],
-                            'user_uid' => $userId,
-                            'created_by' => $userId
+                            'user_email' => $user['email'],
+                            'created_by_email' => $ownerEmail
                         ]);
                     }
 
@@ -2448,7 +2450,6 @@ class DashboardController extends Controller
                         'author_name' => $authorName ?: $user['email'],
                         'author_email' => $user['email'],
                         'author_order' => 1,
-                        'uid' => $userId
                     ]);
                     $matchedCount = 1;
                     $matchedAuthorsInfo[] = [
@@ -2496,8 +2497,8 @@ class DashboardController extends Controller
         }
 
         try {
-            $userData = $this->session->get('user_data');
-            $userUid = $userData['uid'];
+            $userData = $this->session->get('user_data') ?? [];
+            $ownerEmail = $this->sessionOwnerEmail($userData);
 
             $input = $this->request->getJSON(true);
             $education = $input['education'] ?? [];
@@ -2507,34 +2508,33 @@ class DashboardController extends Controller
             log_message('info', 'saveOrcidCv - Employment items: ' . count($employment));
 
             // Ensure education section exists (the only mandatory default)
-            $this->ensureDefaultCvSections($userUid, $ownerEmail);
+            $this->ensureDefaultCvSections('', $ownerEmail);
 
             // Get education section
-            $educationSection = $this->applyCvOwnerFilter($this->cvSectionModel, $userUid, $ownerEmail)
+            $educationSection = $this->applyCvOwnerFilter($this->cvSectionModel, '', $ownerEmail)
                 ->where('type', 'education')
                 ->first();
 
             // Get or create 'work' section if employment data exists
-            $employmentSection = $this->applyCvOwnerFilter($this->cvSectionModel, $userUid, $ownerEmail)
+            $employmentSection = $this->applyCvOwnerFilter($this->cvSectionModel, '', $ownerEmail)
                 ->where('type', 'work')
                 ->first();
 
             // Auto-create work section if we have employment data from ORCID
             if (!$employmentSection && !empty($employment)) {
-                $maxOrder = $this->applyCvOwnerFilter($this->cvSectionModel, $userUid, $ownerEmail)
+                $maxOrder = $this->applyCvOwnerFilter($this->cvSectionModel, '', $ownerEmail)
                     ->selectMax('sort_order')
                     ->first();
                 $newOrder = ($maxOrder['sort_order'] ?? 0) + 1;
 
                 $this->cvSectionModel->insert($this->withCvOwnerEmail([
-                    'user_uid' => $userUid,
                     'type' => 'work',
                     'title' => 'Work Experience',
                     'sort_order' => $newOrder,
                     'is_default' => 0 // Not a default section, created from ORCID data
                 ], $ownerEmail));
 
-                $employmentSection = $this->applyCvOwnerFilter($this->cvSectionModel, $userUid, $ownerEmail)
+                $employmentSection = $this->applyCvOwnerFilter($this->cvSectionModel, '', $ownerEmail)
                     ->where('type', 'work')
                     ->first();
 
@@ -2675,6 +2675,11 @@ class DashboardController extends Controller
             return redirect()->to('/login');
         }
 
+        $ownerEmail = $this->sessionOwnerEmail($this->session->get('user_data') ?? []);
+        if ($ownerEmail === '') {
+            return redirect()->to('/login');
+        }
+
         $rules = [
             'profile_picture' => [
                 'rules' => 'uploaded[profile_picture]|is_image[profile_picture]|max_size[profile_picture,5120]|ext_in[profile_picture,jpg,jpeg,png,gif,webp]',
@@ -2764,7 +2769,7 @@ class DashboardController extends Controller
             }
         }
 
-        $this->userModel->update($userData['uid'], [
+        $this->userModel->update($ownerEmail, [
             'profile_picture' => $publicUrl
         ]);
 
@@ -2831,7 +2836,7 @@ class DashboardController extends Controller
             return redirect()->to('/login');
         }
 
-        $userId = $this->session->get('user_data')['uid'];
+        $ownerEmail = $this->sessionOwnerEmail($this->session->get('user_data') ?? []);
 
         // Validation rules
         $validationRules = [
@@ -2864,7 +2869,7 @@ class DashboardController extends Controller
                 'isbn' => $this->request->getPost('isbn'),
                 'keywords' => $this->request->getPost('keywords'),
                 'notes' => $this->request->getPost('notes'),
-                'created_by' => $userId
+                'created_by_email' => $ownerEmail
             ];
 
             $publicationId = $this->publicationModel->insert($publicationData);
@@ -2878,7 +2883,7 @@ class DashboardController extends Controller
             $authors = json_decode($authorsJson, true);
 
             if ($authors && is_array($authors)) {
-                $this->savePublicationAuthors($publicationId, $authors, $userId);
+                $this->savePublicationAuthors($publicationId, $authors, $ownerEmail);
             }
 
             $db->transComplete();
@@ -2906,8 +2911,8 @@ class DashboardController extends Controller
             return redirect()->to('/login');
         }
 
-        $userId = $this->session->get('user_data')['uid'];
-        $publication = $this->publicationModel->getPublicationWithAuthors($id, $userId);
+        $ownerEmail = $this->sessionOwnerEmail($this->session->get('user_data') ?? []);
+        $publication = $this->publicationModel->getPublicationWithAuthors($id, $ownerEmail);
 
         if (!$publication) {
             return redirect()->to('/dashboard')
@@ -2932,11 +2937,11 @@ class DashboardController extends Controller
             return redirect()->to('/login');
         }
 
-        $userId = $this->session->get('user_data')['uid'];
+        $ownerEmail = $this->sessionOwnerEmail();
 
         // Check ownership
         $publication = $this->publicationModel->where('id', $id)
-            ->where('created_by', $userId)
+            ->where('created_by_email', $ownerEmail)
             ->first();
 
         if (!$publication) {
@@ -2987,7 +2992,7 @@ class DashboardController extends Controller
             $authors = json_decode($authorsJson, true);
 
             if ($authors && is_array($authors)) {
-                $this->savePublicationAuthors($id, $authors, $userId);
+                $this->savePublicationAuthors($id, $authors, $ownerEmail);
             }
 
             $db->transComplete();
@@ -3015,11 +3020,11 @@ class DashboardController extends Controller
             return redirect()->to('/login');
         }
 
-        $userId = $this->session->get('user_data')['uid'];
+        $ownerEmail = $this->sessionOwnerEmail();
 
         // Check ownership
         $publication = $this->publicationModel->where('id', $id)
-            ->where('created_by', $userId)
+            ->where('created_by_email', $ownerEmail)
             ->first();
 
         if (!$publication) {
@@ -3045,13 +3050,13 @@ class DashboardController extends Controller
             return $this->response->setJSON(['error' => 'Unauthorized']);
         }
 
-        $userId = $this->session->get('user_data')['uid'];
+        $ownerEmail = $this->sessionOwnerEmail();
         $searchTerm = $this->request->getGet('search');
         $typeFilter = $this->request->getGet('type');
         $yearFilter = $this->request->getGet('year');
 
         $publications = $this->publicationModel->searchUserPublications(
-            $userId,
+            $ownerEmail,
             $searchTerm,
             $typeFilter,
             $yearFilter
@@ -3073,8 +3078,8 @@ class DashboardController extends Controller
             return redirect()->to('/login');
         }
 
-        $userId = $this->session->get('user_data')['uid'];
-        $authors = $this->authorModel->getUserAuthorsWithStats($userId);
+        $ownerEmail = $this->sessionOwnerEmail();
+        $authors = $this->authorModel->getUserAuthorsWithStats($ownerEmail);
 
         $data = [
             'title' => 'Author Management',
@@ -3094,9 +3099,8 @@ class DashboardController extends Controller
             return redirect()->to('/login');
         }
 
-        $userId = $this->session->get('user_data')['uid'];
-        // Use getPublicationsByAuthor to match by author_email (same condition as other pages)
-        $publications = $this->publicationModel->getPublicationsByAuthor($userId);
+        $ownerEmail = $this->sessionOwnerEmail();
+        $publications = $this->publicationModel->getPublicationsByAuthor($ownerEmail);
 
         switch ($format) {
             case 'csv':
@@ -3111,8 +3115,10 @@ class DashboardController extends Controller
     /**
      * Save Publication Authors with Email Matching
      */
-    private function savePublicationAuthors($publicationId, $authors, $userId)
+    private function savePublicationAuthors($publicationId, $authors, $ownerEmail)
     {
+        $ownerEmail = UserIdentity::normalizeEmail((string) $ownerEmail);
+
         foreach ($authors as $index => $authorData) {
             $authorName = trim($authorData['name'] ?? '');
             $authorEmail = trim($authorData['email'] ?? '');
@@ -3132,8 +3138,8 @@ class DashboardController extends Controller
                     $linkedAuthorId = $existingAuthor['id'];
 
                     // Use registered name if linked to user
-                    if ($existingAuthor['user_uid']) {
-                        $user = $this->userModel->find($existingAuthor['user_uid']);
+                    if (! empty($existingAuthor['user_email'])) {
+                        $user = $this->userModel->find($existingAuthor['user_email']);
                         if ($user) {
                             $finalAuthorName = trim($user['gf_name'] . ' ' . $user['gl_name']);
                         }
@@ -3148,20 +3154,16 @@ class DashboardController extends Controller
 
                         // Create new author linked to user
                         $newAuthorData = [
-                            'name' => $finalAuthorName,
                             'email' => $authorEmail,
-                            'affiliation' => $authorAffiliation ?: $user['major'],
-                            'user_uid' => $user['uid'],
-                            'created_by' => $userId
+                            'user_email' => $user['email'],
+                            'created_by_email' => $ownerEmail,
                         ];
                         $linkedAuthorId = $this->authorModel->insert($newAuthorData);
                     } else {
                         // Create new unlinked author
                         $newAuthorData = [
-                            'name' => $authorName,
                             'email' => $authorEmail,
-                            'affiliation' => $authorAffiliation,
-                            'created_by' => $userId
+                            'created_by_email' => $ownerEmail,
                         ];
                         $linkedAuthorId = $this->authorModel->insert($newAuthorData);
                     }
@@ -3262,7 +3264,6 @@ class DashboardController extends Controller
 
             if (!$existing) {
                 $this->cvSectionModel->insert($this->withCvOwnerEmail([
-                    'user_uid' => $userUid,
                     'type' => $default['type'],
                     'title' => $default['title'],
                     'sort_order' => $index + 1,

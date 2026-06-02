@@ -6,7 +6,7 @@ use CodeIgniter\Filters\FilterInterface;
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
 use App\Helpers\RoleHelper;
-use App\Models\UserModel;
+use App\Libraries\UserIdentity;
 
 class AdminAuthFilter implements FilterInterface
 {
@@ -43,6 +43,11 @@ class AdminAuthFilter implements FilterInterface
                     'message' => 'Unauthorized: Please login first'
                 ])->setStatusCode(401);
             }
+            $oauth = config(\Config\UruPortalOAuth::class);
+            if (! $oauth->enabled) {
+                return redirect()->to(config(\Config\NewsciencePortal::class)->researchRecordLoginUrl());
+            }
+
             return redirect()->to('/auth/login');
         }
 
@@ -58,8 +63,7 @@ class AdminAuthFilter implements FilterInterface
         }
 
         // Check if user is Dean or Chair
-        $userModel = new UserModel();
-        $user = $userModel->find($userData['uid'] ?? 0);
+        $user = UserIdentity::sessionUser();
 
         if ($user && (RoleHelper::isDean($user) || RoleHelper::isChair($user))) {
             return; // Dean or Chair access granted

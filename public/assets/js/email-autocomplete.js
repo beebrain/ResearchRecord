@@ -10,10 +10,18 @@
 // Ensure BASE_URL is available (fallback to window.BASE_URL or empty string)
 const _BASE_URL_EMAIL = (typeof BASE_URL !== 'undefined') ? BASE_URL : (window.BASE_URL || '');
 
+function appRouteEmail(path) {
+    if (window.API_ENDPOINTS?.searchAuthorEmail && path === 'publications/search-author-email') {
+        return window.API_ENDPOINTS.searchAuthorEmail;
+    }
+    const base = _BASE_URL_EMAIL.replace(/\/+$/, '');
+    return `${base}/index.php?/${path.replace(/^\//, '')}`;
+}
+
 const EmailAutoComplete = {
     config: {
         debounceDelay: 500,
-        apiEndpoint: _BASE_URL_EMAIL + '/index.php/publications/search-author-email',
+        apiEndpoint: appRouteEmail('publications/search-author-email'),
         cache: new Map(),
         maxCacheSize: 100
     },

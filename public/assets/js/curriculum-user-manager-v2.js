@@ -79,7 +79,7 @@ window.removecurrilumn = function (uid, curriculumId, buttonElement) {
 
             // Use jQuery AJAX
             $.ajax({
-                url: BASE_URL + '/index.php/user/removeFromCurriculum',
+                url: appRoute('user/removeFromCurriculum'),
                 type: 'POST',
                 dataType: 'json',
                 data: {
@@ -166,7 +166,7 @@ window.handleRemoveMemberDirect = function (userId, curriculumId, userName, curr
 
             // Use jQuery AJAX
             $.ajax({
-                url: BASE_URL + '/index.php/user/removeFromCurriculum',
+                url: appRoute('user/removeFromCurriculum'),
                 type: 'POST',
                 dataType: 'json',
                 data: {
@@ -255,7 +255,7 @@ function initializeApp() {
  */
 function loadFaculties() {
     $.ajax({
-        url: BASE_URL + '/index.php/admin/getFaculties',
+        url: appRoute('admin/getFaculties'),
         type: 'GET',
         dataType: 'json',
         beforeSend: function (xhr) {
@@ -321,7 +321,7 @@ function populateFacultyFilter() {
  * Load all users with curriculum info
  */
 function loadUsers(search = '', facultyId = 'all') {
-    const url = BASE_URL + '/index.php/admin/getAllUsersForCurriculumManagement';
+    const url = appRoute('admin/getAllUsersForCurriculumManagement?');
     const params = {};
 
     if (search) {
@@ -368,7 +368,7 @@ function loadUsers(search = '', facultyId = 'all') {
  * Load curriculums by faculty with members
  */
 function loadCurriculums(facultyId = 'all') {
-    const url = BASE_URL + '/index.php/admin/getCurriculumsByFacultyWithMembers';
+    const url = appRoute('admin/getCurriculumsByFacultyWithMembers?');
     const params = {};
 
     if (facultyId) {
@@ -854,7 +854,7 @@ function assignUserToCurriculum(userId, curriculumId, curriculumName) {
     }
 
     $.ajax({
-        url: BASE_URL + '/index.php/user/updateCurriculum',
+        url: appRoute('user/updateCurriculum'),
         type: 'POST',
         dataType: 'json',
         data: {
@@ -1025,7 +1025,7 @@ async function handleRemoveMember(e, button) {
     try {
         console.log('Sending remove request...', { userId, curriculumId });
 
-        const response = await fetch(`${BASE_URL}/index.php/user/removeFromCurriculum`, {
+        const response = await fetch(appRoute('user/removeFromCurriculum'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -1188,7 +1188,7 @@ function loadUsersForChair(curriculumId, currentChairId = null) {
     }
     
     $.ajax({
-        url: BASE_URL + '/index.php/admin/getUsersForDeanSelection',
+        url: appRoute('admin/getUsersForDeanSelection?'),
         method: 'GET',
         dataType: 'json',
         data: {
@@ -1256,7 +1256,7 @@ window.saveCurriculumChair = function() {
     }
     
     $.ajax({
-        url: BASE_URL + '/index.php/admin/setCurriculumChair',
+        url: appRoute('admin/setCurriculumChair'),
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify({

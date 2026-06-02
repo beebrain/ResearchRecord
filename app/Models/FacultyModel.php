@@ -17,7 +17,7 @@ class FacultyModel extends Model
         'name',
         'code',
         'status',
-        'dean_id'
+        'dean_email'
     ];
 
     protected $useTimestamps = true;
@@ -44,7 +44,7 @@ class FacultyModel extends Model
     public function getWithCurriculumCount()
     {
         return $this->select('faculties.*, COUNT(curriculum.id) as curriculum_count,
-                dean.uid as dean_uid,
+                dean.email as dean_uid,
                 dean.titleThai as dean_title,
                 dean.title as dean_title_en,
                 dean.thai_name as dean_name,
@@ -52,7 +52,7 @@ class FacultyModel extends Model
                 dean.gf_name as dean_gf_name,
                 dean.gl_name as dean_gl_name')
             ->join('curriculum', 'curriculum.faculty_id = faculties.id', 'left')
-            ->join('user as dean', 'dean.uid = faculties.dean_id', 'left')
+            ->join('user as dean', 'dean.email = faculties.dean_email', 'left')
             ->groupBy('faculties.id')
             ->findAll();
     }

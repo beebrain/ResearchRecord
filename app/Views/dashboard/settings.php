@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= esc($title ?? 'Settings') ?></title>
-    <link rel="stylesheet" href="<?= base_url('/public/assets/css/tailwind.min.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.min.css') ?>">
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
@@ -31,14 +31,14 @@
     <div class="max-w-5xl mx-auto px-4 mb-6">
         <div class="flex items-center justify-between bg-white rounded-xl shadow-sm px-4 py-3 border border-gray-100">
             <div class="flex items-center gap-4">
-                <a href="<?= base_url('index.php/dashboard') ?>" class="text-gray-500 hover:text-gray-700 text-sm">← กลับ Dashboard</a>
+                <a href="<?= site_url('dashboard') ?>" class="text-gray-500 hover:text-gray-700 text-sm">← กลับ Dashboard</a>
                 <span class="text-gray-300">|</span>
                 <span class="font-semibold text-gray-700">⚙️ Settings</span>
             </div>
             <div class="flex items-center gap-2">
-                <a href="<?= base_url('index.php/dashboard/cv') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">📄 ดู CV</a>
-                <a href="<?= base_url('index.php/dashboard/cv-manage') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">📝 จัดการ CV</a>
-                <a href="<?= base_url('index.php/dashboard/orcid') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">🔗 ORCID</a>
+                <a href="<?= site_url('dashboard/cv') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">📄 ดู CV</a>
+                <a href="<?= site_url('dashboard/cv-manage') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">📝 จัดการ CV</a>
+                <a href="<?= site_url('dashboard/orcid') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">🔗 ORCID</a>
             </div>
         </div>
     </div>
@@ -76,9 +76,9 @@
                     <!-- Quick Links -->
                     <h3 class="section-title">Quick Links</h3>
                     <div class="space-y-2">
-                        <a href="<?= base_url('index.php/dashboard/cv') ?>" class="block text-sm text-gray-600 hover:text-gray-800">→ View CV</a>
-                        <a href="<?= base_url('index.php/dashboard/cv-manage') ?>" class="block text-sm text-gray-600 hover:text-gray-800">→ Manage CV Sections</a>
-                        <a href="<?= base_url('index.php/dashboard/orcid') ?>" class="block text-sm text-gray-600 hover:text-gray-800">→ ORCID Sync</a>
+                        <a href="<?= site_url('dashboard/cv') ?>" class="block text-sm text-gray-600 hover:text-gray-800">→ View CV</a>
+                        <a href="<?= site_url('dashboard/cv-manage') ?>" class="block text-sm text-gray-600 hover:text-gray-800">→ Manage CV Sections</a>
+                        <a href="<?= site_url('dashboard/orcid') ?>" class="block text-sm text-gray-600 hover:text-gray-800">→ ORCID Sync</a>
                     </div>
                 </div>
 
@@ -86,7 +86,7 @@
                 <div class="w-2/3 p-6">
                     <!-- Profile Form -->
                     <h3 class="section-title">Professional Profile</h3>
-                    <form id="profileForm" action="<?= base_url('index.php/dashboard/settings/profile-summary') ?>" method="POST" class="mb-8">
+                    <form id="profileForm" action="<?= site_url('dashboard/settings/profile-summary') ?>" method="POST" class="mb-8">
                         <?= csrf_field() ?>
                         <div class="space-y-4">
                             <div>
@@ -105,7 +105,7 @@
 
                     <!-- Contact Form -->
                     <h3 class="section-title">Contact Information</h3>
-                    <form id="contactForm" action="<?= base_url('index.php/dashboard/settings/contact') ?>" method="POST">
+                    <form id="contactForm" action="<?= site_url('dashboard/settings/contact') ?>" method="POST">
                         <?= csrf_field() ?>
                         <div class="grid grid-cols-2 gap-4 mb-4">
                             <div>
@@ -143,7 +143,7 @@
             formData.append('profile_picture', e.target.files[0]);
             formData.append('<?= csrf_token() ?>', '<?= csrf_hash() ?>');
 
-            const res = await fetch('<?= base_url('index.php/dashboard/profile-picture') ?>', {
+            const res = await fetch('<?= site_url('dashboard/profile-picture') ?>', {
                 method: 'POST',
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest'

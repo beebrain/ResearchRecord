@@ -11,12 +11,13 @@ $adminFlag = $userData['admin'] ?? 0;
 
 // Get user data for Dean/Chair checks
 $userModel = new UserModel();
-$user = $userModel->find($userData['uid'] ?? 0);
+$userEmail = \App\Libraries\UserIdentity::normalizeEmail((string) ($userData['email'] ?? session()->get('user_email') ?? ''));
+$user      = $userEmail !== '' ? $userModel->find($userEmail) : null;
 
 // ========== NAVIGATION ROLE CHECK LOG START ==========
 log_message('info', '========== NAVIGATION ROLE CHECK START ==========');
 log_message('info', 'Navigation - User Data: ' . json_encode([
-    'uid' => $userData['uid'] ?? 'N/A',
+    'email' => $userEmail ?? ($userData['email'] ?? 'N/A'),
     'role' => $userRole,
     'is_admin' => $isAdmin,
     'admin' => $adminFlag,
@@ -94,7 +95,7 @@ $currentUri = service('uri')->getPath();
     <div class="p-6">
         <nav class="space-y-2">
             <!-- Dashboard - Available to all admins -->
-            <a href="<?= base_url('index.php/admin/dashboard') ?>"
+            <a href="<?= site_url('admin/dashboard') ?>"
                 class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'admin/dashboard') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
                 📊 แดชบอร์ด
             </a>
@@ -111,27 +112,27 @@ $currentUri = service('uri')->getPath();
                 log_message('info', 'Navigation - Rendering SUPER ADMIN menu');
             ?>
                 <!-- Super Admin sees all menus -->
-                <a href="<?= base_url('index.php/admin/publications/manage') ?>"
+                <a href="<?= site_url('admin/publications/manage') ?>"
                     class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'publications/manage') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
                     📚 จัดการผลงานวิจัย
                 </a>
 
-                <a href="<?= base_url('index.php/admin/publications/summary') ?>"
+                <a href="<?= site_url('admin/publications/summary') ?>"
                     class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'publications/summary') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
                     📊 สรุปผลงานวิจัย
                 </a>
 
-                <a href="<?= base_url('index.php/admin/manageEmails') ?>"
+                <a href="<?= site_url('admin/manageEmails') ?>"
                     class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'manageEmails') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
                     👥 ผู้แต่ง
                 </a>
 
-                <a href="<?= base_url('index.php/admin/manage-user-curriculum') ?>"
+                <a href="<?= site_url('admin/manage-user-curriculum') ?>"
                     class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'manage-user-curriculum') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
                     🎓 หลักสูตรของผู้ใช้
                 </a>
 
-                <a href="<?= base_url('index.php/admin/faculty-curriculum') ?>"
+                <a href="<?= site_url('admin/faculty-curriculum') ?>"
                     class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'faculty-curriculum') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
                     🏛️ คณะและหลักสูตร
                 </a>
@@ -139,17 +140,17 @@ $currentUri = service('uri')->getPath();
                 <?php
                 log_message('info', 'Navigation - Rendering User Roles menu (Super Admin only)');
                 ?>
-                <a href="<?= base_url('index.php/admin/admission') ?>"
+                <a href="<?= site_url('admin/admission') ?>"
                     class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'admission') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
                     📋 แบบฟอร์มเปิดรับ นศ.
                 </a>
 
-                <a href="<?= base_url('index.php/admin/education') ?>"
+                <a href="<?= site_url('admin/education') ?>"
                     class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'admin/education') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
                     🎓 ประวัติการศึกษา
                 </a>
 
-                <a href="<?= base_url('index.php/admin/user-roles') ?>"
+                <a href="<?= site_url('admin/user-roles') ?>"
                     class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'user-roles') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
                     🔐 บทบาทผู้ใช้
                 </a>
@@ -158,27 +159,27 @@ $currentUri = service('uri')->getPath();
                 log_message('info', 'Navigation - Rendering FACULTY ADMIN menu (User Roles should NOT appear)');
             ?>
                 <!-- Faculty Admin sees limited menus -->
-                <a href="<?= base_url('index.php/admin/publications/manage') ?>"
+                <a href="<?= site_url('admin/publications/manage') ?>"
                     class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'publications/manage') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
                     📚 จัดการผลงานวิจัย
                 </a>
 
-                <a href="<?= base_url('index.php/admin/publications/summary') ?>"
+                <a href="<?= site_url('admin/publications/summary') ?>"
                     class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'publications/summary') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
                     📊 สรุปผลงานวิจัย
                 </a>
 
-                <a href="<?= base_url('index.php/admin/manage-user-curriculum') ?>"
+                <a href="<?= site_url('admin/manage-user-curriculum') ?>"
                     class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'manage-user-curriculum') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
                     🎓 หลักสูตรของผู้ใช้
                 </a>
 
-                <a href="<?= base_url('index.php/admin/admission') ?>"
+                <a href="<?= site_url('admin/admission') ?>"
                     class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'admission') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
                     📋 แบบฟอร์มเปิดรับ นศ.
                 </a>
 
-                <a href="<?= base_url('index.php/admin/education') ?>"
+                <a href="<?= site_url('admin/education') ?>"
                     class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'admin/education') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
                     🎓 ประวัติการศึกษา
                 </a>
@@ -187,17 +188,17 @@ $currentUri = service('uri')->getPath();
                 log_message('info', 'Navigation - Rendering DEAN menu');
             ?>
                 <!-- Dean sees: Dashboard, Publications, Summary, Admission -->
-                <a href="<?= base_url('index.php/admin/publications/manage') ?>"
+                <a href="<?= site_url('admin/publications/manage') ?>"
                     class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'publications/manage') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
                     📚 จัดการผลงานวิจัย
                 </a>
 
-                <a href="<?= base_url('index.php/admin/publications/summary') ?>"
+                <a href="<?= site_url('admin/publications/summary') ?>"
                     class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'publications/summary') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
                     📊 สรุปผลงานวิจัย
                 </a>
 
-                <a href="<?= base_url('index.php/admin/admission') ?>"
+                <a href="<?= site_url('admin/admission') ?>"
                     class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'admission') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
                     📋 แบบฟอร์มเปิดรับ นศ.
                 </a>
@@ -206,12 +207,12 @@ $currentUri = service('uri')->getPath();
                 log_message('info', 'Navigation - Rendering CHAIR menu');
             ?>
                 <!-- Chair sees: Dashboard, Publications, Admission -->
-                <a href="<?= base_url('index.php/admin/publications/manage') ?>"
+                <a href="<?= site_url('admin/publications/manage') ?>"
                     class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'publications/manage') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
                     📚 จัดการผลงานวิจัย
                 </a>
 
-                <a href="<?= base_url('index.php/admin/admission') ?>"
+                <a href="<?= site_url('admin/admission') ?>"
                     class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'admission') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
                     📋 แบบฟอร์มเปิดรับ นศ.
                 </a>
@@ -222,13 +223,13 @@ $currentUri = service('uri')->getPath();
             <div class="border-t border-gray-200 my-4"></div>
 
             <!-- Back to User Dashboard - Available to all admins -->
-            <a href="<?= base_url('index.php/dashboard') ?>"
+            <a href="<?= site_url('dashboard') ?>"
                 class="flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg">
                 ← กลับไปยังแดชบอร์ดผู้ใช้
             </a>
 
             <!-- Logout - Available to all -->
-            <a href="<?= base_url('index.php/auth/logout') ?>"
+            <a href="<?= site_url('auth/logout') ?>"
                 class="flex items-center px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg">
                 🚪 ออกจากระบบ
             </a>

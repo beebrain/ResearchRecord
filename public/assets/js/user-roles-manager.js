@@ -20,7 +20,7 @@ $(document).ready(function() {
  */
 function loadFaculties() {
     $.ajax({
-        url: BASE_URL + '/index.php/admin/getFaculties',
+        url: appRoute('admin/getFaculties'),
         method: 'GET',
         dataType: 'json',
         success: function(response) {
@@ -50,7 +50,7 @@ function populateUserFacultyDropdown() {
  */
 function loadUsers() {
     $.ajax({
-        url: BASE_URL + '/index.php/admin/getUsersWithRole',
+        url: appRoute('admin/getUsersWithRole'),
         method: 'GET',
         dataType: 'json',
         success: function(response) {
@@ -387,10 +387,10 @@ function setupEventListeners() {
 
         console.log('=== updateUserRole REQUEST ===');
         console.log('Request data:', requestData);
-        console.log('URL:', BASE_URL + '/index.php/admin/updateUserRole');
+        console.log('URL:', appRoute('admin/updateUserRole'));
 
         $.ajax({
-            url: BASE_URL + '/index.php/admin/updateUserRole',
+            url: appRoute('admin/updateUserRole'),
             method: 'POST',
             contentType: 'application/json',
             data: JSON.stringify(requestData),

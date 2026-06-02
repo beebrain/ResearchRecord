@@ -5,9 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>จัดการอีเมลผู้ใช้</title>
-    <link rel="stylesheet" href="<?= base_url('/public/assets/css/tailwind.min.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.min.css') ?>">
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/admin-common.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/admin-common.css') ?>">
 </head>
 
 <body class="min-h-full">
@@ -197,6 +197,9 @@
 
     <script>
         const BASE_URL = '<?= rtrim(base_url(), '/') ?>';
+    </script>
+    <script src="<?= base_url('assets/js/app-routes.js') ?>?v=<?= @filemtime(FCPATH . 'assets/js/app-routes.js') ?: time() ?>"></script>
+    <script>
         let users = [];
         let currentDetailUser = null;
         let userCount = 0;
@@ -205,8 +208,8 @@
         async function loadUsers(searchTerm = '') {
             try {
                 const url = searchTerm ?
-                    `${BASE_URL}/index.php/admin/getUsersWithEmails?search=${encodeURIComponent(searchTerm)}` :
-                    `${BASE_URL}/index.php/admin/getUsersWithEmails`;
+                    `${appRoute('admin/getUsersWithEmails')}?search=${encodeURIComponent(searchTerm)}` :
+                    appRoute('admin/getUsersWithEmails');
 
                 const response = await fetch(url, {
                     method: 'GET',
@@ -314,7 +317,7 @@
 
         async function loadSecondaryEmails(userUid) {
             try {
-                const response = await fetch(`${BASE_URL}/index.php/admin/getSecondaryEmails?user_uid=${userUid}`, {
+                const response = await fetch(`${appRoute('admin/getSecondaryEmails')}?user_uid=${userUid}`, {
                     method: 'GET',
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest'
@@ -374,7 +377,7 @@
             }
 
             try {
-                const response = await fetch(`${BASE_URL}/index.php/admin/updateSecondaryEmail`, {
+                const response = await fetch(appRoute('admin/updateSecondaryEmail'), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
@@ -408,7 +411,7 @@
             }
 
             try {
-                const response = await fetch(`${BASE_URL}/index.php/admin/deleteSecondaryEmail`, {
+                const response = await fetch(appRoute('admin/deleteSecondaryEmail'), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
@@ -459,7 +462,7 @@
             }
 
             try {
-                const response = await fetch(`${BASE_URL}/index.php/admin/addSecondaryEmail`, {
+                const response = await fetch(appRoute('admin/addSecondaryEmail'), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',

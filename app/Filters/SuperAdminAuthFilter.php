@@ -6,6 +6,7 @@ use CodeIgniter\Filters\FilterInterface;
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
 use App\Helpers\RoleHelper;
+use App\Libraries\UserIdentity;
 
 class SuperAdminAuthFilter implements FilterInterface
 {
@@ -28,9 +29,7 @@ class SuperAdminAuthFilter implements FilterInterface
             throw \CodeIgniter\Exceptions\PageNotFoundException::forPageNotFound();
         }
 
-        // Get user data
-        $userModel = new \App\Models\UserModel();
-        $user = $userModel->find($session->get('user_id'));
+        $user = UserIdentity::sessionUser();
 
         if (!$user) {
             return redirect()->to('/login')->with('error', 'User not found');

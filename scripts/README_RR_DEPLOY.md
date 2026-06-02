@@ -1,6 +1,55 @@
-# Research Record Safe FTP Deploy
+# Research Record Deploy
 
-Use these scripts when uploading Research Record changes to production. They
+## Production (sci.uru.ac.th/recordresearch) — win-kc
+
+Path: `C:\inetpub\ResearchRecord` → IIS app **`/recordresearch`** → `public/`
+
+### วิธี A — ส่ง tarball ผ่าน Tailscale (ไม่ต้อง SSH)
+
+**Mac:**
+
+```bash
+cd /Users/boobee/Docker/projects/ResearchRecord
+./scripts/pack-for-win-kc.sh
+tailscale file cp deploy/win-kc-rr.tgz win-kc49a7sh1gd:
+```
+
+**win-kc (RDP / PowerShell บนเครื่อง):**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File C:\inetpub\ResearchRecord\scripts\win-kc-fetch-from-tailscale-and-install.ps1
+```
+
+(ครั้งแรกถ้ายังไม่มีโฟลเดอร์: `tailscale file get` แล้ว extract ด้วยมือ หรือ clone repo ก่อน)
+
+### วิธี B — SCP ผ่าน SSH (ต้องมีรหัส Administrator)
+
+```bash
+WIN_KC_PASS='...' ./scripts/scp-deploy-win-kc-rr.sh --init-iis
+WIN_KC_PASS='...' ./scripts/scp-deploy-win-kc-rr.sh
+```
+
+### วิธี C — git pull บน server (แนะนำ)
+
+```bash
+WIN_KC_PASS='...' ./scripts/git-pull-win-kc-rr.sh --init
+WIN_KC_BRANCH=feature/rr-email-identity WIN_KC_PASS='...' ./scripts/git-pull-win-kc-rr.sh
+```
+
+Server-side setup: `scripts/win-kc-on-server-install.ps1`  
+Full checklist: [docs/SERVER_DEPLOY.md](../docs/SERVER_DEPLOY.md)
+
+Verify:
+
+```bash
+curl -I https://sci.uru.ac.th/recordresearch/index.php/auth/login
+```
+
+---
+
+## Legacy FTP (research.academic / 202.29.52.124)
+
+Use these scripts when uploading Research Record changes to the **old** FTP host. They
 create a local backup and a remote `.bak.<timestamp>` copy before replacing any
 file.
 

@@ -5,14 +5,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>จัดการคณะและหลักสูตร</title>
-    <link rel="stylesheet" href="<?= base_url('/public/assets/css/tailwind.min.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.min.css') ?>">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
     <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/admin-common.css') ?>">
-    <script src="<?= base_url('public/assets/js/modal-handler.js') ?>"></script>
+    <link rel="stylesheet" href="<?= base_url('assets/css/admin-common.css') ?>">
+    <script src="<?= base_url('assets/js/modal-handler.js') ?>"></script>
 </head>
 
 <body class="min-h-full">
@@ -25,7 +25,7 @@
                     <p class="text-sm text-gray-600"><?= session()->get('institution_name') ?? 'มหาวิทยาลัยของคุณ' ?></p>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <button onclick="window.location.href='<?= base_url('index.php/admin/dashboard') ?>'"
+                    <button onclick="window.location.href='<?= site_url('admin/dashboard') ?>'"
                         class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors">
                         ← กลับไปหน้าแดชบอร์ด
                     </button>
@@ -242,7 +242,8 @@
     <script>
         const BASE_URL = '<?= rtrim(base_url(), '/') ?>';
     </script>
-    <script src="<?= base_url('public/assets/js/faculty-curriculum-manager.js') ?>"></script>
+    <script src="<?= base_url('assets/js/app-routes.js') ?>?v=<?= @filemtime(FCPATH . 'assets/js/app-routes.js') ?: time() ?>"></script>
+    <script src="<?= base_url('assets/js/faculty-curriculum-manager.js') ?>?v=<?= @filemtime(FCPATH . 'assets/js/faculty-curriculum-manager.js') ?: time() ?>"></script>
 </body>
 
 </html>

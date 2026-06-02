@@ -29,7 +29,7 @@ foreach ($all_publications ?? [] as $pub) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= esc($title ?? 'Academic CV') ?></title>
-    <link rel="stylesheet" href="<?= base_url('/public/assets/css/tailwind.min.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.min.css') ?>">
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Sarabun', sans-serif; background: #f8f9fa; }
@@ -49,13 +49,13 @@ foreach ($all_publications ?? [] as $pub) {
     <div class="no-print max-w-5xl mx-auto px-4 mb-6">
         <div class="flex items-center justify-between bg-white rounded-xl shadow-sm px-4 py-3 border border-gray-100">
             <div class="flex items-center gap-4">
-                <a href="<?= base_url('index.php/dashboard') ?>" class="text-gray-500 hover:text-gray-700 text-sm">← กลับ Dashboard</a>
+                <a href="<?= site_url('dashboard') ?>" class="text-gray-500 hover:text-gray-700 text-sm">← กลับ Dashboard</a>
                 <span class="text-gray-300">|</span>
                 <span class="font-semibold text-gray-700">📄 Academic CV</span>
             </div>
             <div class="flex items-center gap-2">
-                <a href="<?= base_url('index.php/dashboard/cv-manage') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">📝 แก้ไข CV</a>
-                <a href="<?= base_url('index.php/dashboard/settings') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">⚙️ ตั้งค่า</a>
+                <a href="<?= site_url('dashboard/cv-manage') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">📝 แก้ไข CV</a>
+                <a href="<?= site_url('dashboard/settings') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">⚙️ ตั้งค่า</a>
                 <button onclick="window.print()" class="px-3 py-1.5 bg-gray-800 text-white text-sm rounded-lg hover:bg-gray-900">🖨️ พิมพ์ CV</button>
             </div>
         </div>

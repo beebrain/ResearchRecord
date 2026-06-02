@@ -50,8 +50,8 @@ class CvSyncApiController extends ApiController
                 ]);
             }
 
-            $uid = (string) ($user['uid'] ?? '');
-            $bundle = $this->buildCvBundleForUser($uid, $v['email']);
+            $email = UserIdentity::normalizeEmail((string) $v['email']);
+            $bundle = $this->buildCvBundleForUser($email);
 
             return $this->response->setJSON([
                 'success' => true,
@@ -107,15 +107,15 @@ class CvSyncApiController extends ApiController
                 ]);
             }
 
-            $uid = (string) ($user['uid'] ?? '');
-            $this->replaceCvFromBundle($uid, (string) $v['email'], $bundle);
+            $email = UserIdentity::normalizeEmail((string) $v['email']);
+            $this->replaceCvFromBundle($email, $bundle);
 
             if (!empty($bundle['orcid_id'])) {
                 $profileModel = new UserProfileModel();
-                $profileModel->updateByUserUid($uid, ['orcid_id' => (string) $bundle['orcid_id']]);
+                $profileModel->updateByUserEmail($email, ['orcid_id' => (string) $bundle['orcid_id']]);
             }
 
-            $fresh = $this->buildCvBundleForUser($uid, $v['email']);
+            $fresh = $this->buildCvBundleForUser($email);
 
             return $this->response->setJSON([
                 'success' => true,
@@ -320,8 +320,8 @@ class CvSyncApiController extends ApiController
         }
 
         $rows = $this->db->table('publication_authors pa')
-            ->select('pa.publication_id, pa.author_name, pa.author_email, pa.author_affiliation, pa.author_order, pa.corresponding, pa.uid, u.email AS user_email, u.faculty_id AS rr_faculty_id')
-            ->join('user u', 'u.uid = pa.uid', 'left')
+            ->select('pa.publication_id, pa.author_name, pa.author_email, pa.author_affiliation, pa.author_order, pa.corresponding, u.email AS user_email, u.faculty_id AS rr_faculty_id')
+            ->join('user u', 'u.email = pa.author_email', 'left')
             ->whereIn('pa.publication_id', $publicationIds)
             ->orderBy('pa.publication_id', 'ASC')
             ->orderBy('pa.author_order', 'ASC')
@@ -353,7 +353,7 @@ class CvSyncApiController extends ApiController
                 'order'         => (int) ($row['author_order'] ?? 0),
                 'corresponding' => (int) ($row['corresponding'] ?? 0),
                 'affiliation'   => trim((string) ($row['author_affiliation'] ?? '')) ?: null,
-                'rr_user_uid'   => trim((string) ($row['uid'] ?? '')) ?: null,
+                'rr_user_email' => $email !== '' ? $email : null,
                 'rr_faculty_id' => $facultyId !== null && $facultyId !== '' ? (int) $facultyId : null,
             ];
         }
@@ -397,7 +397,7 @@ class CvSyncApiController extends ApiController
             'keywords'         => trim((string) ($pub['keywords'] ?? '')) ?: null,
             'notes'            => trim((string) ($pub['notes'] ?? '')) ?: null,
             'ref_url'          => trim((string) ($pub['ref_url'] ?? '')) ?: null,
-            'created_by'       => $user['uid'] ?? null,
+            'created_by_email' => UserIdentity::normalizeEmail((string) ($user['email'] ?? '')),
             'approve'          => 0,
         ];
         $syncFields = $this->publicationSyncFields($pub, $hash);
@@ -529,14 +529,13 @@ class CvSyncApiController extends ApiController
             }
 
             $user = $email !== ''
-                ? $this->db->table('user')->select('uid')->where('email', $email)->get()->getRowArray()
+                ? $this->db->table('user')->select('email')->where('email', $email)->get()->getRowArray()
                 : null;
             $data = [
                 'publication_id'      => $publicationId,
                 'author_name'         => $name !== '' ? mb_substr($name, 0, 255) : ($email !== '' ? $email : ''),
                 'author_email'        => $email !== '' ? $email : null,
                 'author_affiliation'  => trim((string) ($row['affiliation'] ?? '')) ?: null,
-                'uid'                 => $user['uid'] ?? ($row['rr_user_uid'] ?? null),
                 'author_order'        => (int) ($row['order'] ?? ($i + 1)),
                 'corresponding'       => (int) ($row['corresponding'] ?? 0),
             ];
@@ -645,17 +644,11 @@ class CvSyncApiController extends ApiController
         $this->response->setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-KEY');
     }
 
-    private function applyCvOwnerFilter($model, string $userUid, string $email)
+    private function applyCvOwnerFilter($model, string $email)
     {
-        $db = \Config\Database::connect();
-        if ($email !== '' && $db->fieldExists('owner_email_norm', 'cv_sections')) {
-            return $model->groupStart()
-                ->where('owner_email_norm', $email)
-                ->orWhere('user_uid', $userUid)
-                ->groupEnd();
-        }
+        $email = UserIdentity::normalizeEmail($email);
 
-        return $model->where('user_uid', $userUid);
+        return $email !== '' ? $model->where('owner_email_norm', $email) : $model->where('1=0', null, false);
     }
 
     private function withCvOwnerEmail(array $data, string $email): array
@@ -671,13 +664,13 @@ class CvSyncApiController extends ApiController
     /**
      * @return array<string,mixed>
      */
-    private function buildCvBundleForUser(string $userUid, string $canonicalEmail): array
+    private function buildCvBundleForUser(string $canonicalEmail): array
     {
         $sectionModel = new CvSectionModel();
         $entryModel   = new CvEntryModel();
         $profileModel = new UserProfileModel();
-        $profile      = $profileModel->getByUserUid($userUid);
         $ownerEmail   = UserIdentity::normalizeEmail($canonicalEmail);
+        $profile      = $profileModel->getByUserEmail($ownerEmail);
 
         $orcidId = $profile['orcid_id'] ?? null;
         if ($orcidId === null && !empty($profile['orcid'])) {
@@ -686,7 +679,7 @@ class CvSyncApiController extends ApiController
             }
         }
 
-        $sections = $this->applyCvOwnerFilter($sectionModel, $userUid, $ownerEmail)
+        $sections = $this->applyCvOwnerFilter($sectionModel, $ownerEmail)
             ->orderBy('sort_order', 'ASC')
             ->orderBy('id', 'ASC')
             ->findAll();
@@ -781,7 +774,7 @@ class CvSyncApiController extends ApiController
     /**
      * @param array<string,mixed> $bundle
      */
-    private function replaceCvFromBundle(string $userUid, string $canonicalEmail, array $bundle): void
+    private function replaceCvFromBundle(string $canonicalEmail, array $bundle): void
     {
         $db            = \Config\Database::connect();
         $sectionModel  = new CvSectionModel();
@@ -790,7 +783,7 @@ class CvSyncApiController extends ApiController
 
         $db->transStart();
 
-        $existing = $this->applyCvOwnerFilter($sectionModel, $userUid, $ownerEmail)->findAll();
+        $existing = $this->applyCvOwnerFilter($sectionModel, $ownerEmail)->findAll();
         foreach ($existing as $ex) {
             $entryModel->where('section_id', (int) $ex['id'])->delete();
             $sectionModel->delete((int) $ex['id']);
@@ -803,7 +796,6 @@ class CvSyncApiController extends ApiController
             }
             $order++;
             $sectionModel->insert($this->withCvOwnerEmail([
-                'user_uid'     => $userUid,
                 'type'         => (string) ($sec['type'] ?? 'custom'),
                 'title'        => mb_substr((string) ($sec['title'] ?? ''), 0, 255),
                 'description'  => $sec['description'] ?? null,

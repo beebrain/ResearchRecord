@@ -38,7 +38,7 @@ class FacultyCurriculumController extends Controller
                 FROM faculties f
                 LEFT JOIN curriculum c ON c.faculty_id = f.id
                 LEFT JOIN user u ON u.curriculum_id = c.id
-                LEFT JOIN publications p ON p.created_by = u.uid
+                LEFT JOIN publications p ON p.created_by_email = u.email
                 WHERE f.status = 'active'
             ";
 
@@ -79,7 +79,7 @@ class FacultyCurriculumController extends Controller
                 FROM curriculum c
                 JOIN faculties f ON f.id = c.faculty_id
                 LEFT JOIN user u ON u.curriculum_id = c.id
-                LEFT JOIN publications p ON p.created_by = u.uid
+                LEFT JOIN publications p ON p.created_by_email = u.email
                 WHERE c.status = 'active'
             ";
 
@@ -120,7 +120,7 @@ class FacultyCurriculumController extends Controller
                     c.name as curriculum_name,
                     f.name as faculty_name
                 FROM publications p
-                JOIN user u ON u.uid = p.created_by
+                JOIN user u ON u.email = p.created_by_email
                 JOIN curriculum c ON c.id = u.curriculum_id
                 JOIN faculties f ON f.id = c.faculty_id
                 WHERE 1=1
@@ -168,7 +168,7 @@ class FacultyCurriculumController extends Controller
                 FROM faculties f
                 LEFT JOIN curriculum c ON c.faculty_id = f.id
                 LEFT JOIN user u ON u.curriculum_id = c.id
-                LEFT JOIN publications p ON p.created_by = u.uid
+                LEFT JOIN publications p ON p.created_by_email = u.email
                 WHERE f.status = 'active'
             ")->getRowArray();
 

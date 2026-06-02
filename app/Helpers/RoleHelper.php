@@ -5,191 +5,157 @@ namespace App\Helpers;
 use App\Libraries\UserIdentity;
 
 /**
- * RoleHelper
- *
- * Provides role-based permission checking for the application
- *
- * Role hierarchy:
- * - god_mode (backdoor): Bypass all permission checks
- * - super_admin: Full access to all resources
- * - faculty_admin: Access to assigned faculties and their curricula/users
- * - user: Access to own publications only
+ * Role-based permissions — identity via normalized email (no uid).
  */
 class RoleHelper
 {
-    /**
-     * Check if god mode is enabled (backdoor access)
-     * God mode grants all permissions and bypasses all checks
-     */
     public static function isGodMode(): bool
     {
-        $session = session();
-        return $session->get('god_mode') === true;
+        return session()->get('god_mode') === true;
     }
 
-    /**
-     * Check if user is super admin or in god mode
-     */
+    public static function emailOf(?array $user): string
+    {
+        if (! is_array($user)) {
+            return '';
+        }
+
+        return UserIdentity::normalizeEmail((string) ($user['email'] ?? ''));
+    }
+
     public static function isSuperAdmin($user): bool
     {
-        // God mode bypasses everything
         if (self::isGodMode()) {
             return true;
         }
 
-        if (is_array($user)) {
-            return isset($user['role']) && $user['role'] === 'super_admin';
-        }
-        return false;
+        return is_array($user) && ($user['role'] ?? '') === 'super_admin';
     }
 
-    /**
-     * Check if user is faculty admin or in god mode
-     */
     public static function isFacultyAdmin($user): bool
     {
-        // God mode bypasses everything
         if (self::isGodMode()) {
             return true;
         }
 
-        if (is_array($user)) {
-            return isset($user['role']) && $user['role'] === 'faculty_admin';
-        }
-        return false;
+        return is_array($user) && ($user['role'] ?? '') === 'faculty_admin';
     }
 
-    /**
-     * Check if user is regular user
-     */
     public static function isRegularUser($user): bool
     {
-        if (is_array($user)) {
-            return !isset($user['role']) || $user['role'] === 'user';
+        if (! is_array($user)) {
+            return true;
         }
-        return true;
+
+        $role = $user['role'] ?? 'user';
+
+        return $role === 'user' || $role === '';
     }
 
-    /**
-     * Check if user is a dean of any faculty
-     */
     public static function isDean($user): bool
     {
-        // God mode bypasses everything
         if (self::isGodMode()) {
             return true;
         }
 
-        if (is_array($user) && isset($user['uid'])) {
-            $db = \Config\Database::connect();
-            $builder = $db->table('faculties');
-            $result = $builder->where('dean_id', $user['uid'])->countAllResults();
-            return $result > 0;
+        $email = self::emailOf($user);
+        if ($email === '') {
+            return false;
         }
-        return false;
+
+        return \Config\Database::connect()->table('faculties')
+            ->where('dean_email', $email)
+            ->countAllResults() > 0;
     }
 
-    /**
-     * Check if user is a chair of any curriculum
-     */
     public static function isChair($user): bool
     {
-        // God mode bypasses everything
         if (self::isGodMode()) {
             return true;
         }
 
-        if (is_array($user) && isset($user['uid'])) {
-            $db = \Config\Database::connect();
-            $builder = $db->table('curriculum');
-            $result = $builder->where('chair_id', $user['uid'])->countAllResults();
-            return $result > 0;
+        $email = self::emailOf($user);
+        if ($email === '') {
+            return false;
         }
-        return false;
+
+        return \Config\Database::connect()->table('curriculum')
+            ->where('chair_email', $email)
+            ->countAllResults() > 0;
     }
 
-    /**
-     * Get faculty IDs where user is dean
-     */
     public static function getDeanFaculties($user): array
     {
-        if (!is_array($user) || !isset($user['uid'])) {
+        $email = self::emailOf($user);
+        if ($email === '') {
             return [];
         }
 
-        $db = \Config\Database::connect();
-        $builder = $db->table('faculties');
-        $faculties = $builder->select('id')->where('dean_id', $user['uid'])->get()->getResultArray();
+        $faculties = \Config\Database::connect()->table('faculties')
+            ->select('id')
+            ->where('dean_email', $email)
+            ->get()
+            ->getResultArray();
 
         return array_column($faculties, 'id');
     }
 
-    /**
-     * Get curriculum IDs where user is chair
-     */
     public static function getChairCurricula($user): array
     {
-        if (!is_array($user) || !isset($user['uid'])) {
+        $email = self::emailOf($user);
+        if ($email === '') {
             return [];
         }
 
-        $db = \Config\Database::connect();
-        $builder = $db->table('curriculum');
-        $curricula = $builder->select('id')->where('chair_id', $user['uid'])->get()->getResultArray();
+        $curricula = \Config\Database::connect()->table('curriculum')
+            ->select('id')
+            ->where('chair_email', $email)
+            ->get()
+            ->getResultArray();
 
         return array_column($curricula, 'id');
     }
 
-    /**
-     * Get faculty IDs accessible by chair (from their curricula)
-     */
     public static function getChairFaculties($user): array
     {
-        if (!is_array($user) || !isset($user['uid'])) {
+        $email = self::emailOf($user);
+        if ($email === '') {
             return [];
         }
 
-        $db = \Config\Database::connect();
-        $builder = $db->table('curriculum');
-        $curricula = $builder->select('faculty_id')->where('chair_id', $user['uid'])->get()->getResultArray();
+        $curricula = \Config\Database::connect()->table('curriculum')
+            ->select('faculty_id')
+            ->where('chair_email', $email)
+            ->get()
+            ->getResultArray();
 
-        return array_unique(array_column($curricula, 'faculty_id'));
+        return array_values(array_unique(array_column($curricula, 'faculty_id')));
     }
 
-    /**
-     * Check if user can manage all faculties
-     */
     public static function canManageAllFaculties($user): bool
     {
         return self::isSuperAdmin($user);
     }
 
-    /**
-     * Get managed faculty IDs for faculty admin
-     * Returns array of faculty IDs or empty array
-     */
     public static function getManagedFaculties($user): array
     {
-        if (!is_array($user)) {
+        if (! is_array($user)) {
             return [];
         }
 
         if (self::isSuperAdmin($user)) {
-            // Super admin manages all faculties - return empty to indicate "all"
             return [];
         }
 
-        if (self::isFacultyAdmin($user) && !empty($user['managed_faculties'])) {
+        if (self::isFacultyAdmin($user) && ! empty($user['managed_faculties'])) {
             $faculties = json_decode($user['managed_faculties'], true);
+
             return is_array($faculties) ? $faculties : [];
         }
 
         return [];
     }
 
-    /**
-     * Check if user can access a specific faculty
-     */
     public static function canAccessFaculty($user, int $facultyId): bool
     {
         if (self::isSuperAdmin($user)) {
@@ -197,16 +163,12 @@ class RoleHelper
         }
 
         if (self::isFacultyAdmin($user)) {
-            $managedFaculties = self::getManagedFaculties($user);
-            return in_array($facultyId, $managedFaculties);
+            return in_array($facultyId, self::getManagedFaculties($user), true);
         }
 
         return false;
     }
 
-    /**
-     * Check if user can access a specific curriculum
-     */
     public static function canAccessCurriculum($user, int $curriculumId, $curriculumModel): bool
     {
         if (self::isSuperAdmin($user)) {
@@ -216,36 +178,35 @@ class RoleHelper
         if (self::isFacultyAdmin($user)) {
             $curriculum = $curriculumModel->find($curriculumId);
             if ($curriculum) {
-                return self::canAccessFaculty($user, $curriculum['faculty_id']);
+                return self::canAccessFaculty($user, (int) $curriculum['faculty_id']);
             }
         }
 
         return false;
     }
 
-    /**
-     * Check if user can access a specific user record
-     *
-     * Faculty admin: target is in scope if their user.faculty_id is managed, or their
-     * primary curriculum belongs to a managed faculty.
-     */
-    public static function canAccessUser($user, int $targetUserId, $userModel): bool
+    public static function canAccessUser($user, string $targetEmail, $userModel): bool
     {
+        $targetEmail = UserIdentity::normalizeEmail($targetEmail);
+        if ($targetEmail === '') {
+            return false;
+        }
+
         if (self::isSuperAdmin($user)) {
             return true;
         }
 
         if (self::isFacultyAdmin($user)) {
-            $targetUser = $userModel->find($targetUserId);
-            if (!$targetUser) {
+            $targetUser = $userModel->getUserByEmail($targetEmail);
+            if (! $targetUser) {
                 return false;
             }
-            // Primary: user's home faculty (ผู้แต่งสังกัดคณะ)
-            if (!empty($targetUser['faculty_id']) && self::canAccessFaculty($user, (int) $targetUser['faculty_id'])) {
+
+            if (! empty($targetUser['faculty_id']) && self::canAccessFaculty($user, (int) $targetUser['faculty_id'])) {
                 return true;
             }
-            // Secondary: primary curriculum under a managed faculty
-            if (!empty($targetUser['curriculum_id'])) {
+
+            if (! empty($targetUser['curriculum_id'])) {
                 $curriculumModel = new \App\Models\CurriculumModel();
 
                 return self::canAccessCurriculum($user, (int) $targetUser['curriculum_id'], $curriculumModel);
@@ -254,21 +215,9 @@ class RoleHelper
             return false;
         }
 
-        // Regular users can only access themselves
-        if (is_array($user) && isset($user['uid'])) {
-            return $user['uid'] == $targetUserId;
-        }
-
-        return false;
+        return self::emailOf($user) !== '' && self::emailOf($user) === $targetEmail;
     }
 
-    /**
-     * Check if user can access a specific publication
-     *
-     * Faculty admin: may edit when the record creator is in scope, or when any
-     * publication author (uid / authors.user_uid / resolvable author_email) is in scope.
-     * This keeps edit rights after listing stopped treating created_by-only as "their work".
-     */
     public static function canAccessPublication($user, int $publicationId, $publicationModel): bool
     {
         if (self::isSuperAdmin($user)) {
@@ -276,167 +225,125 @@ class RoleHelper
         }
 
         $publication = $publicationModel->find($publicationId);
-        if (!$publication) {
+        if (! $publication) {
             return false;
         }
 
         if (self::isFacultyAdmin($user)) {
             $userModel = new \App\Models\UserModel();
-            if (!empty($publication['created_by']) && self::canAccessUser($user, (int) $publication['created_by'], $userModel)) {
+            $creatorEmail = UserIdentity::normalizeEmail((string) ($publication['created_by_email'] ?? ''));
+            if ($creatorEmail !== '' && self::canAccessUser($user, $creatorEmail, $userModel)) {
                 return true;
             }
 
             return self::publicationHasAuthorInManagedScope($user, $publicationId, $userModel);
         }
 
-        // Regular users can only access their own publications
-        if (is_array($user) && isset($user['uid'])) {
-            return $publication['created_by'] == $user['uid'];
-        }
+        $userEmail = self::emailOf($user);
+        $creatorEmail = UserIdentity::normalizeEmail((string) ($publication['created_by_email'] ?? ''));
 
-        return false;
+        return $userEmail !== '' && $userEmail === $creatorEmail;
     }
 
-    /**
-     * True if any author row on this publication maps to a user the faculty admin may manage.
-     */
     private static function publicationHasAuthorInManagedScope($user, int $publicationId, \App\Models\UserModel $userModel): bool
     {
-        $db = \Config\Database::connect();
+        $db   = \Config\Database::connect();
         $rows = $db->table('publication_authors pa')
-            ->select('pa.uid AS pa_uid, a.user_uid AS author_user_uid, pa.author_email')
+            ->select('pa.author_email, a.email AS authors_table_email, a.user_email')
             ->join('authors a', 'a.id = pa.author_id', 'left')
             ->where('pa.publication_id', $publicationId)
             ->get()
             ->getResultArray();
 
-        $checkedUids = [];
+        $checked = [];
         foreach ($rows as $row) {
-            $uid = (int) ($row['pa_uid'] ?? 0);
-            if ($uid <= 0) {
-                $uid = (int) ($row['author_user_uid'] ?? 0);
-            }
-
-            if ($uid > 0) {
-                if (isset($checkedUids[$uid])) {
+            foreach ([$row['author_email'] ?? '', $row['authors_table_email'] ?? '', $row['user_email'] ?? ''] as $raw) {
+                $email = UserIdentity::normalizeEmail((string) $raw);
+                if ($email === '' || isset($checked[$email])) {
                     continue;
                 }
-                $checkedUids[$uid] = true;
-                if (self::canAccessUser($user, $uid, $userModel)) {
+                $checked[$email] = true;
+                if (self::canAccessUser($user, $email, $userModel)) {
                     return true;
                 }
-
-                continue;
-            }
-
-            $email = UserIdentity::normalizeEmail((string) ($row['author_email'] ?? ''));
-            if ($email === '') {
-                continue;
-            }
-
-            $target = $userModel->getUserByEmail($email);
-            if (!is_array($target) || empty($target['uid'])) {
-                continue;
-            }
-            $tuid = (int) $target['uid'];
-            if (isset($checkedUids[$tuid])) {
-                continue;
-            }
-            $checkedUids[$tuid] = true;
-            if (self::canAccessUser($user, $tuid, $userModel)) {
-                return true;
             }
         }
 
         return false;
     }
 
-    /**
-     * Get faculty filter SQL for faculty admin
-     * Returns WHERE clause condition or empty string for super admin
-     */
     public static function getFacultyFilterSQL($user, string $facultyColumn = 'faculty_id'): string
     {
         if (self::isSuperAdmin($user)) {
-            return ''; // No filter - access all
+            return '';
         }
 
         if (self::isFacultyAdmin($user)) {
             $managedFaculties = self::getManagedFaculties($user);
-            if (!empty($managedFaculties)) {
+            if ($managedFaculties !== []) {
                 $ids = implode(',', array_map('intval', $managedFaculties));
+
                 return "$facultyColumn IN ($ids)";
             }
         }
 
-        return '1=0'; // No access
+        return '1=0';
     }
 
-    /**
-     * Get user filter SQL for faculty admin
-     * Returns WHERE clause condition for filtering users by managed faculties
-     */
     public static function getUserFilterSQL($user, $curriculumModel): string
     {
         if (self::isSuperAdmin($user)) {
-            return ''; // No filter - access all
+            return '';
         }
 
         if (self::isFacultyAdmin($user)) {
             $managedFaculties = self::getManagedFaculties($user);
-            if (!empty($managedFaculties)) {
-                // Get all curricula from managed faculties
+            if ($managedFaculties !== []) {
                 $curricula = $curriculumModel
                     ->whereIn('faculty_id', $managedFaculties)
                     ->findAll();
 
-                if (!empty($curricula)) {
+                if ($curricula !== []) {
                     $curriculumIds = array_column($curricula, 'id');
-                    $ids = implode(',', array_map('intval', $curriculumIds));
+                    $ids           = implode(',', array_map('intval', $curriculumIds));
+
                     return "curriculum_id IN ($ids)";
                 }
             }
         }
 
-        // Regular users - return condition that matches only themselves
-        if (is_array($user) && isset($user['uid'])) {
-            return "uid = " . intval($user['uid']);
+        $email = self::emailOf($user);
+        if ($email !== '') {
+            $db = \Config\Database::connect();
+
+            return 'email = ' . $db->escape($email);
         }
 
-        return '1=0'; // No access
+        return '1=0';
     }
 
-    /**
-     * Check if user can manage roles and permissions
-     */
     public static function canManageRoles($user): bool
     {
         return self::isSuperAdmin($user);
     }
 
-    /**
-     * Get role display name
-     */
     public static function getRoleDisplayName(string $role): string
     {
         $roles = [
-            'super_admin' => 'Super Administrator',
+            'super_admin'   => 'Super Administrator',
             'faculty_admin' => 'Faculty Administrator',
-            'user' => 'User'
+            'user'          => 'User',
         ];
 
         return $roles[$role] ?? 'Unknown';
     }
 
-    /**
-     * Get role badge HTML
-     */
     public static function getRoleBadge(string $role): string
     {
         $badges = [
-            'super_admin' => '<span class="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded">Super Admin</span>',
+            'super_admin'   => '<span class="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded">Super Admin</span>',
             'faculty_admin' => '<span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">Faculty Admin</span>',
-            'user' => '<span class="px-2 py-1 bg-gray-100 text-gray-800 text-xs font-medium rounded">User</span>'
+            'user'          => '<span class="px-2 py-1 bg-gray-100 text-gray-800 text-xs font-medium rounded">User</span>',
         ];
 
         return $badges[$role] ?? '<span class="px-2 py-1 bg-gray-100 text-gray-800 text-xs font-medium rounded">Unknown</span>';

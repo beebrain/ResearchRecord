@@ -5,17 +5,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - ระบบบริหารจัดการข้อมูล</title>
-    <!-- Local CSS -->
-    <link rel="stylesheet" href="<?= base_url('/public/assets/css/tailwind.min.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/vendor/datatables.min.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/vendor/sarabun.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/admin-common.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/browser-popup-fix.css') ?>">
-    <!-- Local JavaScript -->
-    <script src="<?= base_url('public/assets/js/vendor/jquery-3.6.0.min.js') ?>"></script>
-    <script src="<?= base_url('public/assets/js/vendor/chart.min.js') ?>"></script>
-    <script src="<?= base_url('public/assets/js/vendor/datatables.min.js') ?>"></script>
-    <script src="<?= base_url('public/assets/js/modal-handler.js') ?>"></script>
+    <link rel="stylesheet" href="<?= asset_url('css/tailwind.min.css') ?>">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" href="<?= asset_url('css/admin-common.css') ?>">
+    <link rel="stylesheet" href="<?= asset_url('css/browser-popup-fix.css') ?>">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <script src="<?= asset_url('js/modal-handler.js') ?>"></script>
     <style>
         .stat-card {
             transition: all 0.2s ease;
@@ -53,7 +51,7 @@
         $pageSubtitle = session()->get('institution_name') ?? 'ระบบบริหารจัดการข้อมูล';
         ob_start();
         ?>
-        <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2" onclick="window.location.href='<?= base_url('index.php/admin/publications/add') ?>'">
+        <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2" onclick="window.location.href='<?= site_url('admin/publications/add') ?>'">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
             </svg>
@@ -328,7 +326,7 @@
                                 <option value="<?= $y ?>" <?= $y == date('Y') + 543 ? 'selected' : '' ?>><?= $y ?></option>
                                 <?php endfor; ?>
                             </select>
-                            <a href="<?= base_url('index.php/admin/admission') ?>" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                            <a href="<?= site_url('admin/admission') ?>" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
                                 จัดการทั้งหมด →
                             </a>
                         </div>
@@ -423,7 +421,7 @@
                             <h3 class="text-base font-semibold text-gray-900">สรุปผลงานวิจัยตามหลักสูตร</h3>
                             <p class="text-xs text-gray-500">ติดตามสถานะผลงานวิจัยของผู้รับผิดชอบหลักสูตรในรอบ 5 ปี (<?= date('Y') - 4 ?> - <?= date('Y') ?>)</p>
                         </div>
-                        <a href="<?= base_url('index.php/admin/publications/summary') ?>" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                        <a href="<?= site_url('admin/publications/summary') ?>" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
                             ดูรายละเอียด →
                         </a>
                     </div>
@@ -525,7 +523,7 @@
                             <h3 class="text-base font-semibold text-gray-900">ผลงานวิจัยล่าสุด</h3>
                             <p class="text-xs text-gray-500">10 ผลงานที่เพิ่มเข้าระบบล่าสุด</p>
                         </div>
-                        <a href="<?= base_url('index.php/admin/publications/manage') ?>" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                        <a href="<?= site_url('admin/publications/manage') ?>" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
                             ดูทั้งหมด →
                         </a>
                     </div>
@@ -579,8 +577,8 @@
             console.log('API Endpoints:', API_ENDPOINTS);
         }
     </script>
-    <script src="<?= base_url('public/assets/js/browser-popup-fix.js') ?>"></script>
-    <script src="<?= base_url('public/assets/js/admin-dashboard.js') ?>"></script>
+    <script src="<?= base_url('assets/js/browser-popup-fix.js') ?>"></script>
+    <script src="<?= base_url('assets/js/admin-dashboard.js') ?>"></script>
 </body>
 
 </html>

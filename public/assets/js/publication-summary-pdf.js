@@ -157,8 +157,11 @@ async function generateCurriculumReport() {
                 // Load curriculums
                 const select = document.getElementById('curriculum-select');
                 try {
-                    console.log('Fetching curriculums from:', `${BASE_URL}/index.php/admin/getCurricula`);
-                    const response = await fetch(`${BASE_URL}/index.php/admin/getCurricula`);
+                    const curriculaUrl = typeof appApiUrl === 'function'
+                        ? appApiUrl('getCurricula', 'admin/getCurricula')
+                        : (API_ENDPOINTS?.getCurricula ?? '');
+                    console.log('Fetching curriculums from:', curriculaUrl);
+                    const response = await fetch(curriculaUrl);
 
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
@@ -203,7 +206,10 @@ async function generateCurriculumReport() {
 
         // Redirect to PDF generation view page
         console.log('Redirecting to PDF view page for curriculum:', curriculumId);
-        window.open(`${BASE_URL}/index.php/admin/publications/pdf-summary?curriculum_id=${curriculumId}`, '_blank');
+        const pdfUrl = typeof appApiUrl === 'function'
+            ? appApiUrl('pdfSummary', 'admin/publications/pdf-summary')
+            : (API_ENDPOINTS?.pdfSummary ?? '');
+        window.open(`${pdfUrl}?curriculum_id=${curriculumId}`, '_blank');
 
     } catch (error) {
         console.error('Curriculum selection error:', error);

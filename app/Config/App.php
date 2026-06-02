@@ -25,6 +25,13 @@ class App extends BaseConfig
         parent::__construct();
 
         // Auto-detect base URL based on server environment
+        $envBase = env('app.baseURL');
+        if (is_string($envBase) && $envBase !== '' && ENVIRONMENT === 'production') {
+            $this->baseURL = rtrim($envBase, '/') . '/';
+
+            return;
+        }
+
         if (isset($_SERVER['HTTP_HOST'])) {
             $host = $_SERVER['HTTP_HOST'];
 
@@ -42,8 +49,16 @@ class App extends BaseConfig
                 (strpos($host, '::1') !== false);
 
             if ($isLocalhost) {
-                // Local development environment (XAMPP)
-                $this->baseURL = $protocol . '://' . $host . '/researchRecord/';
+                $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
+                // Docker/nginx without rewrite: index.php?/controller/method
+                if (stripos($scriptName, 'ResearchRecord/public') !== false) {
+                    // Static files: .../public/assets/...  Routes: .../public/index.php?/dashboard
+                    $this->baseURL     = $protocol . '://' . $host . '/ResearchRecord/public/';
+                    $this->indexPage   = 'index.php?';
+                    $this->uriProtocol = 'QUERY_STRING';
+                } else {
+                    $this->baseURL = $protocol . '://' . $host . '/researchRecord/';
+                }
             } else {
                 // Production environment - auto-detect path
                 $this->baseURL = $this->detectProductionBaseURL($host, $protocol);

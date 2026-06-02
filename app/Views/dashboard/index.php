@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $title ?? 'Dashboard' ?></title>
-    <link rel="stylesheet" href="<?= base_url('/public/assets/css/tailwind.min.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.min.css') ?>">
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -69,15 +69,15 @@
                 <span class="font-semibold text-gray-700">Research Portal</span>
             </div>
             <div class="flex items-center gap-2">
-                <a href="<?= base_url('index.php/publications/create') ?>" class="px-3 py-1.5 bg-gray-800 text-white text-sm rounded-lg hover:bg-gray-900">➕ เพิ่มผลงาน</a>
-                <a href="<?= base_url('index.php/dashboard/cv') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">📄 ดู CV</a>
-                <a href="<?= base_url('index.php/dashboard/cv-manage') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">📝 จัดการ CV</a>
-                <a href="<?= base_url('index.php/dashboard/orcid') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">🔗 ORCID</a>
+                <a href="<?= site_url('publications/create') ?>" class="px-3 py-1.5 bg-gray-800 text-white text-sm rounded-lg hover:bg-gray-900">➕ เพิ่มผลงาน</a>
+                <a href="<?= site_url('dashboard/cv') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">📄 ดู CV</a>
+                <a href="<?= site_url('dashboard/cv-manage') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">📝 จัดการ CV</a>
+                <a href="<?= site_url('dashboard/orcid') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">🔗 ORCID</a>
                 
                 <div id="admin-button-container"></div>
 
-                <a href="<?= base_url('index.php/dashboard/settings') ?>" class="px-2 py-1.5 text-gray-500 hover:text-gray-700">⚙️</a>
-                <a href="<?= base_url('index.php/auth/logout') ?>" class="px-2 py-1.5 text-gray-500 hover:text-gray-700">🚪</a>
+                <a href="<?= site_url('dashboard/settings') ?>" class="px-2 py-1.5 text-gray-500 hover:text-gray-700">⚙️</a>
+                <a href="<?= site_url('auth/logout') ?>" class="px-2 py-1.5 text-gray-500 hover:text-gray-700">🚪</a>
             </div>
         </div>
     </div>
@@ -186,7 +186,7 @@
                     <div class="mb-8">
                         <div class="flex items-center justify-between mb-4">
                             <h3 class="section-title mb-0 border-0 pb-0">Recent Publications</h3>
-                            <a href="<?= base_url('index.php/publications') ?>" class="text-xs text-gray-500 hover:text-gray-700">View all →</a>
+                            <a href="<?= site_url('publications') ?>" class="text-xs text-gray-500 hover:text-gray-700">View all →</a>
                         </div>
 
                         <div id="publications-skeleton" class="space-y-6 hide-on-load">
@@ -399,7 +399,7 @@
             // Admin button
             if (extra && extra.show_admin_button) {
                 const adminBtn = document.createElement('a');
-                adminBtn.href = "<?= base_url('index.php/admin/dashboard') ?>";
+                adminBtn.href = "<?= site_url('admin/dashboard') ?>";
                 adminBtn.className = "px-3 py-1.5 bg-emerald-600 text-sm rounded-lg hover:bg-emerald-700 font-medium";
                 adminBtn.style = "color: #ffffff !important; text-decoration: none !important; display: inline-block; white-space: nowrap; background-color: #059669 !important;";
                 adminBtn.textContent = "🛡️ เข้าสู่ระบบจัดการ";

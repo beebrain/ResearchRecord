@@ -6,15 +6,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>สรุปผลงานวิจัยตามหลักสูตร - Publication Summary</title>
 
-    <link rel="stylesheet" href="<?= base_url('/public/assets/css/tailwind.min.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.min.css') ?>">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/admin-common.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/admin-common.css') ?>">
 
     <!-- SweetAlert2 -->
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/vendor/sweetalert2.min.css') ?>">
-    <script src="<?= base_url('public/assets/js/vendor/sweetalert2.min.js') ?>"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+        const BASE_URL = '<?= rtrim(base_url(), '/') ?>';
+        const API_ENDPOINTS = {
+            summaryData: '<?= site_url('admin/publications/summary-data') ?>',
+            getPublication: '<?= site_url('admin/publications/get') ?>',
+            getCurricula: '<?= site_url('admin/getCurricula') ?>',
+            pdfSummary: '<?= site_url('admin/publications/pdf-summary') ?>',
+            downloadFile: '<?= site_url('utility/downloadFile') ?>'
+        };
+    </script>
 
     <style>
         body {
@@ -264,10 +275,11 @@
         </div>
     </div>
 
-    <!-- PDFMake Library with Thai Fonts (from pdfmake folder) -->
-    <script src="<?= base_url('pdfmake/build/pdfmake.min.js') ?>"></script>
-    <script src="<?= base_url('pdfmake/build/vfs_fonts.js') ?>"></script>
+    <!-- PDFMake Library with Thai Fonts (project root pdfmake/, not under public/) -->
+    <script src="<?= pdfmake_url('build/pdfmake.min.js') ?>"></script>
+    <script src="<?= pdfmake_url('build/vfs_fonts.js') ?>"></script>
     <script>
+        if (typeof pdfMake !== 'undefined') {
         // Register Thai fonts (following EvaluateDocument.js pattern)
         pdfMake.fonts = {
             Sarabun: {
@@ -283,16 +295,13 @@
                 bolditalics: "Roboto-MediumItalic.ttf",
             }
         };
+        }
     </script>
 
-    <!-- Main JavaScript Files -->
-    <script>
-        const BASE_URL = '<?= rtrim(base_url(), '/') ?>';
-    </script>
-    <script src="<?= base_url('public/assets/js/publication-summary.js') ?>"></script>
+    <script src="<?= base_url('assets/js/publication-summary.js') ?>?v=<?= @filemtime(FCPATH . 'assets/js/publication-summary.js') ?: time() ?>"></script>
 
     <!-- PDF Generation Script (Separate File) -->
-    <script src="<?= base_url('public/assets/js/publication-summary-pdf.js') ?>"></script>
+    <script src="<?= base_url('assets/js/publication-summary-pdf.js') ?>?v=<?= @filemtime(FCPATH . 'assets/js/publication-summary-pdf.js') ?: time() ?>"></script>
 </body>
 
 </html>

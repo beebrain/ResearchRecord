@@ -7,7 +7,7 @@ use CodeIgniter\Model;
 class UserModel extends Model
 {
     protected $table = 'user';
-    protected $primaryKey = 'uid';
+    protected $primaryKey = 'email';
     protected $returnType = 'array';
 
     protected $allowedFields = [
@@ -55,6 +55,8 @@ class UserModel extends Model
      */
     public function getUserByEmail($email)
     {
+        $email = \App\Libraries\UserIdentity::normalizeEmail($email);
+
         return $this->where('email', $email)
             ->where('active', 1)
             ->first();
@@ -65,9 +67,15 @@ class UserModel extends Model
      */
     public function insertUserData($userData)
     {
-        if ($this->insert($userData)) {
-            return $this->getInsertID();
+        $userData['email'] = \App\Libraries\UserIdentity::normalizeEmail((string) ($userData['email'] ?? ''));
+        if ($userData['email'] === '') {
+            return false;
         }
+
+        if ($this->insert($userData)) {
+            return $userData['email'];
+        }
+
         return false;
     }
 
@@ -82,16 +90,17 @@ class UserModel extends Model
     /**
      * Get user statistics
      */
-    public function getUserStats($userId)
+    public function getUserStats(string $userEmail)
     {
-        $db = \Config\Database::connect();
+        $userEmail = \App\Libraries\UserIdentity::normalizeEmail($userEmail);
+        $db        = \Config\Database::connect();
 
         $publicationCount = $db->table('publications')
-            ->where('created_by', $userId)
+            ->where('created_by_email', $userEmail)
             ->countAllResults();
 
         $authorCount = $db->table('authors')
-            ->where('created_by', $userId)
+            ->where('created_by_email', $userEmail)
             ->countAllResults();
 
         return [
@@ -104,7 +113,7 @@ class UserModel extends Model
     public function getActiveUsers()
     {
         return $this->where('active', 1)
-            ->orderBy('uid', 'ASC')
+            ->orderBy('email', 'ASC')
             ->findAll();
     }
 
@@ -166,8 +175,8 @@ class UserModel extends Model
             'GROUP_CONCAT(DISTINCT CASE WHEN tc2.is_primary = 0 THEN c2.name END SEPARATOR ", ") as other_curriculums'
         ])
             ->join('faculties uf', 'uf.id = user.faculty_id', 'left')
-            ->join('teacher_curriculum tc', 'tc.teacher_uid = user.uid AND tc.is_primary = 1 AND tc.status = 1', 'left')
-            ->join('teacher_curriculum tc2', 'tc2.teacher_uid = user.uid AND tc2.status = 1', 'left')
+            ->join('teacher_curriculum tc', 'tc.teacher_email = user.email AND tc.is_primary = 1 AND tc.status = 1', 'left')
+            ->join('teacher_curriculum tc2', 'tc2.teacher_email = user.email AND tc2.status = 1', 'left')
             ->join('curriculum c', 'c.id = tc.curriculum_id', 'left')
             ->join('curriculum c2', 'c2.id = tc2.curriculum_id', 'left')
             ->join('faculties cf', 'cf.id = c.faculty_id', 'left')
@@ -184,7 +193,7 @@ class UserModel extends Model
             $builder->where('user.faculty_id', $facultyId);
         }
 
-        return $builder->groupBy('user.uid')
+        return $builder->groupBy('user.email')
             // Show teachers without main faculty first, then those without curriculum
             ->orderBy('CASE WHEN user.faculty_id IS NULL THEN 0 ELSE 1 END', 'ASC', false)
             ->orderBy('CASE WHEN MAX(tc.curriculum_id) IS NULL THEN 0 ELSE 1 END', 'ASC', false)
@@ -233,8 +242,8 @@ class UserModel extends Model
             'GROUP_CONCAT(DISTINCT CASE WHEN tc2.is_primary = 0 THEN c2.name END SEPARATOR ", ") as other_curriculums'
         ])
             ->join('faculties uf', 'uf.id = user.faculty_id', 'left')
-            ->join('teacher_curriculum tc', 'tc.teacher_uid = user.uid AND tc.is_primary = 1 AND tc.status = 1', 'left')
-            ->join('teacher_curriculum tc2', 'tc2.teacher_uid = user.uid AND tc2.status = 1', 'left')
+            ->join('teacher_curriculum tc', 'tc.teacher_email = user.email AND tc.is_primary = 1 AND tc.status = 1', 'left')
+            ->join('teacher_curriculum tc2', 'tc2.teacher_email = user.email AND tc2.status = 1', 'left')
             ->join('curriculum c', 'c.id = tc.curriculum_id', 'left')
             ->join('curriculum c2', 'c2.id = tc2.curriculum_id', 'left')
             ->join('faculties cf', 'cf.id = c.faculty_id', 'left')
@@ -262,7 +271,7 @@ class UserModel extends Model
             $builder->where('user.faculty_id', $facultyId);
         }
 
-        $builder->groupBy('user.uid')
+        $builder->groupBy('user.email')
             ->orderBy('CASE WHEN user.faculty_id IS NULL THEN 0 ELSE 1 END', 'ASC', false)
             ->orderBy('CASE WHEN MAX(tc.curriculum_id) IS NULL THEN 0 ELSE 1 END', 'ASC', false)
             ->orderBy('user.faculty_id', 'ASC')
@@ -349,17 +358,15 @@ class UserModel extends Model
      * Includes role badge and managed faculties for faculty admins
      * Faculty is loaded from user.faculty_id (user table) - main faculty affiliation
      * Curriculum is loaded from teacher_curriculum table (primary curriculum)
-     * Uses user.uid (user_id) as the main join key
+     * Uses user.email as the main identifier
      * 
      * Schema: User has faculty (required), User can have curriculum (optional, can be from different faculty)
      */
     public function getUsersWithRole()
     {
-        // Use user.uid as the main identifier and join key
-        // Use ONLY teacher_curriculum table (no fallback to user.curriculum_id)
         $builder = $this->db->table('user')
             ->select('
-                user.uid as user_id, 
+                user.email as user_id, 
                 user.*, 
                 uf.name as user_faculty_name, 
                 uf.code as user_faculty_code,
@@ -371,7 +378,7 @@ class UserModel extends Model
                 cf.name as curriculum_faculty_name
             ', false)
             ->join('faculties uf', 'uf.id = user.faculty_id', 'left')
-            ->join('teacher_curriculum tc', 'tc.teacher_uid = user.uid AND tc.is_primary = 1 AND tc.status = 1', 'left')
+            ->join('teacher_curriculum tc', 'tc.teacher_email = user.email AND tc.is_primary = 1 AND tc.status = 1', 'left')
             ->join('curriculum c', 'c.id = tc.curriculum_id', 'left')
             ->join('faculties cf', 'cf.id = c.faculty_id', 'left')
             ->where('user.active', 1)
@@ -382,7 +389,7 @@ class UserModel extends Model
         $query = $builder->get();
         $sql = $this->db->getLastQuery();
         log_message('debug', 'getUsersWithRole SQL Query: ' . $sql);
-        log_message('debug', 'getUsersWithRole - Using user.uid (user_id) as main join key');
+        log_message('debug', 'getUsersWithRole - Using user.email as main join key');
         log_message('debug', 'getUsersWithRole - Faculty loaded from: user.faculty_id (user table - main faculty)');
         log_message('debug', 'getUsersWithRole - Curriculum loaded from: teacher_curriculum table ONLY (primary curriculum)');
 
@@ -397,13 +404,15 @@ class UserModel extends Model
     /**
      * Get all curriculums assigned to a teacher
      *
-     * @param int $teacherUid Teacher's UID
+     * @param string $teacherEmail Teacher email
      * @return array Array of curriculum assignments with details
      */
-    public function getTeacherCurriculums($teacherUid)
+    public function getTeacherCurriculums(string $teacherEmail)
     {
-        $builder = $this->db->table('teacher_curriculum_view');
-        return $builder->where('teacher_uid', $teacherUid)
+        $teacherEmail = \App\Libraries\UserIdentity::normalizeEmail($teacherEmail);
+        $builder      = $this->db->table('teacher_curriculum_view');
+
+        return $builder->where('teacher_email', $teacherEmail)
             ->where('assignment_status', 1)
             ->orderBy('is_primary', 'DESC')
             ->orderBy('curriculum_name', 'ASC')
@@ -414,13 +423,15 @@ class UserModel extends Model
     /**
      * Get primary curriculum for a teacher
      *
-     * @param int $teacherUid Teacher's UID
+     * @param string $teacherEmail Teacher email
      * @return array|null Primary curriculum assignment or null
      */
-    public function getTeacherPrimaryCurriculum($teacherUid)
+    public function getTeacherPrimaryCurriculum(string $teacherEmail)
     {
-        $builder = $this->db->table('teacher_curriculum_view');
-        return $builder->where('teacher_uid', $teacherUid)
+        $teacherEmail = \App\Libraries\UserIdentity::normalizeEmail($teacherEmail);
+        $builder      = $this->db->table('teacher_curriculum_view');
+
+        return $builder->where('teacher_email', $teacherEmail)
             ->where('is_primary', 1)
             ->where('assignment_status', 1)
             ->get()
@@ -430,25 +441,26 @@ class UserModel extends Model
     /**
      * Assign a teacher to a curriculum
      *
-     * @param int $teacherUid Teacher's UID
+     * @param string $teacherEmail Teacher email
      * @param int $curriculumId Curriculum ID
      * @param string $role Role of teacher (instructor, coordinator, assistant)
      * @param bool $isPrimary Whether this is the primary curriculum
      * @return bool Success status
      */
-    public function assignTeacherToCurriculum($teacherUid, $curriculumId, $role = 'instructor', $isPrimary = false)
+    public function assignTeacherToCurriculum(string $teacherEmail, $curriculumId, $role = 'instructor', $isPrimary = false)
     {
-        $builder = $this->db->table('teacher_curriculum');
+        $teacherEmail = \App\Libraries\UserIdentity::normalizeEmail($teacherEmail);
+        $builder      = $this->db->table('teacher_curriculum');
 
         // Check if assignment already exists
-        $existing = $builder->where('teacher_uid', $teacherUid)
+        $existing = $builder->where('teacher_email', $teacherEmail)
             ->where('curriculum_id', $curriculumId)
             ->get()
             ->getRowArray();
 
         if ($existing) {
             // Update existing assignment
-            return $builder->where('teacher_uid', $teacherUid)
+            return $builder->where('teacher_email', $teacherEmail)
                 ->where('curriculum_id', $curriculumId)
                 ->update([
                     'role' => $role,
@@ -459,14 +471,14 @@ class UserModel extends Model
 
         // If setting as primary, unset other primary assignments
         if ($isPrimary) {
-            $builder->where('teacher_uid', $teacherUid)
+            $builder->where('teacher_email', $teacherEmail)
                 ->where('is_primary', 1)
                 ->update(['is_primary' => 0]);
         }
 
         // Insert new assignment
         return $builder->insert([
-            'teacher_uid' => $teacherUid,
+            'teacher_email' => $teacherEmail,
             'curriculum_id' => $curriculumId,
             'role' => $role,
             'is_primary' => $isPrimary ? 1 : 0,
@@ -477,14 +489,16 @@ class UserModel extends Model
     /**
      * Remove a teacher from a curriculum
      *
-     * @param int $teacherUid Teacher's UID
+     * @param string $teacherEmail Teacher email
      * @param int $curriculumId Curriculum ID
      * @return bool Success status
      */
-    public function removeTeacherFromCurriculum($teacherUid, $curriculumId)
+    public function removeTeacherFromCurriculum(string $teacherEmail, $curriculumId)
     {
-        $builder = $this->db->table('teacher_curriculum');
-        return $builder->where('teacher_uid', $teacherUid)
+        $teacherEmail = \App\Libraries\UserIdentity::normalizeEmail($teacherEmail);
+        $builder      = $this->db->table('teacher_curriculum');
+
+        return $builder->where('teacher_email', $teacherEmail)
             ->where('curriculum_id', $curriculumId)
             ->delete();
     }
@@ -492,20 +506,21 @@ class UserModel extends Model
     /**
      * Set a curriculum as primary for a teacher
      *
-     * @param int $teacherUid Teacher's UID
+     * @param string $teacherEmail Teacher email
      * @param int $curriculumId Curriculum ID to set as primary
      * @return bool Success status
      */
-    public function setTeacherPrimaryCurriculum($teacherUid, $curriculumId)
+    public function setTeacherPrimaryCurriculum(string $teacherEmail, $curriculumId)
     {
-        $builder = $this->db->table('teacher_curriculum');
+        $teacherEmail = \App\Libraries\UserIdentity::normalizeEmail($teacherEmail);
+        $builder      = $this->db->table('teacher_curriculum');
 
         // Unset all primary flags for this teacher
-        $builder->where('teacher_uid', $teacherUid)
+        $builder->where('teacher_email', $teacherEmail)
             ->update(['is_primary' => 0]);
 
         // Set new primary
-        return $builder->where('teacher_uid', $teacherUid)
+        return $builder->where('teacher_email', $teacherEmail)
             ->where('curriculum_id', $curriculumId)
             ->update(['is_primary' => 1]);
     }
@@ -532,16 +547,20 @@ class UserModel extends Model
      *
      * @return list<array<string,mixed>>
      */
-    public function getCurriculumResponsibleTeachers(int $curriculumId, ?int $chairId = null, int $limit = 5): array
+    public function getCurriculumResponsibleTeachers(int $curriculumId, ?string $chairEmail = null, int $limit = 5): array
     {
         if ($limit < 1) {
             return [];
         }
 
+        $chairEmail = $chairEmail !== null && $chairEmail !== ''
+            ? \App\Libraries\UserIdentity::normalizeEmail($chairEmail)
+            : null;
+
         $rows = $this->db->table('teacher_curriculum tc')
-            ->select('tc.role, tc.is_primary, u.uid, u.email, u.title, u.titleThai,
+            ->select('tc.role, tc.is_primary, u.email, u.title, u.titleThai,
                       u.gf_name, u.gl_name, u.thai_name, u.thai_lastname, u.faculty_id')
-            ->join('user u', 'u.uid = tc.teacher_uid', 'inner')
+            ->join('user u', 'u.email = tc.teacher_email', 'inner')
             ->where('tc.curriculum_id', $curriculumId)
             ->where('tc.status', 1)
             ->where('u.active', 1)
@@ -550,29 +569,28 @@ class UserModel extends Model
             ->getResultArray();
 
         $chairInList = false;
-        if ($chairId !== null && $chairId > 0) {
+        if ($chairEmail !== null) {
             foreach ($rows as $row) {
-                if ((int) ($row['uid'] ?? 0) === (int) $chairId) {
+                if (\App\Libraries\UserIdentity::normalizeEmail((string) ($row['email'] ?? '')) === $chairEmail) {
                     $chairInList = true;
                     break;
                 }
             }
 
             if (! $chairInList) {
-                $chair = $this->find($chairId);
+                $chair = $this->find($chairEmail);
                 if (is_array($chair) && (int) ($chair['active'] ?? 0) === 1) {
                     array_unshift($rows, [
-                        'uid'          => $chair['uid'],
-                        'email'        => $chair['email'] ?? '',
-                        'title'        => $chair['title'] ?? '',
-                        'titleThai'    => $chair['titleThai'] ?? '',
-                        'gf_name'      => $chair['gf_name'] ?? '',
-                        'gl_name'      => $chair['gl_name'] ?? '',
-                        'thai_name'    => $chair['thai_name'] ?? '',
-                        'thai_lastname'=> $chair['thai_lastname'] ?? '',
-                        'faculty_id'   => $chair['faculty_id'] ?? null,
-                        'role'         => 'chair',
-                        'is_primary'   => 1,
+                        'email'         => $chair['email'],
+                        'title'         => $chair['title'] ?? '',
+                        'titleThai'     => $chair['titleThai'] ?? '',
+                        'gf_name'       => $chair['gf_name'] ?? '',
+                        'gl_name'       => $chair['gl_name'] ?? '',
+                        'thai_name'     => $chair['thai_name'] ?? '',
+                        'thai_lastname' => $chair['thai_lastname'] ?? '',
+                        'faculty_id'    => $chair['faculty_id'] ?? null,
+                        'role'          => 'chair',
+                        'is_primary'    => 1,
                     ]);
                 }
             }
@@ -580,9 +598,11 @@ class UserModel extends Model
 
         $roleOrder = ['chair' => 0, 'coordinator' => 1, 'instructor' => 2, 'assistant' => 3];
 
-        usort($rows, static function (array $a, array $b) use ($chairId, $roleOrder): int {
-            $aIsChair = $chairId !== null && (int) ($a['uid'] ?? 0) === (int) $chairId;
-            $bIsChair = $chairId !== null && (int) ($b['uid'] ?? 0) === (int) $chairId;
+        usort($rows, static function (array $a, array $b) use ($chairEmail, $roleOrder): int {
+            $aEmail = \App\Libraries\UserIdentity::normalizeEmail((string) ($a['email'] ?? ''));
+            $bEmail = \App\Libraries\UserIdentity::normalizeEmail((string) ($b['email'] ?? ''));
+            $aIsChair = $chairEmail !== null && $aEmail === $chairEmail;
+            $bIsChair = $chairEmail !== null && $bEmail === $chairEmail;
             if ($aIsChair !== $bIsChair) {
                 return $aIsChair ? -1 : 1;
             }
@@ -643,8 +663,8 @@ class UserModel extends Model
             'GROUP_CONCAT(DISTINCT CASE WHEN tc2.is_primary = 0 THEN c2.name END SEPARATOR ", ") as other_curriculums'
         ])
             ->join('faculties uf', 'uf.id = user.faculty_id', 'left')
-            ->join('teacher_curriculum tc', 'tc.teacher_uid = user.uid AND tc.is_primary = 1', 'left')
-            ->join('teacher_curriculum tc2', 'tc2.teacher_uid = user.uid AND tc2.status = 1', 'left')
+            ->join('teacher_curriculum tc', 'tc.teacher_email = user.email AND tc.is_primary = 1', 'left')
+            ->join('teacher_curriculum tc2', 'tc2.teacher_email = user.email AND tc2.status = 1', 'left')
             ->join('curriculum', 'curriculum.id = tc.curriculum_id', 'left')
             ->join('curriculum c2', 'c2.id = tc2.curriculum_id', 'left')
             ->join('faculties cf', 'cf.id = curriculum.faculty_id', 'left')
@@ -654,7 +674,7 @@ class UserModel extends Model
             ->where('user.user_type', 'TEACHER')
             ->orWhere('user.user_type IS NULL')
             ->groupEnd()
-            ->groupBy('user.uid')
+            ->groupBy('user.email')
             ->orderBy('CASE WHEN user.faculty_id IS NULL THEN 0 ELSE 1 END', 'ASC', false)
             ->orderBy('user.faculty_id', 'ASC')
             ->orderBy('user.gf_name', 'ASC')

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= esc($title ?? 'ORCID Sync') ?></title>
-    <link rel="stylesheet" href="<?= base_url('/public/assets/css/tailwind.min.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.min.css') ?>">
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
@@ -21,14 +21,14 @@
     <div class="max-w-5xl mx-auto px-4 mb-6">
         <div class="flex items-center justify-between bg-white rounded-xl shadow-sm px-4 py-3 border border-gray-100">
             <div class="flex items-center gap-4">
-                <a href="<?= base_url('index.php/dashboard') ?>" class="text-gray-500 hover:text-gray-700 text-sm">← กลับ Dashboard</a>
+                <a href="<?= site_url('dashboard') ?>" class="text-gray-500 hover:text-gray-700 text-sm">← กลับ Dashboard</a>
                 <span class="text-gray-300">|</span>
                 <span class="font-semibold text-gray-700">🔗 ORCID Sync</span>
             </div>
             <div class="flex items-center gap-2">
-                <a href="<?= base_url('index.php/dashboard/cv') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">📄 ดู CV</a>
-                <a href="<?= base_url('index.php/dashboard/cv-manage') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">📝 จัดการ CV</a>
-                <a href="<?= base_url('index.php/dashboard/settings') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">⚙️ ตั้งค่า</a>
+                <a href="<?= site_url('dashboard/cv') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">📄 ดู CV</a>
+                <a href="<?= site_url('dashboard/cv-manage') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">📝 จัดการ CV</a>
+                <a href="<?= site_url('dashboard/settings') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">⚙️ ตั้งค่า</a>
             </div>
         </div>
     </div>
@@ -162,7 +162,7 @@
             btn.disabled = true;
 
             try {
-                const endpoint = '<?= base_url('index.php/dashboard/sync-orcid-doi') ?>';
+                const endpoint = '<?= site_url('dashboard/sync-orcid-doi') ?>';
                 bar.style.width = '50%';
                 text.textContent = 'กำลังดึงข้อมูลจาก ORCID...';
 
@@ -230,7 +230,7 @@
                     if (educationList.length > 0 || employmentList.length > 0) {
                         try {
                             console.log('Saving CV data:', { education: educationList, employment: employmentList });
-                            const cvRes = await fetch('<?= base_url('index.php/dashboard/save-orcid-cv') ?>', {
+                            const cvRes = await fetch('<?= site_url('dashboard/save-orcid-cv') ?>', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                                 body: JSON.stringify({
@@ -270,7 +270,7 @@
                             cancelButtonText: 'ปิด'
                         }).then((r) => {
                             if (r.isConfirmed) {
-                                window.location.href = '<?= base_url('index.php/dashboard/cv-manage') ?>';
+                                window.location.href = '<?= site_url('dashboard/cv-manage') ?>';
                             }
                         });
                     }, 500);

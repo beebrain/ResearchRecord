@@ -7,6 +7,18 @@ use DateTimeInterface;
 
 class Cookie extends BaseConfig
 {
+    public function __construct()
+    {
+        parent::__construct();
+
+        // RR เป็น IIS sub-app (/recordresearch) — จำกัด session cookie ให้ส่งเฉพาะ path นี้
+        // ไม่ชน session ของ newScience ที่ path=/ (ไม่ต้องเปลี่ยนชื่อ cookie)
+        $script = $_SERVER['SCRIPT_NAME'] ?? '';
+        if (stripos($script, '/recordresearch') !== false) {
+            $this->path = '/recordresearch';
+        }
+    }
+
     /**
      * --------------------------------------------------------------------------
      * Cookie Prefix

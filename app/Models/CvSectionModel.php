@@ -13,7 +13,6 @@ class CvSectionModel extends Model
     protected $useSoftDeletes   = false;
 
     protected $allowedFields = [
-        'user_uid',
         'owner_email_norm',
         'type',
         'title',

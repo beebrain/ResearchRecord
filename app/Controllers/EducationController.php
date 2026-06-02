@@ -76,7 +76,7 @@ class EducationController extends Controller
         // Build query
         $builder = $this->userModel->db->table('user');
         $builder->select([
-            'user.uid',
+            'user.email as uid',
             'user.email',
             'user.gf_name',
             'user.gl_name',
@@ -88,10 +88,10 @@ class EducationController extends Controller
             'COUNT(DISTINCT ce.id) as education_count'
         ]);
         $builder->join('faculties f', 'f.id = user.faculty_id', 'left');
-        $builder->join('cv_sections cs', 'cs.user_uid = user.uid AND cs.type = "education"', 'left');
+        $builder->join('cv_sections cs', 'cs.owner_email_norm = user.email AND cs.type = "education"', 'left');
         $builder->join('cv_entries ce', 'ce.section_id = cs.id', 'left');
         $builder->where('user.active', 1);
-        $builder->groupBy('user.uid');
+        $builder->groupBy('user.email');
         $builder->orderBy('user.gf_name', 'ASC');
 
         // Faculty Admin filter
@@ -130,6 +130,10 @@ class EducationController extends Controller
     public function getEducation($userUid = null)
     {
         if (!$userUid) {
+            $userUid = $this->request->getGet('email') ?? $this->request->getGet('user_uid');
+        }
+
+        if (!$userUid) {
             return $this->response->setJSON([
                 'success' => false,
                 'message' => 'User ID is required'
@@ -158,7 +162,7 @@ class EducationController extends Controller
         return $this->response->setJSON([
             'success' => true,
             'user' => [
-                'uid' => $user['uid'],
+                'uid' => $user['email'],
                 'name' => trim(($user['gf_name'] ?? '') . ' ' . ($user['gl_name'] ?? '')),
                 'thai_name' => trim(($user['thai_name'] ?? '') . ' ' . ($user['thai_lastname'] ?? '')),
                 'email' => $user['email']
@@ -301,7 +305,7 @@ class EducationController extends Controller
         // Build query to get users with education
         $builder = $this->userModel->db->table('user u');
         $builder->select([
-            'u.uid',
+            'u.email as uid',
             'u.email',
             'u.gf_name',
             'u.gl_name',
@@ -337,7 +341,7 @@ class EducationController extends Controller
         foreach ($users as $user) {
             // Get education section
             $section = $this->cvSectionModel
-                ->where('user_uid', $user['uid'])
+                ->where('owner_email_norm', $user['email'])
                 ->where('type', 'education')
                 ->first();
 
@@ -377,7 +381,7 @@ class EducationController extends Controller
             }
 
             $facultyGroups[$fid]['users'][] = [
-                'uid' => $user['uid'],
+                'uid' => $user['email'],
                 'title' => $user['titleThai'] ?? $user['title'] ?? '',
                 'thai_name' => trim(($user['thai_name'] ?? '') . ' ' . ($user['thai_lastname'] ?? '')),
                 'eng_name' => trim(($user['gf_name'] ?? '') . ' ' . ($user['gl_name'] ?? '')),
@@ -430,18 +434,18 @@ class EducationController extends Controller
     /**
      * สร้าง Education Section ถ้ายังไม่มี
      */
-    private function ensureEducationSection($userUid)
+    private function ensureEducationSection($userEmail)
     {
-        // Check if education section exists
+        $userEmail = \App\Libraries\UserIdentity::normalizeEmail((string) $userEmail);
+
         $section = $this->cvSectionModel
-            ->where('user_uid', $userUid)
+            ->where('owner_email_norm', $userEmail)
             ->where('type', 'education')
             ->first();
 
         if (!$section) {
-            // Create education section
             $this->cvSectionModel->insert([
-                'user_uid' => $userUid,
+                'owner_email_norm' => $userEmail,
                 'type' => 'education',
                 'title' => 'Education',
                 'description' => 'ประวัติการศึกษา',

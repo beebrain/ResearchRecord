@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Libraries\UserIdentity;
 use CodeIgniter\Model;
 
 class UserProfileModel extends Model
@@ -13,7 +14,7 @@ class UserProfileModel extends Model
     protected $useSoftDeletes   = false;
 
     protected $allowedFields = [
-        'user_uid',
+        'user_email',
         'bio',
         'expertise',
         'phone',
@@ -32,45 +33,64 @@ class UserProfileModel extends Model
     protected $createdField  = 'created_at';
     protected $updatedField  = 'updated_at';
 
-    /**
-     * Get profile by user UID
-     */
-    public function getByUserUid($userUid)
+    public function getByUserEmail(string $email): ?array
     {
-        return $this->where('user_uid', $userUid)->first();
+        $email = UserIdentity::normalizeEmail($email);
+
+        return $email === '' ? null : $this->where('user_email', $email)->first();
     }
 
-    /**
-     * Get or create profile for user
-     */
-    public function getOrCreate($userUid)
+    public function getOrCreate(string $userEmail): ?array
     {
-        $profile = $this->getByUserUid($userUid);
-
-        if (!$profile) {
-            // Create empty profile
-            $this->insert([
-                'user_uid' => $userUid,
-            ]);
-            return $this->getByUserUid($userUid);
+        $userEmail = UserIdentity::normalizeEmail($userEmail);
+        if ($userEmail === '') {
+            return null;
         }
 
-        return $profile;
+        $profile = $this->getByUserEmail($userEmail);
+        if ($profile) {
+            return $profile;
+        }
+
+        if (UserIdentity::resolveUserByEmail($userEmail) === null) {
+            log_message('warning', 'UserProfile getOrCreate skipped: no user row for {email}', ['email' => $userEmail]);
+
+            return null;
+        }
+
+        $this->insert(['user_email' => $userEmail]);
+
+        return $this->getByUserEmail($userEmail);
     }
 
-    /**
-     * Update profile by user UID
-     */
-    public function updateByUserUid($userUid, $data)
+    public function updateByUserEmail(string $userEmail, array $data): bool
     {
-        $profile = $this->getByUserUid($userUid);
+        $userEmail = UserIdentity::normalizeEmail($userEmail);
+        if ($userEmail === '') {
+            return false;
+        }
 
+        $profile = $this->getByUserEmail($userEmail);
         if ($profile) {
             return $this->update($profile['id'], $data);
-        } else {
-            // Create new profile if doesn't exist
-            $data['user_uid'] = $userUid;
-            return $this->insert($data);
         }
+
+        if (UserIdentity::resolveUserByEmail($userEmail) === null) {
+            log_message('warning', 'UserProfile update skipped: no user row for {email}', ['email' => $userEmail]);
+
+            return false;
+        }
+
+        $data['user_email'] = $userEmail;
+
+        return (bool) $this->insert($data);
+    }
+
+    /**
+     * @deprecated Use updateByUserEmail — $userKey must be a user email.
+     */
+    public function updateByUserUid($userKey, array $data): bool
+    {
+        return $this->updateByUserEmail((string) $userKey, $data);
     }
 }

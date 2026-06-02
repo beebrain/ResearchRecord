@@ -10,8 +10,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- pdfMake Local Files (with Thai fonts in vfs_fonts.js) -->
-    <script src="<?= base_url(); ?>pdfmake/build/pdfmake.min.js"></script>
-    <script src="<?= base_url(); ?>pdfmake/build/vfs_fonts.js"></script>
+    <script src="<?= pdfmake_url('build/pdfmake.min.js') ?>"></script>
+    <script src="<?= pdfmake_url('build/vfs_fonts.js') ?>"></script>
 
     <!-- Initialize fonts immediately after pdfMake loads -->
     <script>
@@ -36,7 +36,7 @@
     </script>
 
     <!-- Admission Form PDF Script -->
-    <script src="<?= base_url('public/assets/js/admission-form-pdf.js') ?>"></script>
+    <script src="<?= base_url('assets/js/admission-form-pdf.js') ?>"></script>
 
     <style>
         .loader {
@@ -90,10 +90,13 @@
     </div>
 
     <script>
+        const BASE_URL = '<?= rtrim(base_url(), '/') ?>';
+    </script>
+    <script src="<?= base_url('assets/js/app-routes.js') ?>?v=<?= @filemtime(FCPATH . 'assets/js/app-routes.js') ?: time() ?>"></script>
+    <script>
         // Get form ID from URL
         const urlParams = new URLSearchParams(window.location.search);
         const FORM_ID = urlParams.get('form_id');
-        const BASE_URL = '<?= rtrim(base_url(), '/') ?>';
 
         // Update status function
         function updateStatus(message, step) {
@@ -114,7 +117,7 @@
                 updateStatus('กำลังโหลดข้อมูลแบบฟอร์ม...', 'ขั้นตอนที่ 1/3');
 
                 // Fetch form data
-                const response = await fetch(`${BASE_URL}/index.php/admin/admission/get/${FORM_ID}`, {
+                const response = await fetch(appRoute('admin/admission/get/' + FORM_ID), {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',

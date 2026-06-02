@@ -5,15 +5,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $title ?? 'รายงานประวัติการศึกษา' ?></title>
-    <link rel="stylesheet" href="<?= base_url('/public/assets/css/tailwind.min.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.min.css') ?>">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/admin-common.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/admin-common.css') ?>">
 
-    <!-- pdfMake -->
-    <script src="<?= base_url(); ?>pdfmake/build/pdfmake.min.js"></script>
-    <script src="<?= base_url(); ?>pdfmake/build/vfs_fonts.js"></script>
+    <!-- pdfMake (lives at project root, not public/) -->
+    <script src="<?= pdfmake_url('build/pdfmake.min.js') ?>"></script>
+    <script src="<?= pdfmake_url('build/vfs_fonts.js') ?>"></script>
 
     <script>
         if (typeof pdfMake !== 'undefined') {
@@ -79,7 +79,7 @@
                                 <h2 class="text-xl font-bold text-gray-900">สร้างรายงานประวัติการศึกษา</h2>
                                 <p class="text-sm text-gray-600 mt-1">เลือกคณะและสร้างรายงาน PDF ประวัติการศึกษาของบุคลากร</p>
                             </div>
-                            <a href="<?= base_url('index.php/admin/education') ?>"
+                            <a href="<?= site_url('admin/education') ?>"
                                 class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
                                 ← กลับไปหน้าจัดการ
                             </a>
@@ -160,6 +160,9 @@
 
     <script>
         const BASE_URL = '<?= rtrim(base_url(), '/') ?>';
+    </script>
+    <script src="<?= base_url('assets/js/app-routes.js') ?>?v=<?= @filemtime(FCPATH . 'assets/js/app-routes.js') ?: time() ?>"></script>
+    <script>
         let reportData = null;
 
         function loadPreview() {
@@ -171,7 +174,7 @@
             $('#loadingSection').removeClass('hidden');
             $('#btnGeneratePDF').prop('disabled', true);
 
-            $.get(`${BASE_URL}/index.php/admin/education/report-data`, { faculty_id: facultyId })
+            $.get(appRoute('admin/education/report-data?'), { faculty_id: facultyId })
                 .done(function(response) {
                     $('#loadingSection').addClass('hidden');
 

@@ -5,17 +5,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $title ?? 'เพิ่มผลงานวิจัย' ?></title>
-    <link rel="stylesheet" href="<?= base_url('/public/assets/css/tailwind.min.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.min.css') ?>">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <meta name="csrf-token" content="<?= csrf_hash() ?>">
 
     <!-- Shared Admin Styles -->
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/admin-common.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/admin-common.css') ?>">
 
     <!-- Publication Form Specific Styles -->
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/publication-form.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/author-search.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/publication-form.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/author-search.css') ?>">
 
     <style>
         /* AI Waiting Modal Animation */
@@ -72,7 +72,7 @@
         <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div class="flex items-center justify-between">
                 <h1 class="text-xl font-semibold text-gray-900">เพิ่มผลงานวิจัย</h1>
-                <a href="<?= base_url('index.php/publications') ?>"
+                <a href="<?= site_url('publications') ?>"
                     class="text-sm text-gray-600 hover:text-gray-900">
                     ← กลับสู่แดชบอร์ด
                 </a>
@@ -121,7 +121,7 @@
             </div>
 
             <!-- Form Content -->
-            <form id="publicationForm" action="<?= base_url('index.php/publications/store') ?>" method="POST">
+            <form id="publicationForm" action="<?= site_url('publications/store') ?>" method="POST">
                 <?= csrf_field() ?>
 
                 <!-- Hidden field for file reference -->
@@ -548,9 +548,9 @@
         const BASE_URL = '<?= rtrim(base_url(), '/') ?>';
         let authorCount = 1;
     </script>
-    <script src="<?= base_url('public/assets/js/publication-form.js') ?>"></script>
-    <script src="<?= base_url('public/assets/js/email-autocomplete.js') ?>"></script>
-    <script src="<?= base_url('public/assets/js/author-search.js') ?>"></script>
+    <script src="<?= base_url('assets/js/publication-form.js') ?>"></script>
+    <script src="<?= base_url('assets/js/email-autocomplete.js') ?>"></script>
+    <script src="<?= base_url('assets/js/author-search.js') ?>"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         // EMERGENCY JS - Add after your existing JS
@@ -733,8 +733,8 @@
     </div>
 
     <!-- File Upload & AI Assistant Scripts -->
-    <script src="<?= base_url('public/assets/js/publication-upload.js?v=' . time()) ?>"></script>
-    <script src="<?= base_url('public/assets/js/publication-ai.js?v=' . time()) ?>"></script>
+    <script src="<?= base_url('assets/js/publication-upload.js?v=' . time()) ?>"></script>
+    <script src="<?= base_url('assets/js/publication-ai.js?v=' . time()) ?>"></script>
 </body>
 
 </html>

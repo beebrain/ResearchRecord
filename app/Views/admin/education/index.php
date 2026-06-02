@@ -5,17 +5,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $title ?? 'จัดการประวัติการศึกษา' ?></title>
-    <link rel="stylesheet" href="<?= base_url('/public/assets/css/tailwind.min.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.min.css') ?>">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
     <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/admin-common.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/admin-common.css') ?>">
 
-    <!-- pdfMake for PDF generation -->
-    <script src="<?= base_url(); ?>pdfmake/build/pdfmake.min.js"></script>
-    <script src="<?= base_url(); ?>pdfmake/build/vfs_fonts.js"></script>
+    <!-- pdfMake for PDF generation (lives at project root, not public/) -->
+    <script src="<?= pdfmake_url('build/pdfmake.min.js') ?>"></script>
+    <script src="<?= pdfmake_url('build/vfs_fonts.js') ?>"></script>
     <script>
         if (typeof pdfMake !== 'undefined') {
             pdfMake.fonts = {
@@ -256,6 +256,9 @@
 
     <script>
         const BASE_URL = '<?= rtrim(base_url(), '/') ?>';
+    </script>
+    <script src="<?= base_url('assets/js/app-routes.js') ?>?v=<?= @filemtime(FCPATH . 'assets/js/app-routes.js') ?: time() ?>"></script>
+    <script>
         let usersTable;
         let currentEducationData = [];
         const IS_FACULTY_ADMIN = <?= !empty($isFacultyAdmin) ? 'true' : 'false' ?>;
@@ -276,7 +279,13 @@
                 processing: true,
                 serverSide: false,
                 ajax: {
-                    url: `${BASE_URL}/index.php/admin/education/users`,
+                    url: appRoute('admin/education/users?'),
+                    cache: false,
+                    data: function(d) {
+                        // Send filter params via data instead of URL to avoid double-? with CI4 query-string routing
+                        d.faculty_id = $('#facultyFilter').val() || '';
+                        d.search = $('#searchInput').val() || '';
+                    },
                     dataSrc: function(json) {
                         return json.data || [];
                     }
@@ -381,10 +390,8 @@
         });
 
         function reloadUsers() {
-            const faculty = $('#facultyFilter').val();
-            const search = $('#searchInput').val();
-
-            usersTable.ajax.url(`${BASE_URL}/index.php/admin/education/users?faculty_id=${faculty}&search=${encodeURIComponent(search)}`).load();
+            // Simply reload — filter params are sent via DataTable ajax.data callback
+            usersTable.ajax.reload(null, false);
         }
 
         function openEducationModal(userUid) {
@@ -402,7 +409,7 @@
         }
 
         function loadEducationEntries(userUid) {
-            $.get(`${BASE_URL}/index.php/admin/education/get/${userUid}`, function(response) {
+            $.get(appRoute('admin/education/get') + '?email=' + encodeURIComponent(userUid), function(response) {
                 if (response.success) {
                     const user = response.user;
                     const displayName = user.thai_name || user.name || user.email;
@@ -535,7 +542,7 @@
             };
 
             $.ajax({
-                url: `${BASE_URL}/index.php/admin/education/saveEntry`,
+                url: appRoute('admin/education/saveEntry'),
                 method: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify(formData),
@@ -572,7 +579,7 @@
                 cancelButtonText: 'ยกเลิก'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    $.post(`${BASE_URL}/index.php/admin/education/deleteEntry/${entryId}`, function(response) {
+                    $.post(appRoute('admin/education/deleteEntry/' + entryId), function(response) {
                         if (response.success) {
                             Swal.fire({
                                 icon: 'success',
@@ -613,7 +620,7 @@
             });
 
             try {
-                const response = await $.get(`${BASE_URL}/index.php/admin/education/report-data`, { faculty_id: facultyId });
+                const response = await $.get(appRoute('admin/education/report-data?'), { faculty_id: facultyId });
 
                 if (!response.success || !response.data || response.data.length === 0) {
                     Swal.fire({

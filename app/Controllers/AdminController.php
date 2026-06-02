@@ -9,6 +9,7 @@ use App\Models\PublicationModel;
 use App\Models\FacultyModel;
 use App\Models\CurriculumModel;
 use App\Helpers\RoleHelper;
+use App\Libraries\UserIdentity;
 
 class AdminController extends Controller
 {
@@ -50,14 +51,18 @@ class AdminController extends Controller
         if (($userData['role'] ?? '') !== 'faculty_admin') {
             return null;
         }
-        $uid = (int) ($userData['uid'] ?? 0);
-        if ($uid <= 0) {
+        $email = UserIdentity::sessionEmail();
+        if ($email === '') {
+            $userData = $this->session->get('user_data') ?? [];
+            $email    = UserIdentity::normalizeEmail((string) ($userData['email'] ?? ''));
+        }
+        if ($email === '') {
             return $this->response->setJSON([
                 'success' => false,
                 'message' => 'ไม่ได้รับอนุญาต',
             ])->setStatusCode(403);
         }
-        $user = $this->userModel->find($uid);
+        $user = $this->userModel->find($email);
         if (!is_array($user)) {
             return $this->response->setJSON([
                 'success' => false,
@@ -94,10 +99,10 @@ class AdminController extends Controller
     public function getDashboardSummary()
     {
         try {
-            $userId = $this->session->get('user_id');
-            if (!$userId) {
-                $userData = $this->session->get('user_data');
-                $userId = $userData['uid'] ?? null;
+            $userId = UserIdentity::sessionEmail();
+            if ($userId === '') {
+                $userData = $this->session->get('user_data') ?? [];
+                $userId   = UserIdentity::normalizeEmail((string) ($userData['email'] ?? ''));
             }
 
             if (!$userId) {
@@ -166,13 +171,11 @@ class AdminController extends Controller
             f.name,
             f.code,
             (SELECT COUNT(*) FROM curriculum c WHERE c.faculty_id = f.id AND c.status = 1) as curricula_count,
-            (SELECT COUNT(DISTINCT tc.teacher_uid) FROM teacher_curriculum tc 
+            (SELECT COUNT(DISTINCT tc.teacher_email) FROM teacher_curriculum tc 
              INNER JOIN curriculum c ON c.id = tc.curriculum_id 
              WHERE c.faculty_id = f.id AND tc.status = 1) as teachers_count,
-            (SELECT COUNT(DISTINCT p.id) FROM publications p 
-             INNER JOIN user u ON u.uid = p.created_by 
-             INNER JOIN curriculum c ON c.id = u.curriculum_id 
-             WHERE c.faculty_id = f.id) as publications_count,
+            (SELECT COUNT(DISTINCT pv.id) FROM publication_view pv 
+             WHERE pv.faculty_id = f.id) as publications_count,
             (SELECT COUNT(*) FROM student_admission_forms saf WHERE saf.faculty_id = f.id) as admission_forms_count
         ");
         $builder->where('f.status', 1);
@@ -192,16 +195,14 @@ class AdminController extends Controller
     {
         $db = \Config\Database::connect();
 
-        $builder = $db->table('publications p');
-        $builder->select('p.publication_type, COUNT(*) as count');
+        $builder = $db->table('publication_view pv');
+        $builder->select('pv.publication_type, COUNT(*) as count');
 
         if (!empty($facultyIds)) {
-            $builder->join('user u', 'u.uid = p.created_by', 'left');
-            $builder->join('curriculum c', 'c.id = u.curriculum_id', 'left');
-            $builder->whereIn('c.faculty_id', $facultyIds);
+            $builder->whereIn('pv.faculty_id', $facultyIds);
         }
 
-        $builder->groupBy('p.publication_type');
+        $builder->groupBy('pv.publication_type');
         $builder->orderBy('count', 'DESC');
 
         return $builder->get()->getResultArray();
@@ -214,25 +215,22 @@ class AdminController extends Controller
     {
         $db = \Config\Database::connect();
 
-        $builder = $db->table('publications p');
+        $builder = $db->table('publication_view pv');
         $builder->select("
-            p.id,
-            p.title,
-            p.publication_type,
-            p.publication_year,
-            p.created_at,
-            CONCAT(u.gf_name, ' ', u.gl_name) as created_by_name,
-            f.name as faculty_name
+            pv.id,
+            pv.title,
+            pv.publication_type,
+            pv.publication_year,
+            pv.created_at,
+            pv.created_by_name,
+            pv.created_by_faculty_name as faculty_name
         ");
-        $builder->join('user u', 'u.uid = p.created_by', 'left');
-        $builder->join('curriculum c', 'c.id = u.curriculum_id', 'left');
-        $builder->join('faculties f', 'f.id = c.faculty_id', 'left');
 
         if (!empty($facultyIds)) {
-            $builder->whereIn('c.faculty_id', $facultyIds);
+            $builder->whereIn('pv.faculty_id', $facultyIds);
         }
 
-        $builder->orderBy('p.created_at', 'DESC');
+        $builder->orderBy('pv.created_at', 'DESC');
         $builder->limit($limit);
 
         return $builder->get()->getResultArray();
@@ -373,9 +371,9 @@ class AdminController extends Controller
                           u2.thai_name as author_user_thai_name,
                           u2.thai_lastname as author_user_thai_lastname,
                           u2.titleThai as author_user_title_thai')
-                ->join('user u1', 'pa.uid = u1.uid', 'left')
+                ->join('user u1', 'pa.author_email = u1.email', 'left')
                 ->join('authors a', 'pa.author_id = a.id', 'left')
-                ->join('user u2', 'a.user_uid = u2.uid', 'left')
+                ->join('user u2', 'a.user_email = u2.email', 'left')
                 ->where('pa.publication_id', $id)
                 ->orderBy('pa.author_order', 'ASC')
                 ->get()
@@ -384,8 +382,8 @@ class AdminController extends Controller
             // Process authors to get proper names
             foreach ($authors as &$author) {
                 // Priority: uid from user table > author_id from authors+user > name from publication_authors
-                if (!empty($author['uid']) && !empty($author['user_thai_name'])) {
-                    // Use user table Thai name (direct link via uid)
+                if (!empty($author['author_email']) && !empty($author['user_thai_name'])) {
+                    // Use user table Thai name (direct link via author_email)
                     $fullName = trim($author['user_thai_name'] . ' ' . ($author['user_thai_lastname'] ?? ''));
                     if (!empty($author['user_title_thai'])) {
                         $fullName = $author['user_title_thai'] . $fullName;
@@ -672,15 +670,11 @@ class AdminController extends Controller
                                 'email' => $authorInput['email'] ?? null,
                                 'affiliation' => $authorInput['affiliation'] ?? 'มหาวิทยาลัยราชภัฏอุตรดิตถ์',
                                 'author_id' => null,
-                                'uid' => null,
                                 'corresponding' => isset($authorInput['corresponding']) && $authorInput['corresponding'] == '1' ? 1 : 0
                             ];
 
-                            // Priority 1: Use uid if provided from autocomplete
-                            if (!empty($authorInput['uid'])) {
-                                $authorData['uid'] = $authorInput['uid'];
-
-                                // Verify author_id exists before using it
+                            $linkedEmail = UserIdentity::normalizeEmail((string) ($authorInput['user_uid'] ?? $authorInput['uid'] ?? ''));
+                            if ($linkedEmail !== '') {
                                 if (!empty($authorInput['author_id'])) {
                                     $authorExists = $this->db->table('authors')
                                         ->where('id', $authorInput['author_id'])
@@ -689,16 +683,14 @@ class AdminController extends Controller
                                         $authorData['author_id'] = $authorInput['author_id'];
                                     }
                                 }
-                            }
-                            // Priority 2: Try to find existing author by email
-                            elseif (!empty($authorInput['email'])) {
+                                if (empty($authorData['email'])) {
+                                    $authorData['email'] = $linkedEmail;
+                                }
+                            } elseif (!empty($authorInput['email'])) {
                                 $existingAuthor = $this->authorModel->getAuthorlinkUser($authorInput['email']);
                                 if ($existingAuthor) {
                                     $authorData['author_id'] = $existingAuthor['id'];
-                                    $authorData['autor_name'] = $existingAuthor['name'];
-                                    $authorData['author_affiliation'] = $existingAuthor['affiliation'];
-                                    $authorData['author_email'] = $existingAuthor['email'];
-                                    $authorData['uid'] = $existingAuthor['user_id'];
+                                    $authorData['email'] = $existingAuthor['email'] ?? $authorInput['email'];
                                 }
                             }
 
@@ -781,15 +773,14 @@ class AdminController extends Controller
         // 1. Teachers in curriculum (teacher_curriculum) AND have publications
         // 2. OR authors with publications in faculties
         $authorQuery = $db->query("
-            SELECT COUNT(DISTINCT u.uid) as count
+            SELECT COUNT(DISTINCT u.email) as count
             FROM user u
-            INNER JOIN teacher_curriculum tc ON tc.teacher_uid = u.uid AND tc.status = 1
+            INNER JOIN teacher_curriculum tc ON tc.teacher_email = u.email AND tc.status = 1
             INNER JOIN publication_authors pa ON (
-                pa.uid = u.uid 
-                OR pa.author_email = u.email
+                pa.author_email = u.email
                 OR EXISTS (
                     SELECT 1 FROM authors a 
-                    WHERE a.id = pa.author_id AND a.user_uid = u.uid
+                    WHERE a.id = pa.author_id AND a.user_email = u.email
                 )
             )
             WHERE u.active = 1
@@ -904,8 +895,8 @@ class AdminController extends Controller
 
         // Count total active users (teachers)
         $userBuilder = $db->table('user u');
-        $userBuilder->select('u.uid');
-        $userBuilder->join('teacher_curriculum tc', 'tc.teacher_uid = u.uid AND tc.status = 1', 'inner');
+        $userBuilder->select('u.email');
+        $userBuilder->join('teacher_curriculum tc', 'tc.teacher_email = u.email AND tc.status = 1', 'inner');
         $userBuilder->where('u.active', 1);
         $userBuilder->distinct();
 
@@ -918,9 +909,9 @@ class AdminController extends Controller
 
         // Count users with education entries
         $eduBuilder = $db->table('user u');
-        $eduBuilder->select('u.uid');
-        $eduBuilder->join('teacher_curriculum tc', 'tc.teacher_uid = u.uid AND tc.status = 1', 'inner');
-        $eduBuilder->join('cv_sections cs', "cs.user_uid = u.uid AND cs.type = 'education'", 'inner');
+        $eduBuilder->select('u.email');
+        $eduBuilder->join('teacher_curriculum tc', 'tc.teacher_email = u.email AND tc.status = 1', 'inner');
+        $eduBuilder->join('cv_sections cs', "cs.owner_email_norm = u.email AND cs.type = 'education'", 'inner');
         $eduBuilder->join('cv_entries ce', 'ce.section_id = cs.id', 'inner');
         $eduBuilder->where('u.active', 1);
         $eduBuilder->distinct();
@@ -954,7 +945,7 @@ class AdminController extends Controller
 
         if (!empty($facultyIds)) {
             // Join to get faculty info
-            $builder->join('user u', 'u.uid = p.created_by', 'left');
+            $builder->join('user u', 'u.email = p.created_by_email', 'left');
             $builder->join('curriculum c', 'c.id = u.curriculum_id', 'left');
             $builder->whereIn('c.faculty_id', $facultyIds);
         }
@@ -984,16 +975,15 @@ class AdminController extends Controller
         // Count unique authors who are teachers in curricula of managed faculties AND have publications
         $facultyIdsStr = implode(',', array_map('intval', $facultyIds));
         $authorQuery = $db->query("
-            SELECT COUNT(DISTINCT u.uid) as count
+            SELECT COUNT(DISTINCT u.email) as count
             FROM user u
-            INNER JOIN teacher_curriculum tc ON tc.teacher_uid = u.uid AND tc.status = 1
+            INNER JOIN teacher_curriculum tc ON tc.teacher_email = u.email AND tc.status = 1
             INNER JOIN curriculum c ON c.id = tc.curriculum_id AND c.faculty_id IN ({$facultyIdsStr})
             INNER JOIN publication_authors pa ON (
-                pa.uid = u.uid 
-                OR pa.author_email = u.email
+                pa.author_email = u.email
                 OR EXISTS (
                     SELECT 1 FROM authors a 
-                    WHERE a.id = pa.author_id AND a.user_uid = u.uid
+                    WHERE a.id = pa.author_id AND a.user_email = u.email
                 )
             )
             INNER JOIN publication_view pv ON pv.id = pa.publication_id AND pv.faculty_id IN ({$facultyIdsStr})
@@ -1010,53 +1000,44 @@ class AdminController extends Controller
     /**
      * Get statistics by user
      */
-    private function getStatsByUser(int $userId)
+    private function getStatsByUser(string $userEmail)
     {
         $db = \Config\Database::connect();
+        $userEmail = UserIdentity::normalizeEmail($userEmail);
 
         // Count user's publications using author_email (same condition as getPublicationsByAuthor)
-        // Get all user emails first
         $userEmails = [];
-        $user = $this->userModel->find($userId);
+        $user = $this->userModel->find($userEmail);
         if ($user && !empty($user['email'])) {
-            $userEmails[] = $user['email'];
+            $userEmails[] = UserIdentity::normalizeEmail((string) $user['email']);
         }
 
-        // Get all emails from authors table for this user
         $authorEmails = $db->table('authors')
             ->select('email')
-            ->where('user_uid', $userId)
+            ->where('user_email', $userEmail)
             ->where('email IS NOT NULL')
             ->where('email !=', '')
             ->get()
             ->getResultArray();
 
         foreach ($authorEmails as $authorEmail) {
-            if (!empty($authorEmail['email']) && !in_array($authorEmail['email'], $userEmails)) {
+            if (!empty($authorEmail['email']) && !in_array($authorEmail['email'], $userEmails, true)) {
                 $userEmails[] = $authorEmail['email'];
             }
         }
 
-        // Count publications using author_email as PRIMARY condition
         $publicationIds = $db->table('publication_authors pa')
             ->select('pa.publication_id')
             ->distinct()
-            ->join('authors a', 'pa.author_id = a.id', 'left')
-            ->join('user u', 'pa.uid = u.uid', 'left');
+            ->join('authors a', 'pa.author_id = a.id', 'left');
 
         if (!empty($userEmails)) {
             $publicationIds->groupStart()
                 ->whereIn('pa.author_email', $userEmails)
                 ->orWhereIn('a.email', $userEmails)
-                ->orWhereIn('u.email', $userEmails)
-                ->orWhere('pa.uid', $userId)
-                ->orWhere('a.user_uid', $userId)
                 ->groupEnd();
         } else {
-            $publicationIds->groupStart()
-                ->where('pa.uid', $userId)
-                ->orWhere('a.user_uid', $userId)
-                ->groupEnd();
+            $publicationIds->where('pa.author_email', $userEmail);
         }
 
         $ids = array_column($publicationIds->get()->getResultArray(), 'publication_id');
@@ -1092,7 +1073,7 @@ class AdminController extends Controller
                 u.gl_name,
                 GROUP_CONCAT(pa.author_name ORDER BY pa.author_order SEPARATOR ', ') as authors
             FROM publications p
-            LEFT JOIN user u ON p.created_by = u.uid
+            LEFT JOIN user u ON p.created_by_email = u.email
             LEFT JOIN publication_authors pa ON p.id = pa.publication_id
             GROUP BY p.id
             ORDER BY p.created_at DESC
@@ -1148,7 +1129,8 @@ class AdminController extends Controller
 
             // Enrich users with secondary emails from authors table
             foreach ($users as &$user) {
-                $secondaryEmails = $this->authorModel->getAuthorEmailsByUser($user['uid']);
+                $secondaryEmails = $this->authorModel->getAuthorEmailsByUser($user['email']);
+                $user['uid'] = $user['email'];
                 $user['secondary_emails'] = implode(',', $secondaryEmails);
                 $user['username'] = $user['gf_name'] . ' ' . $user['gl_name'];
                 $user['primary_email'] = $user['email'];
@@ -1178,10 +1160,10 @@ class AdminController extends Controller
         }
 
         try {
-            $userUid = $this->request->getPost('user_uid');
+            $userEmail = UserIdentity::normalizeEmail((string) ($this->request->getPost('user_uid') ?? ''));
             $email = $this->request->getPost('email');
 
-            if (!$userUid || !$email) {
+            if (!$userEmail || !$email) {
                 return $this->response->setJSON([
                     'success' => false,
                     'message' => 'User ID and email are required'
@@ -1197,7 +1179,7 @@ class AdminController extends Controller
             }
 
             // Check if user exists
-            $user = $this->userModel->find($userUid);
+            $user = $this->userModel->find($userEmail);
             if (!$user) {
                 return $this->response->setJSON([
                     'success' => false,
@@ -1214,7 +1196,7 @@ class AdminController extends Controller
             }
 
             // Check if email already exists in authors table for this user
-            $existingAuthor = $this->authorModel->where('user_uid', $userUid)
+            $existingAuthor = $this->authorModel->where('user_email', $userEmail)
                 ->where('email', $email)
                 ->first();
 
@@ -1237,8 +1219,8 @@ class AdminController extends Controller
             // Add email to authors table
             $authorData = [
                 'email' => $email,
-                'user_uid' => $userUid,
-                'created_by' => $userUid
+                'user_email' => $userEmail,
+                'created_by_email' => $userEmail
             ];
 
             $inserted = $this->authorModel->insert($authorData);
@@ -1276,12 +1258,12 @@ class AdminController extends Controller
         try {
             $authorId = $this->request->getPost('author_id');
             $newEmail = $this->request->getPost('email');
-            $userUid = $this->request->getPost('user_uid');
+            $userEmail = UserIdentity::normalizeEmail((string) ($this->request->getPost('user_uid') ?? ''));
 
-            if (!$authorId || !$newEmail || !$userUid) {
+            if (!$authorId || !$newEmail || $userEmail === '') {
                 return $this->response->setJSON([
                     'success' => false,
-                    'message' => 'Author ID, user ID, and email are required'
+                    'message' => 'Author ID, user email, and email are required'
                 ]);
             }
 
@@ -1295,7 +1277,7 @@ class AdminController extends Controller
 
             // Check if author exists and belongs to this user
             $author = $this->authorModel->find($authorId);
-            if (!$author || $author['user_uid'] !== $userUid) {
+            if (!$author || UserIdentity::normalizeEmail((string) ($author['user_email'] ?? '')) !== $userEmail) {
                 return $this->response->setJSON([
                     'success' => false,
                     'message' => 'Author not found or unauthorized'
@@ -1303,7 +1285,7 @@ class AdminController extends Controller
             }
 
             // Get user data
-            $user = $this->userModel->find($userUid);
+            $user = $this->userModel->find($userEmail);
             if (!$user) {
                 return $this->response->setJSON([
                     'success' => false,
@@ -1320,7 +1302,7 @@ class AdminController extends Controller
             }
 
             // Check if new email already exists for this user (in authors table)
-            $existingAuthor = $this->authorModel->where('user_uid', $userUid)
+            $existingAuthor = $this->authorModel->where('user_email', $userEmail)
                 ->where('email', $newEmail)
                 ->where('id !=', $authorId)
                 ->first();
@@ -1376,18 +1358,18 @@ class AdminController extends Controller
 
         try {
             $authorId = $this->request->getPost('author_id');
-            $userUid = $this->request->getPost('user_uid');
+            $userEmail = UserIdentity::normalizeEmail((string) ($this->request->getPost('user_uid') ?? ''));
 
-            if (!$authorId || !$userUid) {
+            if (!$authorId || $userEmail === '') {
                 return $this->response->setJSON([
                     'success' => false,
-                    'message' => 'Author ID and user ID are required'
+                    'message' => 'Author ID and user email are required'
                 ]);
             }
 
             // Check if author exists and belongs to this user
             $author = $this->authorModel->find($authorId);
-            if (!$author || $author['user_uid'] !== $userUid) {
+            if (!$author || UserIdentity::normalizeEmail((string) ($author['user_email'] ?? '')) !== $userEmail) {
                 return $this->response->setJSON([
                     'success' => false,
                     'message' => 'Author not found or unauthorized'
@@ -1427,16 +1409,16 @@ class AdminController extends Controller
         }
 
         try {
-            $userUid = $this->request->getGet('user_uid');
+            $userEmail = UserIdentity::normalizeEmail((string) ($this->request->getGet('user_uid') ?? ''));
 
-            if (!$userUid) {
+            if ($userEmail === '') {
                 return $this->response->setJSON([
                     'success' => false,
-                    'message' => 'User ID is required'
+                    'message' => 'User email is required'
                 ]);
             }
 
-            $authors = $this->authorModel->getUserAuthorProfiles($userUid);
+            $authors = $this->authorModel->getUserAuthorProfiles($userEmail);
 
             return $this->response->setJSON([
                 'success' => true,
@@ -1509,7 +1491,7 @@ class AdminController extends Controller
                     $faculties = $this->db->table('faculties')
                         ->select('faculties.*, 
                             COUNT(curriculum.id) as curriculum_count,
-                            dean.uid as dean_uid,
+                            dean.email as dean_uid,
                             dean.titleThai as dean_title,
                             dean.title as dean_title_en,
                             dean.thai_name as dean_name,
@@ -1517,7 +1499,7 @@ class AdminController extends Controller
                             dean.gf_name as dean_gf_name,
                             dean.gl_name as dean_gl_name')
                         ->join('curriculum', 'curriculum.faculty_id = faculties.id', 'left')
-                        ->join('user as dean', 'dean.uid = faculties.dean_id', 'left')
+                        ->join('user as dean', 'dean.email = faculties.dean_email', 'left')
                         ->whereIn('faculties.id', $managedFaculties)
                         ->groupBy('faculties.id')
                         ->get()
@@ -1560,11 +1542,14 @@ class AdminController extends Controller
 
             // Get user data from session
             $userData = $this->session->get('user_data') ?? [];
-            $userId = $userData['uid'] ?? null;
+            $userId = UserIdentity::sessionEmail();
+            if ($userId === '') {
+                $userId = UserIdentity::normalizeEmail((string) ($userData['email'] ?? ''));
+            }
 
             // Get full user data from database and merge with session data (same as getPublicationSummaryData)
             $user = $userData;
-            if ($userId) {
+            if ($userId !== '') {
                 $dbUser = $this->userModel->find($userId);
                 if ($dbUser) {
                     $user = array_merge($dbUser, $userData);
@@ -2110,7 +2095,7 @@ class AdminController extends Controller
             if ($userEmail && !$userId) {
                 $userByEmail = $this->userModel->getUserByEmail($userEmail);
                 if ($userByEmail) {
-                    $userId = $userByEmail['uid'];
+                    $userId = $userByEmail['email'];
                     log_message('info', 'updateUserRole - Found user by email: ' . $userEmail . ' -> userId=' . $userId);
                 } else {
                     log_message('warning', 'updateUserRole - User not found with email: ' . $userEmail);
@@ -2252,12 +2237,14 @@ class AdminController extends Controller
 
             // Get user data from session
             $userData = $this->session->get('user_data') ?? [];
-            $userId = $userData['uid'] ?? null;
+            $sessionEmail = UserIdentity::sessionEmail();
+            if ($sessionEmail === '') {
+                $sessionEmail = UserIdentity::normalizeEmail((string) ($userData['email'] ?? ''));
+            }
 
-            // Get full user data from database and merge with session data
             $user = $userData;
-            if ($userId) {
-                $dbUser = $this->userModel->find($userId);
+            if ($sessionEmail !== '') {
+                $dbUser = $this->userModel->find($sessionEmail);
                 if ($dbUser) {
                     $user = array_merge($dbUser, $userData);
                 }
@@ -2331,12 +2318,14 @@ class AdminController extends Controller
 
             // Get user data from session
             $userData = $this->session->get('user_data') ?? [];
-            $userId = $userData['uid'] ?? null;
+            $sessionEmail = UserIdentity::sessionEmail();
+            if ($sessionEmail === '') {
+                $sessionEmail = UserIdentity::normalizeEmail((string) ($userData['email'] ?? ''));
+            }
 
-            // Get full user data from database and merge with session data
             $user = $userData;
-            if ($userId) {
-                $dbUser = $this->userModel->find($userId);
+            if ($sessionEmail !== '') {
+                $dbUser = $this->userModel->find($sessionEmail);
                 if ($dbUser) {
                     $user = array_merge($dbUser, $userData);
                 }
@@ -2396,7 +2385,7 @@ class AdminController extends Controller
             // Get users (อาจารย์ผู้รับผิดชอบหลักสูตร) for this curriculum
             $users = $this->db->table('teacher_curriculum tc')
                 ->select('u.*, tc.is_primary')
-                ->join('user u', 'tc.teacher_uid = u.uid', 'inner')
+                ->join('user u', 'tc.teacher_email = u.email', 'inner')
                 ->where('tc.curriculum_id', $curriculumId)
                 ->where('tc.status', 1)
                 ->where('u.active', 1)
@@ -2425,14 +2414,14 @@ class AdminController extends Controller
                 // Get all emails from authors table for this user
                 $authorEmails = $this->db->table('authors')
                     ->select('email')
-                    ->where('user_uid', $user['uid'])
+                    ->where('user_email', $user['email'])
                     ->where('email IS NOT NULL')
                     ->where('email !=', '')
                     ->get()
                     ->getResultArray();
 
                 foreach ($authorEmails as $authorEmail) {
-                    if (!empty($authorEmail['email']) && !in_array($authorEmail['email'], $userEmails)) {
+                    if (!empty($authorEmail['email']) && !in_array($authorEmail['email'], $userEmails, true)) {
                         $userEmails[] = $authorEmail['email'];
                     }
                 }
@@ -2440,7 +2429,6 @@ class AdminController extends Controller
                 // Get publications where user is an author (approved only)
                 $publications = [];
                 if (!empty($userEmails)) {
-                    // Also get publications by user's uid directly
                     $pubQuery = $this->db->table('publications p')
                         ->select('p.*')
                         ->join('publication_authors pa', 'pa.publication_id = p.id', 'left')
@@ -2449,7 +2437,7 @@ class AdminController extends Controller
                         ->groupStart()
                         ->whereIn('pa.author_email', $userEmails)
                         ->orWhereIn('a.email', $userEmails)
-                        ->orWhere('p.created_by', $user['uid'])
+                        ->orWhere('p.created_by_email', $user['email'])
                         ->groupEnd()
                         ->groupBy('p.id')
                         ->orderBy('p.publication_year', 'DESC')
@@ -2490,7 +2478,7 @@ class AdminController extends Controller
                     $directPubQuery = $this->db->table('publications p')
                         ->select('p.*')
                         ->where('p.approve', 1)
-                        ->where('p.created_by', $user['uid'])
+                        ->where('p.created_by_email', $user['email'])
                         ->orderBy('p.publication_year', 'DESC')
                         ->get()
                         ->getResultArray();
@@ -2530,7 +2518,7 @@ class AdminController extends Controller
                 }
 
                 $usersData[] = [
-                    'uid' => $user['uid'],
+                    'uid' => $user['email'],
                     'name' => trim(($user['titleThai'] ?? '') . ' ' . ($user['thai_name'] ?? '') . ' ' . ($user['thai_lastname'] ?? '')),
                     'position' => $user['position'] ?? '',
                     'is_primary' => $user['is_primary'] ?? 0,
@@ -2580,9 +2568,12 @@ class AdminController extends Controller
 
             // Get current user from session
             $userData = $this->session->get('user_data') ?? [];
-            $userId = $userData['uid'] ?? null;
+            $userId = UserIdentity::sessionEmail();
+            if ($userId === '') {
+                $userId = UserIdentity::normalizeEmail((string) ($userData['email'] ?? ''));
+            }
 
-            if (!$userId) {
+            if ($userId === '') {
                 return $this->response->setJSON([
                     'success' => false,
                     'message' => 'User not found in session'
@@ -2680,7 +2671,7 @@ class AdminController extends Controller
 
             $allTeachers = $this->db->table('teacher_curriculum tc')
                 ->select('tc.curriculum_id as tc_curriculum_id, u.*')
-                ->join('user u', 'tc.teacher_uid = u.uid', 'inner')
+                ->join('user u', 'tc.teacher_email = u.email', 'inner')
                 ->whereIn('tc.curriculum_id', $curriculumIds)
                 ->where('tc.status', 1)
                 ->where('u.active', 1)
@@ -2690,104 +2681,92 @@ class AdminController extends Controller
             // DEBUG: Log all teachers and their curriculum_ids
             $debugTeachers = [];
             foreach ($allTeachers as $t) {
-                $debugTeachers[] = ['cid' => $t['tc_curriculum_id'], 'uid' => $t['uid'], 'name' => $t['thai_name'] ?? 'N/A'];
+                $debugTeachers[] = ['cid' => $t['tc_curriculum_id'], 'email' => $t['email'] ?? '', 'name' => $t['thai_name'] ?? 'N/A'];
             }
             log_message('debug', 'Summary API - Curriculum IDs requested: ' . json_encode($curriculumIds));
             log_message('debug', 'Summary API - Teachers loaded: ' . json_encode($debugTeachers));
 
             // OPTIMIZATION 3: Get all author emails in one batch query
-            $teacherUids = array_unique(array_column($allTeachers, 'uid'));
+            $teacherEmails = array_unique(array_filter(array_column($allTeachers, 'email')));
             $allAuthorEmails = [];
-            if (!empty($teacherUids)) {
+            if (!empty($teacherEmails)) {
                 $emailResults = $this->db->table('authors')
-                    ->select('user_uid, email')
-                    ->whereIn('user_uid', $teacherUids)
+                    ->select('user_email, email')
+                    ->whereIn('user_email', $teacherEmails)
                     ->where('email IS NOT NULL')
                     ->where('email !=', '')
                     ->get()
                     ->getResultArray();
 
                 foreach ($emailResults as $row) {
-                    $uid = $row['user_uid'];
-                    if (!isset($allAuthorEmails[$uid])) {
-                        $allAuthorEmails[$uid] = [];
+                    $key = UserIdentity::normalizeEmail((string) ($row['user_email'] ?? ''));
+                    if ($key === '') {
+                        continue;
                     }
-                    $allAuthorEmails[$uid][] = $row['email'];
+                    if (!isset($allAuthorEmails[$key])) {
+                        $allAuthorEmails[$key] = [];
+                    }
+                    $allAuthorEmails[$key][] = $row['email'];
                 }
             }
 
             // OPTIMIZATION 4: Get all publications for all teachers in one query
-            // Build comprehensive email list for all teachers
             $allUserEmails = [];
             foreach ($allTeachers as $teacher) {
-                $uid = $teacher['uid'];
-                $emails = [];
-                if (!empty($teacher['email'])) {
-                    $emails[] = $teacher['email'];
+                $key = UserIdentity::normalizeEmail((string) ($teacher['email'] ?? ''));
+                if ($key === '') {
+                    continue;
                 }
-                if (isset($allAuthorEmails[$uid])) {
-                    $emails = array_merge($emails, $allAuthorEmails[$uid]);
+                $emails = [$key];
+                if (isset($allAuthorEmails[$key])) {
+                    $emails = array_merge($emails, $allAuthorEmails[$key]);
                 }
-                $allUserEmails[$uid] = array_unique($emails);
+                $allUserEmails[$key] = array_unique($emails);
             }
 
-            // Get all publications in one query
             $flatEmails = [];
-            $flatUids = [];
-            foreach ($allUserEmails as $uid => $emails) {
+            foreach ($allUserEmails as $emails) {
                 $flatEmails = array_merge($flatEmails, $emails);
-                $flatUids[] = $uid;
             }
             $flatEmails = array_unique($flatEmails);
 
             $allPublicationsQuery = $this->db->table('publication_authors pa')
-                ->select('p.id, p.title, p.publication_year, p.publication_type, p.source, p.approve, pa.author_email, pa.uid as pa_uid, a.user_uid')
+                ->select('p.id, p.title, p.publication_year, p.publication_type, p.source, p.approve, pa.author_email, a.email as author_table_email')
                 ->join('publications p', 'pa.publication_id = p.id', 'inner')
                 ->join('authors a', 'pa.author_id = a.id', 'left')
                 ->where('p.publication_year >=', $fiveYearsAgo)
                 ->where('p.publication_year <=', $currentYear);
 
-            if (!empty($flatEmails) || !empty($flatUids)) {
-                $allPublicationsQuery->groupStart();
-                if (!empty($flatEmails)) {
-                    $allPublicationsQuery->whereIn('pa.author_email', $flatEmails)
-                        ->orWhereIn('a.email', $flatEmails);
-                }
-                if (!empty($flatUids)) {
-                    $allPublicationsQuery->orWhereIn('pa.uid', $flatUids)
-                        ->orWhereIn('a.user_uid', $flatUids);
-                }
-                $allPublicationsQuery->groupEnd();
+            if (!empty($flatEmails)) {
+                $allPublicationsQuery->groupStart()
+                    ->whereIn('pa.author_email', $flatEmails)
+                    ->orWhereIn('a.email', $flatEmails)
+                    ->groupEnd();
+            } else {
+                $allPublicationsQuery->where('1=0', null, false);
             }
 
             $allPublicationsRaw = $allPublicationsQuery->get()->getResultArray();
 
-            // Index publications by user
             $publicationsByUser = [];
             foreach ($allPublicationsRaw as $pub) {
-                // Match publication to user based on email or UID
-                foreach ($allUserEmails as $uid => $emails) {
-                    $matched = false;
-                    if (in_array($pub['author_email'], $emails)) {
-                        $matched = true;
-                    } elseif ($pub['pa_uid'] == $uid || $pub['user_uid'] == $uid) {
-                        $matched = true;
-                    }
+                foreach ($allUserEmails as $userKey => $emails) {
+                    $matched = in_array($pub['author_email'], $emails, true)
+                        || (!empty($pub['author_table_email']) && in_array($pub['author_table_email'], $emails, true));
 
                     if ($matched) {
-                        if (!isset($publicationsByUser[$uid])) {
-                            $publicationsByUser[$uid] = [];
+                        if (!isset($publicationsByUser[$userKey])) {
+                            $publicationsByUser[$userKey] = [];
                         }
-                        // Avoid duplicates
                         $exists = false;
-                        foreach ($publicationsByUser[$uid] as $existing) {
+                        foreach ($publicationsByUser[$userKey] as $existing) {
                             if ($existing['id'] == $pub['id']) {
                                 $exists = true;
                                 break;
                             }
                         }
                         if (!$exists) {
-                            $publicationsByUser[$uid][] = $pub;
+                            $publicationsByUser[$userKey][] = $pub;
                         }
                     }
                 }
@@ -2841,10 +2820,10 @@ class AdminController extends Controller
                     $totalPublicationCount = 0;
 
                     foreach ($users as $user) {
-                        $uid = $user['uid'];
+                        $teacherKey = UserIdentity::normalizeEmail((string) ($user['email'] ?? ''));
 
                         // Get publications from pre-loaded data
-                        $allPublications = $publicationsByUser[$uid] ?? [];
+                        $allPublications = $publicationsByUser[$teacherKey] ?? [];
 
                         // Filter approved publications
                         $approvedPublications = array_filter($allPublications, function ($pub) {
@@ -2890,7 +2869,7 @@ class AdminController extends Controller
 
                         // Add user to list
                         $curriculumUsers[] = [
-                            'user_id' => $user['uid'],
+                            'user_id' => $user['email'],
                             'user_name' => trim(($user['thai_name'] ?? '') . ' ' . ($user['thai_lastname'] ?? '')),
                             'titleThai' => $user['titleThai'] ?? null,
                             'user_email' => $user['email'],
@@ -2965,8 +2944,8 @@ class AdminController extends Controller
             $builder = $this->db->table('user');
 
             $builder->select([
-                'user.uid',
                 'user.email',
+                'user.email as uid',
                 'user.gf_name',
                 'user.gl_name',
                 'user.thai_name',
@@ -2983,7 +2962,7 @@ class AdminController extends Controller
                 'GROUP_CONCAT(DISTINCT CONCAT(tcv.curriculum_name, " (", tcv.curriculum_code, ")") SEPARATOR ", ") as all_curriculums'
             ])
                 ->join('faculties uf', 'uf.id = user.faculty_id', 'left')
-                ->join('teacher_curriculum_view tcv', 'tcv.teacher_uid = user.uid AND tcv.assignment_status = 1', 'left')
+                ->join('teacher_curriculum_view tcv', 'tcv.teacher_email = user.email AND tcv.assignment_status = 1', 'left')
                 ->where('user.active', 1)
                 ->where('user.user_type', 'TEACHER');
 
@@ -3009,7 +2988,7 @@ class AdminController extends Controller
                     ->groupEnd();
             }
 
-            $users = $builder->groupBy('user.uid')
+            $users = $builder->groupBy('user.email')
                 ->orderBy('user.faculty_id', 'ASC')
                 ->orderBy('user.gf_name', 'ASC')
                 ->get()
@@ -3074,10 +3053,10 @@ class AdminController extends Controller
                 'c.code',
                 'c.degree_level',
                 'c.faculty_id',
-                'c.chair_id',
+                'c.chair_email',
                 'f.name as faculty_name',
                 'f.code as faculty_code',
-                'chair.uid as chair_uid',
+                'chair.email as chair_uid',
                 'chair.titleThai as chair_title',
                 'chair.title as chair_title_en',
                 'chair.thai_name as chair_name',
@@ -3086,7 +3065,7 @@ class AdminController extends Controller
                 'chair.gl_name as chair_gl_name'
             ])
                 ->join('faculties f', 'f.id = c.faculty_id', 'left')
-                ->join('user as chair', 'chair.uid = c.chair_id', 'left')
+                ->join('user as chair', 'chair.email = c.chair_email', 'left')
                 ->where('c.status', 1);
 
             // For faculty admin, always filter by managed faculties (even if 'all' is selected)
@@ -3116,7 +3095,7 @@ class AdminController extends Controller
             foreach ($curriculums as $curriculum) {
                 $membersBuilder = $this->db->table('teacher_curriculum_view tcv');
                 $membersBuilder->select([
-                    'tcv.teacher_uid',
+                    'tcv.teacher_email as teacher_uid',
                     'tcv.thai_name',
                     'tcv.thai_lastname',
                     'tcv.gf_name',
@@ -3226,7 +3205,7 @@ class AdminController extends Controller
 
         // Get forms based on user role
         $userData = $this->session->get('user_data');
-        $user = $this->userModel->find($userData['uid'] ?? 0);
+        $user = $this->userModel->find(UserIdentity::sessionEmail() ?: ($userData['email'] ?? ''));
 
         if ($this->session->get('god_mode') === true || RoleHelper::isSuperAdmin($user)) {
             // Super admin: see all forms
@@ -3311,7 +3290,7 @@ class AdminController extends Controller
 
         // Get forms based on user role
         $userData = $this->session->get('user_data');
-        $user = $this->userModel->find($userData['uid'] ?? 0);
+        $user = $this->userModel->find(UserIdentity::sessionEmail() ?: ($userData['email'] ?? ''));
 
         if ($this->session->get('god_mode') === true || RoleHelper::isSuperAdmin($user)) {
             // Super admin: see all forms
@@ -3386,7 +3365,7 @@ class AdminController extends Controller
 
             // Get user's managed faculties if faculty admin
             $userData = $this->session->get('user_data');
-            $user = $this->userModel->find($userData['uid'] ?? 0);
+            $user = $this->userModel->find(UserIdentity::sessionEmail() ?: ($userData['email'] ?? ''));
 
             $facultyIds = null;
             if (RoleHelper::isFacultyAdmin($user) && !$this->session->get('god_mode')) {
@@ -3455,7 +3434,7 @@ class AdminController extends Controller
 
             // Update form data
             $userData = $this->session->get('user_data');
-            $input['updated_by'] = $userData['uid'] ?? null;
+            $input['updated_by_email'] = UserIdentity::sessionEmail() ?: ($userData['email'] ?? null);
 
             // Remove teachers data to save separately
             $teachers = $input['teachers'] ?? [];
@@ -3646,8 +3625,8 @@ class AdminController extends Controller
             // If curriculum_id is provided, get only members of that curriculum
             if ($curriculumId) {
                 $builder = $this->db->table('teacher_curriculum tc')
-                    ->select('u.uid, u.titleThai, u.title, u.thai_name, u.thai_lastname, u.gf_name, u.gl_name, u.email, u.faculty_id')
-                    ->join('user u', 'u.uid = tc.teacher_uid', 'inner')
+                    ->select('u.email, u.email as uid, u.titleThai, u.title, u.thai_name, u.thai_lastname, u.gf_name, u.gl_name, u.faculty_id')
+                    ->join('user u', 'u.email = tc.teacher_email', 'inner')
                     ->where('tc.curriculum_id', $curriculumId)
                     ->where('tc.status', 1)
                     ->where('u.active', 1)
@@ -3656,7 +3635,7 @@ class AdminController extends Controller
             } else {
                 // Get all active users (preferably teachers)
                 $builder = $this->db->table('user')
-                    ->select('uid, titleThai, title, thai_name, thai_lastname, gf_name, gl_name, email, faculty_id')
+                    ->select('email as uid, titleThai, title, thai_name, thai_lastname, gf_name, gl_name, email, faculty_id')
                     ->where('active', 1)
                     ->orderBy('thai_name', 'ASC')
                     ->orderBy('gf_name', 'ASC');
@@ -3694,7 +3673,7 @@ class AdminController extends Controller
                 }
 
                 $formattedUsers[] = [
-                    'uid' => $user['uid'],
+                    'uid' => $user['email'],
                     'name' => $name,
                     'title' => $title,
                     'email' => $user['email'],

@@ -20,10 +20,10 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
     <!-- Modal Handler -->
-    <script src="<?= base_url('public/assets/js/modal-handler.js') ?>"></script>
+    <script src="<?= base_url('assets/js/modal-handler.js') ?>"></script>
 
     <!-- Author Search CSS -->
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/author-search.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/author-search.css') ?>">
 
     <style>
         body {
@@ -61,7 +61,7 @@
                     <p class="text-sm text-gray-600">จัดการและแก้ไขผลงานวิจัยของคุณ</p>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <a href="<?= base_url('index.php/dashboard') ?>" class="text-sm text-gray-600 hover:text-gray-900">
+                    <a href="<?= site_url('dashboard') ?>" class="text-sm text-gray-600 hover:text-gray-900">
                         ← กลับสู่แดชบอร์ด
                     </a>
                 </div>
@@ -107,7 +107,7 @@
                         </select>
                     </div>
 
-                    <a href="<?= base_url('index.php/publications/create') ?>" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors inline-flex items-center justify-center gap-2">
+                    <a href="<?= site_url('publications/create') ?>" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors inline-flex items-center justify-center gap-2">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                         </svg>
@@ -418,7 +418,7 @@
             async function loadPublications() {
                 try {
                     // Always filter by current user's ID, even in God mode
-                    const currentUserId = <?= isset($user['uid']) ? (int)$user['uid'] : 'null' ?>;
+                    const currentUserId = <?= json_encode($user['email'] ?? '') ?>;
                     const apiUrl = '<?= site_url('api/dashboard/publications') ?>?limit=1000&filter_user_id=' + currentUserId;
                     console.log('=== LOAD PUBLICATIONS START ===');
                     console.log('API URL:', apiUrl);
@@ -1018,10 +1018,10 @@
         </script>
 
         <!-- Author Search Script -->
-        <script src="<?= base_url('public/assets/js/author-search.js') ?>"></script>
+        <script src="<?= base_url('assets/js/author-search.js') ?>"></script>
 
         <!-- Email Autocomplete Script -->
-        <script src="<?= base_url('public/assets/js/email-autocomplete.js') ?>"></script>
+        <script src="<?= base_url('assets/js/email-autocomplete.js') ?>"></script>
     </div>
 </body>
 

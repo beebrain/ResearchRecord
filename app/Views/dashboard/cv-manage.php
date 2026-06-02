@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= esc($title ?? 'จัดการ CV') ?></title>
-    <link rel="stylesheet" href="<?= base_url('/public/assets/css/tailwind.min.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.min.css') ?>">
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
@@ -24,14 +24,14 @@
     <div class="max-w-6xl mx-auto px-4 mb-6">
         <div class="flex items-center justify-between bg-white rounded-xl shadow-sm px-4 py-3 border border-gray-100">
             <div class="flex items-center gap-4">
-                <a href="<?= base_url('index.php/dashboard') ?>" class="text-gray-500 hover:text-gray-700 text-sm">← กลับ Dashboard</a>
+                <a href="<?= site_url('dashboard') ?>" class="text-gray-500 hover:text-gray-700 text-sm">← กลับ Dashboard</a>
                 <span class="text-gray-300">|</span>
                 <span class="font-semibold text-gray-700">📝 จัดการ CV</span>
             </div>
             <div class="flex items-center gap-2">
-                <a href="<?= base_url('index.php/dashboard/cv') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">📄 ดู CV</a>
-                <a href="<?= base_url('index.php/dashboard/orcid') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">🔗 ORCID</a>
-                <a href="<?= base_url('index.php/dashboard/settings') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">⚙️ ตั้งค่า</a>
+                <a href="<?= site_url('dashboard/cv') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">📄 ดู CV</a>
+                <a href="<?= site_url('dashboard/orcid') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">🔗 ORCID</a>
+                <a href="<?= site_url('dashboard/settings') ?>" class="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">⚙️ ตั้งค่า</a>
             </div>
         </div>
     </div>
@@ -67,7 +67,7 @@
             
             <!-- Create Section Form - Compact Inline -->
             <div class="px-6 pb-6 border-t border-gray-100 pt-4 bg-gray-50">
-                <form id="createSectionForm" action="<?= base_url('index.php/dashboard/settings/section') ?>" method="POST">
+                <form id="createSectionForm" action="<?= site_url('dashboard/settings/section') ?>" method="POST">
                     <?= csrf_field() ?>
                     <div class="flex flex-wrap items-end gap-3">
                         <div class="flex-1 min-w-[300px]">
@@ -149,7 +149,7 @@
                         <!-- Add Entry Form -->
                         <div class="border-t border-gray-100 p-5 bg-gradient-to-b from-gray-50 to-white">
                             <p class="text-xs text-gray-500 uppercase mb-4 font-medium">➕ เพิ่มรายการใหม่</p>
-                            <form class="cv-entry-form" action="<?= base_url('index.php/dashboard/settings/entry') ?>" method="POST" data-section-id="<?= $section['id'] ?>">
+                            <form class="cv-entry-form" action="<?= site_url('dashboard/settings/entry') ?>" method="POST" data-section-id="<?= $section['id'] ?>">
                                 <?= csrf_field() ?>
                                 <input type="hidden" name="section_id" value="<?= $section['id'] ?>">
                                 <input type="hidden" name="entry_id" value="" id="entry-id-<?= $section['id'] ?>">
@@ -233,7 +233,7 @@
         }
 
         async function editEntry(sectionId, entryId) {
-            const response = await fetch(`<?= base_url('index.php/dashboard/settings/entry/') ?>${entryId}`, {
+            const response = await fetch(`<?= site_url('dashboard/settings/entry/') ?>${entryId}`, {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             });
             const result = await response.json();
@@ -268,7 +268,7 @@
                 cancelButtonText: 'ยกเลิก'
             });
             if (result.isConfirmed) {
-                await fetch(`<?= base_url('index.php/dashboard/settings/entry/delete/') ?>${entryId}`, {
+                await fetch(`<?= site_url('dashboard/settings/entry/delete/') ?>${entryId}`, {
                     method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }
                 });
                 location.reload();
@@ -287,7 +287,7 @@
                 cancelButtonText: 'ยกเลิก'
             });
             if (result.isConfirmed) {
-                await fetch(`<?= base_url('index.php/dashboard/settings/section/delete/') ?>${sectionId}`, {
+                await fetch(`<?= site_url('dashboard/settings/section/delete/') ?>${sectionId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
                     body: `<?= csrf_token() ?>=<?= csrf_hash() ?>`
@@ -305,7 +305,7 @@
                     ghostClass: 'sortable-ghost',
                     onEnd: async () => {
                         const order = Array.from(container.querySelectorAll('.cv-section-item')).map((el, i) => ({id: el.dataset.sectionId, order: i}));
-                        await fetch('<?= base_url('index.php/dashboard/settings/section/reorder') ?>', {
+                        await fetch('<?= site_url('dashboard/settings/section/reorder') ?>', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
                             body: `order=${encodeURIComponent(JSON.stringify(order))}&<?= csrf_token() ?>=<?= csrf_hash() ?>`
@@ -323,7 +323,7 @@
                     onEnd: async () => {
                         const sectionId = container.dataset.sectionId;
                         const order = Array.from(container.querySelectorAll('.cv-entry-item')).map((el, i) => ({id: el.dataset.entryId, order: i}));
-                        await fetch('<?= base_url('index.php/dashboard/settings/entry/reorder') ?>', {
+                        await fetch('<?= site_url('dashboard/settings/entry/reorder') ?>', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
                             body: `section_id=${sectionId}&order=${encodeURIComponent(JSON.stringify(order))}&<?= csrf_token() ?>=<?= csrf_hash() ?>`

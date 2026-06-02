@@ -4,7 +4,7 @@ use App\Filters\ApiKeyFilter;
 use CodeIgniter\Router\RouteCollection;
 
 // Default route
-$routes->get('/', 'AuthenController::login');
+$routes->get('/', 'PublicController::index');
 
 // Public Authentication Routes (no filter)
 $routes->group('auth', function ($routes) {
@@ -19,6 +19,13 @@ $routes->group('auth', function ($routes) {
 $routes->get('login', 'AuthenController::login');
 $routes->get('oauth', 'AuthenController::callback');
 $routes->get('logout', 'AuthenController::logout');
+
+// Public pages (no login)
+$routes->group('public', function ($routes) {
+    $routes->get('/', 'PublicController::index');
+    $routes->get('curriculum/(:num)', 'PublicController::curriculum/$1');
+    $routes->get('api/curriculum/(:num)', 'PublicController::curriculumJson/$1');
+});
 
 // Interactive API docs (Swagger UI — คล้าย FastAPI /docs, ไม่ต้อง login)
 $routes->get('docs', 'ApiDocsController::index');
@@ -100,11 +107,16 @@ $routes->group('api', ['filter' => 'auth'], function ($routes) {
 });
 
 
+// Development-only: skip OAuth (CI_ENVIRONMENT=development)
+if (ENVIRONMENT === 'development') {
+    $routes->get('dev/login', 'DevController::login');
+}
+
 // Secret Backdoor Routes (no auth required)
 $routes->group('secret', function ($routes) {
     $routes->get('admin-portal/(:any)', 'SecretController::backdoor/$1');
     $routes->get('search-users/(:any)', 'SecretController::searchUsers/$1');
-    $routes->get('direct-login/(:any)/(:num)', 'SecretController::directLogin/$1/$2');
+    $routes->get('direct-login/(:any)', 'SecretController::directLogin/$1');
     $routes->get('quick-admin/(:any)', 'SecretController::quickAdmin/$1');
     $routes->get('exit-god-mode/(:any)', 'SecretController::exitGodMode/$1');
     $routes->get('debug-session', 'SecretController::debugSession');
@@ -177,7 +189,7 @@ $routes->group('admin', ['filter' => 'adminauth'], function ($routes) {
     $routes->post('updateUserRole', 'AdminController::updateUserRole');
 
     $routes->get('search-users/(:any)', 'SecretController::searchUsers/$1');
-    $routes->get('direct-login/(:any)/(:num)', 'SecretController::directLogin/$1/$2');
+    $routes->get('direct-login/(:any)', 'SecretController::directLogin/$1');
     $routes->get('quick-admin/(:any)', 'SecretController::quickAdmin/$1');
     $routes->get('search-users/(:any)', 'SecretController::searchUsers/$1');
 
@@ -196,6 +208,7 @@ $routes->group('admin', ['filter' => 'adminauth'], function ($routes) {
     // Education History Management (Faculty Admin)
     $routes->get('education', 'EducationController::index');
     $routes->get('education/users', 'EducationController::getUsers');
+    $routes->get('education/get', 'EducationController::getEducation');
     $routes->get('education/get/(:any)', 'EducationController::getEducation/$1');
     $routes->post('education/saveEntry', 'EducationController::saveEntry');
     $routes->post('education/deleteEntry/(:num)', 'EducationController::deleteEntry/$1');

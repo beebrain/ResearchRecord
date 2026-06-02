@@ -2,21 +2,26 @@
 
 namespace App\Services;
 
+use Config\UruPortalOAuth;
+
 class OAuthService
 {
     protected $config;
+    protected UruPortalOAuth $oauthConfig;
 
-    public function __construct()
+    public function __construct(?UruPortalOAuth $oauthConfig = null)
     {
-        // OAuth configuration with your actual URU Portal credentials
+        $this->oauthConfig = $oauthConfig ?? config(UruPortalOAuth::class);
         $this->config = [
-            'client_id'     => 'research_academic',                              // Your actual Client ID
-            'client_secret' => 'secret',                                // Your actual Client Secret
-            'redirect_uri'  => 'http://research.academic.uru.ac.th/index.php/oauth', // Your registered callback URL
-            'auth_url'      => 'https://uruportal.uru.ac.th/oauth_login',    // URU OAuth login endpoint
-            'token_url'     => 'https://uruportal.uru.ac.th/oauth/token',    // URU token endpoint
-            'user_url'      => 'https://uruportal.uru.ac.th/me',            // URU user info endpoint
-            'scope'         => 'read'
+            'client_id'     => $this->oauthConfig->clientId,
+            'client_secret' => $this->oauthConfig->clientSecret,
+            'redirect_uri'  => $this->oauthConfig->callbackUrl,
+            'auth_url'      => $this->oauthConfig->loginUrl,
+            'token_url'     => $this->oauthConfig->tokenUrl,
+            'user_url'      => $this->oauthConfig->userInfoUrl,
+            'scope'         => 'read',
+            'enabled'       => $this->oauthConfig->enabled,
+            'http_verify_ssl' => $this->oauthConfig->httpVerifySsl,
         ];
     }
 
@@ -25,18 +30,11 @@ class OAuthService
      */
     public function getAuthUrl($state = null): string
     {
-        $params = [
-            'response_type' => 'code',
-            'client_id'     => $this->config['client_id'],
-            'redirect_uri'  => $this->config['redirect_uri'],
-            'scope'         => $this->config['scope']
-        ];
-
-        if ($state) {
-            $params['state'] = $state;
+        if (!$this->config['enabled']) {
+            throw new \RuntimeException('URU Portal OAuth is disabled');
         }
 
-        return $this->config['auth_url'] . '?' . http_build_query($params);
+        return $this->oauthConfig->buildAuthUrl($state ?? '');
     }
 
     /**
@@ -96,8 +94,8 @@ class OAuthService
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 30,
             CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => false,
+            CURLOPT_SSL_VERIFYPEER => !empty($this->config['http_verify_ssl']),
+            CURLOPT_SSL_VERIFYHOST => !empty($this->config['http_verify_ssl']) ? 2 : 0,
             CURLOPT_HTTPHEADER     => [
                 'Content-Type: application/x-www-form-urlencoded',
                 'Accept: application/json',
@@ -209,8 +207,8 @@ class OAuthService
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 30,
             CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => false,
+            CURLOPT_SSL_VERIFYPEER => !empty($this->config['http_verify_ssl']),
+            CURLOPT_SSL_VERIFYHOST => !empty($this->config['http_verify_ssl']) ? 2 : 0,
             CURLOPT_HTTPHEADER     => $headers
         ]);
 

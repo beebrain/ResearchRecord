@@ -7,6 +7,14 @@ let allData = [];
 let filteredData = [];
 let selectedFacultyId = null;
 
+function appApiUrl(endpointKey, routePath) {
+    if (typeof API_ENDPOINTS !== 'undefined' && API_ENDPOINTS[endpointKey]) {
+        return API_ENDPOINTS[endpointKey];
+    }
+    const base = (typeof BASE_URL !== 'undefined' ? BASE_URL : (window.BASE_URL || '')).replace(/\/+$/, '');
+    return `${base}/index.php?/${routePath.replace(/^\//, '')}`;
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     loadSummaryData();
@@ -18,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
  */
 async function loadSummaryData() {
     try {
-        const response = await fetch(`${BASE_URL}/index.php/admin/publications/summary-data`);
+        const response = await fetch(appApiUrl('summaryData', 'admin/publications/summary-data'));
         const result = await response.json();
 
         console.log('Summary data:', result);
@@ -31,11 +39,11 @@ async function loadSummaryData() {
             renderFacultyList();
             renderCurriculumCards();
         } else {
-            showError('ไม่สามารถโหลดข้อมูลได้: ' + result.message);
+            showError('ไม่สามารถโหลดข้อมูลได้: ' + (result.message || ''));
         }
     } catch (error) {
         console.error('Load error:', error);
-        showError('เกิดข้อผิดพลาดในการโหลดข้อมูล');
+        showError('เกิดข้อผิดพลาดในการโหลดข้อมูล (ตรวจสอบการเชื่อมต่อ API)');
     }
 }
 
@@ -545,7 +553,7 @@ async function showPublicationDetail(publicationId, event) {
 
     try {
         // Fetch publication details from API (use admin route)
-        const response = await fetch(`${BASE_URL}/index.php/admin/publications/get/${publicationId}`);
+        const response = await fetch(`${appApiUrl('getPublication', 'admin/publications/get')}/${publicationId}`);
         const result = await response.json();
 
         if (!result.success) {
@@ -859,7 +867,14 @@ function handlePublicationModalBackdropClick(event) {
  * Show error message
  */
 function showError(message) {
-    alert(message);
+    const container = document.getElementById('faculty-list');
+    if (container) {
+        container.innerHTML = `<div class="text-sm text-red-600 p-2 bg-red-50 rounded border border-red-200">${escapeHtml(message)}</div>`;
+    }
+    const grid = document.getElementById('curriculum-grid');
+    if (grid) {
+        grid.innerHTML = '<div class="w-full text-center py-12 text-gray-500">ไม่สามารถโหลดข้อมูลหลักสูตรได้</div>';
+    }
 }
 
 /**
@@ -930,7 +945,7 @@ function extractLocalFileName(urlString) {
  */
 function getLocalFileDownloadUrl(fileName) {
     if (!fileName) return null;
-    return `${BASE_URL}/index.php/utility/downloadFile/${fileName}`;
+    return `${appApiUrl('downloadFile', 'utility/downloadFile')}/${fileName}`;
 }
 
 // Export functions to global scope for onclick handlers

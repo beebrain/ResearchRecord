@@ -9,8 +9,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- pdfMake Local Files (with Thai fonts in vfs_fonts.js) -->
-    <script src="<?= base_url(); ?>pdfmake/build/pdfmake.min.js"></script>
-    <script src="<?= base_url(); ?>pdfmake/build/vfs_fonts.js"></script>
+    <script src="<?= pdfmake_url('build/pdfmake.min.js') ?>"></script>
+    <script src="<?= pdfmake_url('build/vfs_fonts.js') ?>"></script>
     
     <!-- Initialize fonts immediately after pdfMake loads -->
     <script>
@@ -35,7 +35,7 @@
     </script>
     
     <!-- Publication Summary PDF Script -->
-    <script src="<?= base_url('public/assets/js/publication-summary-pdf.js') ?>"></script>
+    <script src="<?= base_url('assets/js/publication-summary-pdf.js') ?>"></script>
     
     <style>
         .loader {
@@ -86,7 +86,9 @@
         // Get curriculum ID from URL
         const urlParams = new URLSearchParams(window.location.search);
         const CURRICULUM_ID = urlParams.get('curriculum_id');
-        const BASE_URL = '<?= base_url() ?>';
+        const API_ENDPOINTS = {
+            curriculumReport: '<?= site_url('admin/publications/curriculum-report') ?>'
+        };
         
         // Update status function
         function updateStatus(message, step) {
@@ -107,7 +109,7 @@
                 updateStatus('กำลังโหลดข้อมูลหลักสูตร...', 'ขั้นตอนที่ 1/3');
                 
                 // Fetch curriculum data
-                const response = await fetch(`${BASE_URL}index.php/admin/publications/curriculum-report?curriculum_id=${CURRICULUM_ID}`);
+                const response = await fetch(`${API_ENDPOINTS.curriculumReport}?curriculum_id=${CURRICULUM_ID}`);
                 const result = await response.json();
                 
                 if (!result.success) {

@@ -5,14 +5,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>แบบฟอร์มขอเปิดรับนักศึกษาใหม่</title>
-    <link rel="stylesheet" href="<?= base_url('/public/assets/css/tailwind.min.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/vendor/sarabun.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/admin-common.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/vendor/sweetalert2.min.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/vendor/jquery.datetimepicker.min.css') ?>">
-    <script src="<?= base_url('public/assets/js/vendor/jquery-3.6.0.min.js') ?>"></script>
-    <script src="<?= base_url('public/assets/js/vendor/sweetalert2.min.js') ?>"></script>
-    <script src="<?= base_url('public/assets/js/vendor/jquery.datetimepicker.full.min.js') ?>"></script>
+    <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.min.css') ?>">
+    <link rel="stylesheet" href="<?= asset_url('css/sarabun.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/admin-common.css') ?>">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jquery-datetimepicker@2.5.21/jquery.datetimepicker.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery-datetimepicker@2.5.21/build/jquery.datetimepicker.full.min.js"></script>
     <style>
         body {
             font-family: 'Sarabun', sans-serif;
@@ -308,6 +308,9 @@
 
     <script>
         const BASE_URL = '<?= rtrim(base_url(), '/') ?>';
+    </script>
+    <script src="<?= base_url('assets/js/app-routes.js') ?>?v=<?= @filemtime(FCPATH . 'assets/js/app-routes.js') ?: time() ?>"></script>
+    <script>
         let currentFormId = null;
 
         const statusMap = {
@@ -378,11 +381,11 @@
             $('#forms-table-body').html('<tr><td colspan="7" class="px-6 py-8 text-center"><div class="animate-spin inline-block w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full"></div><p class="mt-2 text-gray-500">กำลังโหลด...</p></td></tr>');
 
             // Update URL without reload
-            const newUrl = BASE_URL + '/index.php/admin/admission?year=' + year + (faculty ? '&faculty=' + faculty : '');
+            const newUrl = appRoute('admin/admission') + '?year=' + year + (faculty ? '&faculty=' + faculty : '');
             window.history.pushState({}, '', newUrl);
 
             $.ajax({
-                url: BASE_URL + '/index.php/admin/admission/list',
+                url: appRoute('admin/admission/list?'),
                 type: 'GET',
                 data: {
                     year: year,
@@ -507,7 +510,7 @@
 
             if (year) {
                 $.ajax({
-                    url: BASE_URL + '/index.php/admin/admission/generate',
+                    url: appRoute('admin/admission/generate'),
                     type: 'POST',
                     contentType: 'application/json',
                     data: JSON.stringify({
@@ -516,7 +519,7 @@
                     success: function(result) {
                         if (result.success) {
                             Swal.fire('สำเร็จ!', `สร้างแบบฟอร์ม ${result.count} รายการ`, 'success').then(() => {
-                                window.location.href = BASE_URL + '/index.php/admin/admission?year=' + year;
+                                window.location.href = appRoute('admin/admission') + '?year=' + year;
                             });
                         } else {
                             Swal.fire('ผิดพลาด', result.message, 'error');
@@ -535,7 +538,7 @@
             $('#modalBody').html('<div class="flex justify-center py-8"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>');
 
             $.ajax({
-                url: BASE_URL + '/index.php/admin/admission/get/' + id,
+                url: appRoute('admin/admission/get/' + id),
                 type: 'GET',
                 success: function(result) {
                     if (result.success) {
@@ -1250,7 +1253,7 @@
             if (!userId) return;
 
             $.ajax({
-                url: BASE_URL + '/index.php/admin/admission/update-position',
+                url: appRoute('admin/admission/update-position'),
                 type: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify({
@@ -1403,7 +1406,7 @@
             $('#viewModalBody').html('<div class="flex justify-center py-8"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div></div>');
 
             $.ajax({
-                url: BASE_URL + '/index.php/admin/admission/get/' + id,
+                url: appRoute('admin/admission/get/' + id),
                 type: 'GET',
                 success: function(result) {
                     if (result.success) {
@@ -1831,7 +1834,7 @@
 
         function generatePDFForCurrentForm() {
             if (viewFormId) {
-                const pdfUrl = BASE_URL + '/index.php/admin/admission/pdf-summary?form_id=' + viewFormId;
+                const pdfUrl = appRoute('admin/admission/pdf-summary') + '?form_id=' + viewFormId;
                 window.open(pdfUrl, '_blank', 'width=600,height=400');
             }
         }
@@ -2016,7 +2019,7 @@
             if (status) data.status = status;
 
             $.ajax({
-                url: BASE_URL + '/index.php/admin/admission/save/' + currentFormId,
+                url: appRoute('admin/admission/save/' + currentFormId),
                 type: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify(data),
@@ -2058,7 +2061,7 @@
             }
 
             // Open PDF generation page in new window
-            const pdfUrl = BASE_URL + '/index.php/admin/admission/pdf-summary?form_id=' + id;
+            const pdfUrl = appRoute('admin/admission/pdf-summary') + '?form_id=' + id;
             window.open(pdfUrl, '_blank', 'width=600,height=400');
         }
 

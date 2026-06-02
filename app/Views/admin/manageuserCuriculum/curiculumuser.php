@@ -5,9 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>จัดการหลักสูตรผู้ใช้</title>
-    <link rel="stylesheet" href="<?= base_url('/public/assets/css/tailwind.min.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.min.css') ?>">
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/admin-common.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/admin-common.css') ?>">
     <style>
         .user-card {
             transition: all 0.2s ease;
@@ -212,18 +212,15 @@
     </div>
 
     <!-- jQuery Library (Local) -->
-    <script src="<?= base_url('public/assets/js/vendor/jquery-3.6.0.min.js') ?>"></script>
-
-    <!-- SweetAlert2 Library (Local) -->
-    <script src="<?= base_url('public/assets/js/vendor/sweetalert2.min.js') ?>"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <!-- Set BASE_URL for the external script -->
     <script>
         window.BASE_URL = '<?= rtrim(base_url(), '/') ?>';
     </script>
-
-    <!-- Include the curriculum user manager script -->
-    <script src="<?= base_url('public/assets/js/curriculum-user-manager-v2.js') ?>"></script>
+    <script src="<?= base_url('assets/js/app-routes.js') ?>?v=<?= @filemtime(FCPATH . 'assets/js/app-routes.js') ?: time() ?>"></script>
+    <script src="<?= base_url('assets/js/curriculum-user-manager-v2.js') ?>?v=<?= @filemtime(FCPATH . 'assets/js/curriculum-user-manager-v2.js') ?: time() ?>"></script>
 
     <!-- Chair Selection Modal -->
     <div id="chairModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">

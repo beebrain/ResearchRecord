@@ -16,7 +16,6 @@ class PublicationAuthorModel extends Model
         'author_email',
         'author_affiliation',
         'author_id',
-        'uid',
         'author_order',
         'corresponding'
     ];
@@ -46,7 +45,6 @@ class PublicationAuthorModel extends Model
                 'author_email' => $author['email'] ?? null,
                 'author_affiliation' => $author['affiliation'] ?? null,
                 'author_id' => $author['author_id'] ?? null,
-                'uid' => $author['uid'] ?? null,
                 'author_order' => $index + 1,
                 'corresponding' => $author['corresponding'] ?? 0
             ];

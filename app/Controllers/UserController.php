@@ -106,7 +106,7 @@ class UserController extends Controller
                 // Remove all curriculum assignments from teacher_curriculum table
                 $db = \Config\Database::connect();
                 $db->table('teacher_curriculum')
-                    ->where('teacher_uid', $userId)
+                    ->where('teacher_email', $userId)
                     ->delete();
                 
                 // Also clear legacy user.curriculum_id for backward compatibility
@@ -300,9 +300,9 @@ class UserController extends Controller
                 // Convert user data to author format
                 $authorData = [
                     'id' => null,
-                    'user_id' => $user['uid'],
-                    'user_uid' => $user['uid'],
-                    'uid' => $user['uid'],
+                    'user_id' => $user['email'],
+                    'user_uid' => $user['email'],
+                    'uid' => $user['email'],
                     'email' => $user['email'],
                     'thai_name' => ($user['thai_name'] ?? '') . ' ' . ($user['thai_lastname'] ?? ''),
                     'english_name' => ($user['gf_name'] ?? '') . ' ' . ($user['gl_name'] ?? ''),
@@ -332,8 +332,8 @@ class UserController extends Controller
                     'id' => $author['id'] ?? $author['author_id'] ?? null,
                     'author_id' => $author['author_id'] ?? null,
                     'user_id' => $author['user_id'] ?? null,
-                    'user_uid' => $author['user_uid'] ?? null,
-                    'uid' => $author['user_uid'] ?? null,
+                    'user_uid' => $author['user_email'] ?? null,
+                    'uid' => $author['user_email'] ?? null,
                     'email' => $author['email'] ?? $email,
                     'thai_name' => $author['name'] ?? '',
                     'english_name' => $author['name'] ?? '',
@@ -424,9 +424,9 @@ class UserController extends Controller
                 // Convert user data to author format
                 $authorData = [
                     'id' => null,
-                    'user_id' => $user['uid'],
-                    'user_uid' => $user['uid'],
-                    'uid' => $user['uid'],
+                    'user_id' => $user['email'],
+                    'user_uid' => $user['email'],
+                    'uid' => $user['email'],
                     'email' => $user['email'],
                     'thai_name' => ($user['thai_name'] ?? '') . ' ' . ($user['thai_lastname'] ?? ''),
                     'english_name' => ($user['gf_name'] ?? '') . ' ' . ($user['gl_name'] ?? ''),

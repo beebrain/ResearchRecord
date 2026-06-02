@@ -20,17 +20,28 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
     <script>
-        // Define BASE_URL for JavaScript
         window.BASE_URL = '<?= rtrim(base_url(), '/') ?>';
-        console.log('BASE_URL initialized:', window.BASE_URL);
+        window.API_ENDPOINTS = {
+            publications: '<?= site_url('api/dashboard/publications') ?>',
+            getPublication: '<?= site_url('admin/publications/get') ?>',
+            deletePublication: '<?= site_url('admin/publications/delete') ?>',
+            approvePublication: '<?= site_url('admin/publications/approve') ?>',
+            setApprovalStatus: '<?= site_url('admin/publications/set_approval_status') ?>',
+            updatePublication: '<?= site_url('admin/publications/update') ?>',
+            savePublication: '<?= site_url('admin/publications/save') ?>',
+            uploadFile: '<?= site_url('utility/uploadFile') ?>',
+            downloadFile: '<?= site_url('utility/downloadFile') ?>',
+            searchUserNames: '<?= site_url('publications/search-user-names') ?>',
+            searchAuthorEmail: '<?= site_url('publications/search-author-email') ?>'
+        };
     </script>
 
     <!-- Modal Handler -->
-    <script src="<?= base_url('public/assets/js/modal-handler.js') ?>"></script>
+    <script src="<?= base_url('assets/js/modal-handler.js') ?>"></script>
 
     <!-- Publication Form Styles (matching create.php) -->
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/publication-form.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/author-search.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/publication-form.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/author-search.css') ?>">
 
     <style>
         body {
@@ -701,9 +712,8 @@
         </div>
 
         <script>
-            // Define BASE_URL globally for external scripts (author-search.js, email-autocomplete.js)
-            window.BASE_URL = '<?= rtrim(base_url(), '/') ?>';
             const BASE_URL = window.BASE_URL;
+            const API = window.API_ENDPOINTS;
             let allPublications = [];
             let filteredPublications = [];
 
@@ -750,7 +760,7 @@
             // Load publications data
             async function loadPublications() {
                 try {
-                    const apiUrl = BASE_URL + '/index.php/api/dashboard/publications?limit=1000';
+                    const apiUrl = API.publications + '?limit=1000';
                     console.log('=== LOAD PUBLICATIONS START ===');
                     console.log('API URL:', apiUrl);
                     console.log('BASE_URL:', BASE_URL);
@@ -1110,7 +1120,7 @@
                     });
 
                     // Fetch publication data
-                    const apiUrl = BASE_URL + '/index.php/admin/publications/get/' + id;
+                    const apiUrl = API.getPublication + '/' + id;
                     console.log('Fetching from:', apiUrl);
                     const response = await fetch(apiUrl);
                     console.log('Response status:', response.status);
@@ -1174,7 +1184,7 @@
                             }
                         });
 
-                        const apiUrl = BASE_URL + '/index.php/admin/publications/delete/' + id;
+                        const apiUrl = API.deletePublication + '/' + id;
                         console.log('Deleting from:', apiUrl);
 
                         const response = await fetch(apiUrl, {
@@ -1270,7 +1280,7 @@
                         });
 
                         // Call admin API to approve publication
-                        const apiUrl = BASE_URL + '/index.php/admin/publications/approve/' + id;
+                        const apiUrl = API.approvePublication + '/' + id;
                         const response = await fetch(apiUrl, {
                             method: 'POST',
                             headers: {
@@ -1380,7 +1390,7 @@
                         });
 
                         // Call API endpoint via AJAX
-                        const apiUrl = BASE_URL + '/index.php/admin/publications/set_approval_status/' + id;
+                        const apiUrl = API.setApprovalStatus + '/' + id;
                         const response = await fetch(apiUrl, {
                             method: 'POST',
                             headers: {
@@ -1450,7 +1460,7 @@
                     if (dataEl) dataEl.classList.add('hidden');
 
                     // Fetch publication data
-                    const apiUrl = BASE_URL + '/index.php/admin/publications/get/' + id;
+                    const apiUrl = API.getPublication + '/' + id;
                     const response = await fetch(apiUrl);
                     const result = await response.json();
 
@@ -1772,11 +1782,11 @@
                 if (!r) return null;
                 const base = (typeof BASE_URL !== 'undefined' ? BASE_URL : '').replace(/\/$/, '');
                 if (r.startsWith('local:')) {
-                    return base + '/index.php/utility/downloadFile/' + r.slice(6).trim();
+                    return API.downloadFile + '/' + r.slice(6).trim();
                 }
                 if (r.indexOf('downloadFile') !== -1) {
                     if (r.startsWith('http://') || r.startsWith('https://')) return r;
-                    return (r.startsWith('/') ? base + r : base + '/index.php/utility/downloadFile/' + r.replace(/^.*\/downloadFile\/?/, ''));
+                    return (r.startsWith('/') ? base + r : API.downloadFile + '/' + r.replace(/^.*\/downloadFile\/?/, ''));
                 }
                 return null;
             }
@@ -2930,7 +2940,7 @@
                         const formData = new FormData();
                         formData.append('file', file);
 
-                        const response = await fetch(BASE_URL + '/index.php/utility/uploadFile', {
+                        const response = await fetch(API.uploadFile, {
                             method: 'POST',
                             body: formData,
                             headers: {
@@ -3044,9 +3054,9 @@
                     // Determine API endpoint based on mode
                     let apiUrl;
                     if (isEditMode && currentEditPublicationId) {
-                        apiUrl = BASE_URL + '/index.php/admin/publications/update/' + currentEditPublicationId;
+                        apiUrl = API.updatePublication + '/' + currentEditPublicationId;
                     } else {
-                        apiUrl = BASE_URL + '/index.php/admin/publications/save';
+                        apiUrl = API.savePublication;
                     }
 
                     const response = await fetch(apiUrl, {
@@ -3116,13 +3126,13 @@
         </script>
 
         <!-- Author Search Script -->
-        <script src="<?= base_url('public/assets/js/author-search.js') ?>"></script>
+        <script src="<?= base_url('assets/js/author-search.js') ?>"></script>
 
         <!-- Email Autocomplete Script -->
-        <script src="<?= base_url('public/assets/js/email-autocomplete.js') ?>"></script>
+        <script src="<?= base_url('assets/js/email-autocomplete.js') ?>"></script>
 
         <!-- Publication AI Script (for validation functions) -->
-        <script src="<?= base_url('public/assets/js/publication-ai.js?v=' . time()) ?>"></script>
+        <script src="<?= base_url('assets/js/publication-ai.js?v=' . time()) ?>"></script>
 
         </main>
     </div>

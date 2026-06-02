@@ -28,7 +28,7 @@ class PublicationModel extends Model
         'keywords',
         'notes',
         'ref_url',
-        'created_by',
+        'created_by_email',
         'approve',
         'orcid_put_code',
         'sync_external_key',
@@ -41,9 +41,11 @@ class PublicationModel extends Model
     /**
      * Get all publications for a user
      */
-    public function getUserPublications($userId)
+    public function getUserPublications($userEmail)
     {
-        return $this->where('created_by', $userId)
+        $userEmail = UserIdentity::normalizeEmail((string) $userEmail);
+
+        return $this->where('created_by_email', $userEmail)
             ->orderBy('publication_year', 'DESC')
             ->orderBy('publication_month', 'DESC')
             ->orderBy('created_at', 'DESC')
@@ -53,12 +55,13 @@ class PublicationModel extends Model
     /**
      * Get user publications with authors
      */
-    public function getUserPublicationsWithAuthors($userId)
+    public function getUserPublicationsWithAuthors($userEmail)
     {
+        $userEmail = UserIdentity::normalizeEmail((string) $userEmail);
         $builder = $this->db->table('publications p');
         $builder->select('p.*, GROUP_CONCAT(pa.author_name ORDER BY pa.author_order SEPARATOR ", ") as authors')
             ->join('publication_authors pa', 'p.id = pa.publication_id', 'left')
-            ->where('p.created_by', $userId)
+            ->where('p.created_by_email', $userEmail)
             ->groupBy('p.id')
             ->orderBy('p.publication_year', 'DESC')
             ->orderBy('p.publication_month', 'DESC')
@@ -70,10 +73,11 @@ class PublicationModel extends Model
     /**
      * Get publication with authors for editing
      */
-    public function getPublicationWithAuthors($publicationId, $userId)
+    public function getPublicationWithAuthors($publicationId, $userEmail)
     {
+        $userEmail = UserIdentity::normalizeEmail((string) $userEmail);
         $publication = $this->where('id', $publicationId)
-            ->where('created_by', $userId)
+            ->where('created_by_email', $userEmail)
             ->first();
 
         if (!$publication) {
@@ -94,12 +98,13 @@ class PublicationModel extends Model
     /**
      * Search publications
      */
-    public function searchUserPublications($userId, $searchTerm = null, $typeFilter = null, $yearFilter = null)
+    public function searchUserPublications($userEmail, $searchTerm = null, $typeFilter = null, $yearFilter = null)
     {
+        $userEmail = UserIdentity::normalizeEmail((string) $userEmail);
         $builder = $this->db->table('publications p');
         $builder->select('p.*, GROUP_CONCAT(pa.author_name ORDER BY pa.author_order SEPARATOR ", ") as authors')
             ->join('publication_authors pa', 'p.id = pa.publication_id', 'left')
-            ->where('p.created_by', $userId);
+            ->where('p.created_by_email', $userEmail);
 
         if ($searchTerm) {
             $builder->like('p.title', $searchTerm);
@@ -124,9 +129,11 @@ class PublicationModel extends Model
     /**
      * Get this year count
      */
-    public function getThisYearCount($userId)
+    public function getThisYearCount($userEmail)
     {
-        return $this->where('created_by', $userId)
+        $userEmail = UserIdentity::normalizeEmail((string) $userEmail);
+
+        return $this->where('created_by_email', $userEmail)
             ->where('publication_year', date('Y'))
             ->countAllResults();
     }
@@ -177,11 +184,12 @@ class PublicationModel extends Model
      * Get publications by user ID with authors
      * Used for regular users to see only their own publications
      */
-    public function getPublicationsByUser($userId, $limit = 1000)
+    public function getPublicationsByUser($userEmail, $limit = 1000)
     {
+        $userEmail = UserIdentity::normalizeEmail((string) $userEmail);
         $builder = $this->db->table('publication_view');
         $builder->select('*')
-            ->where('created_by', $userId)
+            ->where('created_by_email', $userEmail)
             ->orderBy('publication_year', 'DESC')
             ->orderBy('publication_month', 'DESC')
             ->orderBy('created_at', 'DESC')
@@ -194,19 +202,18 @@ class PublicationModel extends Model
      * Get publications where a user is an author, using email as the canonical
      * match while preserving uid fallback for older rows.
      */
-    public function getPublicationsByAuthor($userId, $limit = 1000)
+    public function getPublicationsByAuthor($userKey, $limit = 1000)
     {
-        $user = $this->db->table('user')
-            ->select('email, uid')
-            ->where('uid', $userId)
-            ->get()
-            ->getRowArray();
+        if (is_string($userKey) && str_contains($userKey, '@')) {
+            return $this->getPublicationsByCanonicalEmail($userKey, $limit);
+        }
 
-        if (!empty($user['email'])) {
+        $user = UserIdentity::resolveUserByEmail((string) $userKey);
+        if ($user !== null && ! empty($user['email'])) {
             return $this->getPublicationsByCanonicalEmail((string) $user['email'], $limit);
         }
 
-        return $this->getPublicationsForIdentity([], (int) $userId, $limit);
+        return [];
     }
 
     /**
@@ -222,10 +229,9 @@ class PublicationModel extends Model
         }
 
         $user = UserIdentity::resolveUserByEmail($email);
-        $userId = $user !== null ? (int) ($user['uid'] ?? 0) : 0;
-        $emails = $this->emailsForIdentity($email, $userId);
+        $emails = $this->emailsForIdentity($email, $user);
 
-        return $this->getPublicationsForIdentity($emails, $userId, $limit);
+        return $this->getPublicationsForIdentity($emails, $limit);
     }
 
     /**
@@ -241,9 +247,8 @@ class PublicationModel extends Model
         }
 
         $user   = UserIdentity::resolveUserByEmail($email);
-        $userId = $user !== null ? (int) ($user['uid'] ?? 0) : 0;
-        $emails = $this->emailsForIdentity($email, $userId);
-        $ids    = $this->publicationIdsForIdentity($emails, $userId);
+        $emails = $this->emailsForIdentity($email, $user);
+        $ids    = $this->publicationIdsForIdentity($emails);
 
         if ($ids === []) {
             return [];
@@ -270,154 +275,65 @@ class PublicationModel extends Model
             return [];
         }
 
-        $userIds = [];
         $userEmails = [];
+        $userModel  = new UserModel();
 
-        // PART 1: Get teachers IN the faculty (user.faculty_id IN facultyIds)
-        $userModel = new \App\Models\UserModel();
-        $teachersInFaculty = $userModel->whereIn('faculty_id', $facultyIds)->findAll();
-        
-        foreach ($teachersInFaculty as $teacher) {
-            $userIds[] = $teacher['uid'];
-            if (!empty($teacher['email'])) {
-                $userEmails[] = $teacher['email'];
+        foreach ($userModel->whereIn('faculty_id', $facultyIds)->findAll() as $teacher) {
+            $email = UserIdentity::normalizeEmail((string) ($teacher['email'] ?? ''));
+            if ($email !== '') {
+                $userEmails[] = $email;
             }
         }
 
-        // PART 2: Get teachers NOT in the faculty but assigned to curriculums of the faculty
-        // Get curricula from these faculties
-        $curriculumModel = new \App\Models\CurriculumModel();
-        $curricula = $curriculumModel->whereIn('faculty_id', $facultyIds)->findAll();
-        
-        if (!empty($curricula)) {
+        $curriculumModel = new CurriculumModel();
+        $curricula       = $curriculumModel->whereIn('faculty_id', $facultyIds)->findAll();
+
+        if (! empty($curricula)) {
             $curriculumIds = array_column($curricula, 'id');
-            
-            // Get teachers assigned to these curricula via teacher_curriculum table
-            // Exclude teachers who are already in the faculty (to avoid duplicates)
             $teachersInCurricula = $this->db->table('teacher_curriculum tc')
-                ->select('tc.teacher_uid, u.email')
-                ->join('user u', 'tc.teacher_uid = u.uid', 'left')
+                ->select('u.email')
+                ->join('user u', 'tc.teacher_email = u.email', 'inner')
                 ->whereIn('tc.curriculum_id', $curriculumIds)
                 ->where('tc.status', 1)
-                ->whereNotIn('u.faculty_id', $facultyIds) // Exclude teachers already in faculty
+                ->whereNotIn('u.faculty_id', $facultyIds)
                 ->get()
                 ->getResultArray();
-            
+
             foreach ($teachersInCurricula as $teacher) {
-                $uid = $teacher['teacher_uid'];
-                if (!in_array($uid, $userIds)) {
-                    $userIds[] = $uid;
-                    if (!empty($teacher['email']) && !in_array($teacher['email'], $userEmails)) {
-                        $userEmails[] = $teacher['email'];
-                    }
+                $email = UserIdentity::normalizeEmail((string) ($teacher['email'] ?? ''));
+                if ($email !== '') {
+                    $userEmails[] = $email;
                 }
             }
         }
 
-        if (empty($userIds)) {
+        $userEmails = $this->normalizeEmailList($userEmails);
+        if ($userEmails === []) {
             return [];
         }
 
-        // Step 1: Get ALL emails from ALL users (from both parts)
-        // Get all emails from authors table for these users
-        $authorEmails = $this->db->table('authors')
-            ->select('email')
-            ->whereIn('user_uid', $userIds)
-            ->where('email IS NOT NULL')
-            ->where('email !=', '')
-            ->get()
-            ->getResultArray();
-        
-        foreach ($authorEmails as $authorEmail) {
-            if (!empty($authorEmail['email']) && !in_array($authorEmail['email'], $userEmails)) {
-                $userEmails[] = $authorEmail['email'];
+        foreach ($userEmails as $email) {
+            $authorEmails = $this->db->table('authors')
+                ->select('email')
+                ->where('user_email', $email)
+                ->where('email IS NOT NULL')
+                ->where('email !=', '')
+                ->get()
+                ->getResultArray();
+
+            foreach ($authorEmails as $row) {
+                $userEmails[] = (string) ($row['email'] ?? '');
             }
         }
-        
-        if (empty($userEmails) && empty($userIds)) {
+
+        $userEmails = $this->normalizeEmailList($userEmails);
+        if ($userEmails === []) {
             return [];
         }
 
-        // Step 2: Get distinct publication IDs where users are authors (using author_email as PRIMARY)
-        $builder = $this->db->table('publication_authors pa');
-        $builder->select('pa.publication_id')
-            ->distinct()
-            ->join('authors a', 'pa.author_id = a.id', 'left')
-            ->join('user u', 'pa.uid = u.uid', 'left');
-        
-        if (!empty($userEmails)) {
-            $builder->groupStart()
-                ->whereIn('pa.author_email', $userEmails)  // PRIMARY: author_email from publication_authors
-                ->orWhereIn('a.email', $userEmails)         // Also check authors.email
-                ->orWhereIn('u.email', $userEmails)          // Also check user.email from joined user
-                // SECONDARY: Also include UID match as fallback
-                ->orWhereIn('pa.uid', $userIds)
-                ->orWhereIn('a.user_uid', $userIds)
-            ->groupEnd();
-        } else {
-            // Fallback: If no emails found, search by UID only
-            $builder->groupStart()
-                ->whereIn('pa.uid', $userIds)
-                ->orWhereIn('a.user_uid', $userIds)
-            ->groupEnd();
-        }
-        
-        $publicationIds = $builder->get()->getResultArray();
+        $ids = $this->publicationIdsForIdentity($userEmails);
 
-        if (empty($publicationIds)) {
-            return [];
-        }
-
-        $ids = array_column($publicationIds, 'publication_id');
-        
-        // Remove duplicates by publication ID (in case same publication appears multiple times)
-        $ids = array_unique($ids);
-
-        // Step 3: Get publications from publications table directly (same structure as getPublicationsByAuthor)
-        $builder = $this->db->table('publications p');
-        $builder->select('
-                p.*,
-                CONCAT(u.gf_name, " ", u.gl_name) as created_by_name,
-                GROUP_CONCAT(
-                    CASE
-                        WHEN pa2.author_id IS NOT NULL AND a2.user_uid IS NOT NULL
-                        THEN CONCAT(uu2.gf_name, " ", uu2.gl_name)
-                        ELSE pa2.author_name
-                    END
-                    ORDER BY pa2.author_order
-                    SEPARATOR ", "
-                ) as authors_names_en,
-                GROUP_CONCAT(
-                    CASE
-                        WHEN pa2.author_id IS NOT NULL AND a2.user_uid IS NOT NULL
-                        THEN CONCAT(uu2.thai_name, " ", uu2.thai_lastname)
-                        ELSE pa2.author_name
-                    END
-                    ORDER BY pa2.author_order
-                    SEPARATOR ", "
-                ) as authors_names_thai,
-                GROUP_CONCAT(
-                    CASE
-                        WHEN pa2.author_id IS NOT NULL AND a2.user_uid IS NOT NULL
-                        THEN CONCAT(uu2.thai_name, " ", uu2.thai_lastname)
-                        ELSE pa2.author_name
-                    END
-                    ORDER BY pa2.author_order
-                    SEPARATOR ", "
-                ) as authors
-            ')
-            ->join('user u', 'p.created_by = u.uid', 'left')
-            ->join('publication_authors pa2', 'p.id = pa2.publication_id', 'left')
-            ->join('authors a2', 'pa2.author_id = a2.id', 'left')
-            ->join('user uu2', 'a2.user_uid = uu2.uid', 'left')
-            ->whereIn('p.id', $ids)
-            ->groupBy('p.id')
-            ->orderBy('p.publication_year', 'DESC')
-            ->orderBy('p.publication_month', 'DESC')
-            ->orderBy('p.created_at', 'DESC')
-            ->limit($limit);
-
-        return $builder->get()->getResultArray();
+        return $ids === [] ? [] : $this->publicationRowsByIds($ids, (int) $limit, false);
     }
     /**
      * Get publications strictly by author email
@@ -438,10 +354,10 @@ class PublicationModel extends Model
      *
      * @return list<array<string,mixed>>
      */
-    private function getPublicationsForIdentity(array $emails, int $userId, int $limit): array
+    private function getPublicationsForIdentity(array $emails, int $limit): array
     {
         $emails = $this->normalizeEmailList($emails);
-        $ids = $this->publicationIdsForIdentity($emails, $userId);
+        $ids    = $this->publicationIdsForIdentity($emails);
         if ($ids === []) {
             return [];
         }
@@ -450,16 +366,18 @@ class PublicationModel extends Model
     }
 
     /**
+     * @param array<string,mixed>|null $user
+     *
      * @return list<string>
      */
-    private function emailsForIdentity(string $canonicalEmail, int $userId): array
+    private function emailsForIdentity(string $canonicalEmail, ?array $user): array
     {
         $emails = [$canonicalEmail];
 
-        if ($userId > 0) {
+        if ($user !== null && ! empty($user['email'])) {
             $authorEmails = $this->db->table('authors')
                 ->select('email')
-                ->where('user_uid', $userId)
+                ->where('user_email', $user['email'])
                 ->where('email IS NOT NULL')
                 ->where('email !=', '')
                 ->get()
@@ -496,40 +414,26 @@ class PublicationModel extends Model
      *
      * @return list<int>
      */
-    private function publicationIdsForIdentity(array $emails, int $userId): array
+    private function publicationIdsForIdentity(array $emails): array
     {
+        $emails = $this->normalizeEmailList($emails);
+        if ($emails === []) {
+            return [];
+        }
+
         $builder = $this->db->table('publication_authors pa');
         $builder->select('pa.publication_id')
             ->distinct()
             ->join('authors a', 'pa.author_id = a.id', 'left')
-            ->join('user u', 'pa.uid = u.uid', 'left');
-
-        if ($emails !== []) {
-            $builder->groupStart()
-                ->whereIn('pa.author_email', $emails)
-                ->orWhereIn('a.email', $emails)
-                ->orWhereIn('u.email', $emails);
-
-            if ($userId > 0) {
-                $builder->orWhere('pa.uid', $userId)
-                    ->orWhere('a.user_uid', $userId);
-            }
-
-            $builder->groupEnd();
-        } elseif ($userId > 0) {
-            $builder->groupStart()
-                ->where('pa.uid', $userId)
-                ->orWhere('a.user_uid', $userId)
-                ->groupEnd();
-        } else {
-            return [];
-        }
+            ->join('user u', 'a.user_email = u.email', 'left')
+            ->groupStart()
+            ->whereIn('pa.author_email', $emails)
+            ->orWhereIn('a.email', $emails)
+            ->orWhereIn('u.email', $emails)
+            ->groupEnd();
 
         $publicationIds = $builder->get()->getResultArray();
-        $ids = array_column($publicationIds, 'publication_id');
-
-        // Intentionally exclude publications.created_by: data entry must not list as someone's
-        // research output unless they appear in publication_authors (or linked authors/user).
+        $ids            = array_column($publicationIds, 'publication_id');
 
         return array_values(array_unique(array_map('intval', $ids)));
     }
@@ -547,7 +451,7 @@ class PublicationModel extends Model
                 CONCAT(u.gf_name, " ", u.gl_name) as created_by_name,
                 GROUP_CONCAT(
                     CASE
-                        WHEN pa2.author_id IS NOT NULL AND a2.user_uid IS NOT NULL
+                        WHEN pa2.author_id IS NOT NULL AND a2.user_email IS NOT NULL
                         THEN CONCAT(uu2.gf_name, " ", uu2.gl_name)
                         ELSE pa2.author_name
                     END
@@ -556,7 +460,7 @@ class PublicationModel extends Model
                 ) as authors_names_en,
                 GROUP_CONCAT(
                     CASE
-                        WHEN pa2.author_id IS NOT NULL AND a2.user_uid IS NOT NULL
+                        WHEN pa2.author_id IS NOT NULL AND a2.user_email IS NOT NULL
                         THEN CONCAT(uu2.thai_name, " ", uu2.thai_lastname)
                         ELSE pa2.author_name
                     END
@@ -565,7 +469,7 @@ class PublicationModel extends Model
                 ) as authors_names_thai,
                 GROUP_CONCAT(
                     CASE
-                        WHEN pa2.author_id IS NOT NULL AND a2.user_uid IS NOT NULL
+                        WHEN pa2.author_id IS NOT NULL AND a2.user_email IS NOT NULL
                         THEN CONCAT(uu2.thai_name, " ", uu2.thai_lastname)
                         ELSE pa2.author_name
                     END
@@ -573,10 +477,10 @@ class PublicationModel extends Model
                     SEPARATOR ", "
                 ) as authors
             ')
-            ->join('user u', 'p.created_by = u.uid', 'left')
+            ->join('user u', 'p.created_by_email = u.email', 'left')
             ->join('publication_authors pa2', 'p.id = pa2.publication_id', 'left')
             ->join('authors a2', 'pa2.author_id = a2.id', 'left')
-            ->join('user uu2', 'a2.user_uid = uu2.uid', 'left')
+            ->join('user uu2', 'a2.user_email = uu2.email', 'left')
             ->whereIn('p.id', $ids)
             ->groupBy('p.id');
 

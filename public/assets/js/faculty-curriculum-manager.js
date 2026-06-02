@@ -22,7 +22,7 @@ function init() {
 
 function loadFaculties() {
     $.ajax({
-        url: BASE_URL + '/index.php/admin/getFaculties',
+        url: appRoute('admin/getFaculties'),
         method: 'GET',
         dataType: 'json',
         success: function(response) {
@@ -175,7 +175,7 @@ function closeFacultyModal() {
 }
 
 function loadUsersForDean(facultyId = null) {
-    let url = BASE_URL + '/index.php/admin/getUsersForDeanSelection';
+    let url = appRoute('admin/getUsersForDeanSelection');
     if (facultyId) {
         url += '?faculty_id=' + facultyId;
     }
@@ -210,7 +210,7 @@ function loadUsersForDean(facultyId = null) {
 
 function createFaculty(data) {
     $.ajax({
-        url: BASE_URL + '/index.php/admin/createFaculty',
+        url: appRoute('admin/createFaculty'),
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify(data),
@@ -232,7 +232,7 @@ function createFaculty(data) {
 
 function updateFaculty(data) {
     $.ajax({
-        url: BASE_URL + '/index.php/admin/updateFaculty',
+        url: appRoute('admin/updateFaculty'),
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify(data),
@@ -269,7 +269,7 @@ function deleteFaculty(id) {
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
-                url: BASE_URL + '/index.php/admin/deleteFaculty',
+                url: appRoute('admin/deleteFaculty'),
                 method: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify({ id: id }),
@@ -293,7 +293,7 @@ function deleteFaculty(id) {
 
 function toggleFacultyStatus(id) {
     $.ajax({
-        url: BASE_URL + '/index.php/admin/toggleFacultyStatus',
+        url: appRoute('admin/toggleFacultyStatus'),
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify({ id: id }),
@@ -315,7 +315,7 @@ function toggleFacultyStatus(id) {
 // ==================== Curriculum Management ====================
 
 function loadCurricula(facultyId = null) {
-    let url = BASE_URL + '/index.php/admin/getCurricula';
+    let url = appRoute('admin/getCurricula');
     if (facultyId) {
         url += '?faculty_id=' + facultyId;
     }
@@ -469,7 +469,7 @@ function closeCurriculumModal() {
 
 function createCurriculum(data) {
     $.ajax({
-        url: BASE_URL + '/index.php/admin/createCurriculum',
+        url: appRoute('admin/createCurriculum'),
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify(data),
@@ -492,7 +492,7 @@ function createCurriculum(data) {
 
 function updateCurriculum(data) {
     $.ajax({
-        url: BASE_URL + '/index.php/admin/updateCurriculum',
+        url: appRoute('admin/updateCurriculum'),
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify(data),
@@ -515,7 +515,7 @@ function updateCurriculum(data) {
 function editCurriculum(id) {
     // Get curriculum data
     $.ajax({
-        url: BASE_URL + '/index.php/admin/getCurricula',
+        url: appRoute('admin/getCurricula'),
         method: 'GET',
         dataType: 'json',
         success: function(response) {
@@ -542,7 +542,7 @@ function deleteCurriculum(id) {
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
-                url: BASE_URL + '/index.php/admin/deleteCurriculum',
+                url: appRoute('admin/deleteCurriculum'),
                 method: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify({ id: id }),
@@ -566,7 +566,7 @@ function deleteCurriculum(id) {
 
 function toggleCurriculumStatus(id) {
     $.ajax({
-        url: BASE_URL + '/index.php/admin/toggleCurriculumStatus',
+        url: appRoute('admin/toggleCurriculumStatus'),
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify({ id: id }),

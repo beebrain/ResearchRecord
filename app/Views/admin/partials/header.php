@@ -58,14 +58,14 @@
                             <?= $roleDisplay ?>
                         </div>
                     </div>
-                    <a href="<?= base_url('index.php/profile') ?>" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                    <a href="<?= site_url('profile') ?>" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                         👤 โปรไฟล์ของฉัน
                     </a>
-                    <a href="<?= base_url('index.php/dashboard') ?>" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                    <a href="<?= site_url('dashboard') ?>" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                         ← กลับไปยังแดชบอร์ดผู้ใช้
                     </a>
                     <div class="border-t border-gray-100 my-1"></div>
-                    <a href="<?= base_url('index.php/auth/logout') ?>" class="flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50">
+                    <a href="<?= site_url('auth/logout') ?>" class="flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                         🚪 ออกจากระบบ
                     </a>
                 </div>

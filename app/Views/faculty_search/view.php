@@ -55,7 +55,7 @@
     <header class="gradient-header text-white shadow-lg">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <div class="flex items-center justify-between">
-                <a href="<?= base_url('index.php/faculty-search') ?>" 
+                <a href="<?= site_url('faculty-search') ?>" 
                    class="text-white hover:text-purple-200 flex items-center transition-colors">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
@@ -184,7 +184,7 @@
 
     <script>
         const BASE_URL = '<?= rtrim(base_url(), '/') ?>';
-        const TEACHER_UID = <?= $teacher['uid'] ?>;
+        const TEACHER_UID = <?= json_encode($teacher['email'] ?? '') ?>;
         const API_KEY = '<?= esc(\App\Filters\ApiKeyFilter::getExpectedKey(), 'js') ?>';
         let allPublications = [];
         let filteredPublications = [];

@@ -5,9 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ดูแบบฟอร์มขอเปิดรับนักศึกษาใหม่ - <?= esc($form['curriculum_name_display'] ?? '') ?></title>
-    <link rel="stylesheet" href="<?= base_url('/public/assets/css/tailwind.min.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/vendor/sarabun.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('public/assets/css/admin-common.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.min.css') ?>">
+    <link rel="stylesheet" href="<?= asset_url('css/sarabun.css') ?>">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="<?= base_url('assets/css/admin-common.css') ?>">
     <style>
         body {
             font-family: 'Sarabun', sans-serif;
@@ -32,9 +33,9 @@
                     <p class="text-gray-600">คณะ<?= esc($form['faculty_name'] ?? '-') ?> | หลักสูตร<?= esc($form['curriculum_name_display'] ?? '-') ?></p>
                 </div>
                 <div class="flex gap-2">
-                    <a href="<?= base_url('index.php/admin/admission') ?>" class="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg">← กลับ</a>
-                    <a href="<?= base_url('index.php/admin/admission/edit/' . $form['id']) ?>" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">✏️ แก้ไข</a>
-                    <a href="<?= base_url('index.php/admin/admission/print/' . $form['id']) ?>" target="_blank" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg">🖨️ พิมพ์</a>
+                    <a href="<?= site_url('admin/admission') ?>" class="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg">← กลับ</a>
+                    <a href="<?= site_url('admin/admission/edit/' . $form['id']) ?>" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">✏️ แก้ไข</a>
+                    <a href="<?= site_url('admin/admission/print/' . $form['id']) ?>" target="_blank" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg">🖨️ พิมพ์</a>
                 </div>
             </div>
 

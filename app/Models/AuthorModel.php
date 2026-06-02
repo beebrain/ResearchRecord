@@ -2,173 +2,150 @@
 
 namespace App\Models;
 
+use App\Libraries\UserIdentity;
 use CodeIgniter\Model;
 
 class AuthorModel extends Model
 {
-    protected $table = 'authors';
+    protected $table      = 'authors';
     protected $primaryKey = 'id';
     protected $returnType = 'array';
 
     protected $allowedFields = [
         'email',
-        'user_uid',
-        'created_by'
+        'user_email',
+        'created_by_email',
     ];
 
     protected $useTimestamps = true;
-    protected $createdField = 'created_at';
-    protected $updatedField = '';
+    protected $createdField  = 'created_at';
+    protected $updatedField  = '';
 
-    /**
-     * Get author by email
-     */
     public function getAuthorByEmail($email)
     {
-        return $this->where('email', $email)->first();
-    }
+        $email = UserIdentity::normalizeEmail($email);
 
+        return $email === '' ? null : $this->where('email', $email)->first();
+    }
 
     public function getAuthorlinkUser($email)
     {
-        if (empty($email)) {
+        $email = UserIdentity::normalizeEmail($email);
+        if ($email === '') {
             return null;
         }
 
-        $builder = $this->db->table('authors a');
-
-        $result = $builder
-            ->select('
-            a.id as author_id,
-            a.email as author_email,
-            a.user_uid,
-            u.uid as user_id,
-            u.thai_name as thai_name,
-            u.thai_lastname as thai_lastname,
-            u.email as user_email,
-            u.major
-        ')
-            ->join('user u', 'a.user_uid = u.uid', 'left')
+        $result = $this->db->table('authors a')
+            ->select('a.id AS author_id, a.email AS author_email, a.user_email,
+                u.email AS user_email, u.thai_name, u.thai_lastname, u.major')
+            ->join('user u', 'a.user_email = u.email', 'left')
+            ->groupStart()
             ->where('a.email', $email)
             ->orWhere('u.email', $email)
+            ->groupEnd()
             ->get()
             ->getRowArray();
 
-        // ADD THIS LINE TO SEE THE QUERY
-        log_message('debug', 'SQL: ' . $this->db->getLastQuery());
-
-        if ($result) {
-            return [
-                'id' => $result['author_id'],              // ← ADD THIS LINE
-                'author_id' => $result['author_id'],       // Keep existing
-                'user_id' => $result['user_id'],
-                'name' => trim($result['thai_name'] . ' ' . $result['thai_lastname']),
-                'email' => $email,
-                'affiliation' => $result['major'] ?? '',
-                'user_uid' => $result['user_id'],          // Frontend expects this
-                'is_linked' => !empty($result['user_uid'])
-            ];
+        if (! $result) {
+            return null;
         }
 
-        return null;
-    }
-    /**
-     * Link author to user account
-     */
-    public function linkAuthorToUser($authorId, $userId)
-    {
-        return $this->update($authorId, ['user_uid' => $userId]);
+        return [
+            'id'         => $result['author_id'],
+            'author_id'  => $result['author_id'],
+            'email'      => $email,
+            'name'       => trim(($result['thai_name'] ?? '') . ' ' . ($result['thai_lastname'] ?? '')),
+            'affiliation'=> $result['major'] ?? '',
+            'user_email' => $result['user_email'] ?? '',
+            'is_linked'  => ! empty($result['user_email']),
+        ];
     }
 
-    /**
-     * Get authors created by user
-     */
-    public function getAuthorsByUser($userId)
+    public function linkAuthorToUser($authorId, $userEmail)
     {
-        return $this->where('created_by', $userId)
-            ->orderBy('name', 'ASC')
+        return $this->update($authorId, [
+            'user_email' => UserIdentity::normalizeEmail((string) $userEmail),
+        ]);
+    }
+
+    public function getAuthorsByUser(string $userEmail)
+    {
+        $userEmail = UserIdentity::normalizeEmail($userEmail);
+
+        return $this->where('created_by_email', $userEmail)
+            ->orderBy('email', 'ASC')
             ->findAll();
     }
 
-
-
-
-    /**
-     * Get unique authors for a user (from publication_authors table)
-     */
-    public function getUserUniqueAuthors($userId)
+    public function getUserUniqueAuthors(string $userEmail)
     {
-        $builder = $this->db->table('publication_authors pa');
-        $builder->select('pa.author_name, pa.author_email, MAX(pa.author_affiliation) as author_affiliation')
+        $userEmail = UserIdentity::normalizeEmail($userEmail);
+
+        return $this->db->table('publication_authors pa')
+            ->select('pa.author_name, pa.author_email, MAX(pa.author_affiliation) as author_affiliation')
             ->join('publications p', 'pa.publication_id = p.id')
-            ->where('p.created_by', $userId)
+            ->where('p.created_by_email', $userEmail)
             ->groupBy('pa.author_email, pa.author_name')
-            ->orderBy('pa.author_name', 'ASC');
-
-        return $builder->get()->getResultArray();
+            ->orderBy('pa.author_name', 'ASC')
+            ->get()
+            ->getResultArray();
     }
 
-    /**
-     * Get author count for user
-     */
-    public function getUserAuthorCount($userId)
+    public function getUserAuthorCount(string $userEmail): int
     {
-        $authors = $this->getUserUniqueAuthors($userId);
-        return count($authors);
+        return count($this->getUserUniqueAuthors($userEmail));
     }
 
-    /**
-     * Get authors with publication statistics
-     */
-    public function getUserAuthorsWithStats($userId)
+    public function getUserAuthorsWithStats(string $userEmail)
     {
-        $builder = $this->db->table('publication_authors pa');
-        $builder->select('pa.author_name, pa.author_email, MAX(pa.author_affiliation) as author_affiliation, COUNT(pa.id) as publication_count')
+        $userEmail = UserIdentity::normalizeEmail($userEmail);
+
+        return $this->db->table('publication_authors pa')
+            ->select('pa.author_name, pa.author_email, MAX(pa.author_affiliation) as author_affiliation, COUNT(pa.id) as publication_count')
             ->join('publications p', 'pa.publication_id = p.id')
-            ->where('p.created_by', $userId)
+            ->where('p.created_by_email', $userEmail)
             ->groupBy('pa.author_email, pa.author_name')
-            ->orderBy('publication_count', 'DESC');
-
-        return $builder->get()->getResultArray();
+            ->orderBy('publication_count', 'DESC')
+            ->get()
+            ->getResultArray();
     }
 
-
     /**
-     * ADD this method to your AuthorModel.php
-     * 
-     * Get all author emails for a specific user
-     * Used for showing multiple emails in autocomplete
+     * @return list<string>
      */
-    public function getAuthorEmailsByUser($userUid)
+    public function getAuthorEmailsByUser(string $userEmail): array
     {
-        return $this->where('user_uid', $userUid)
+        $userEmail = UserIdentity::normalizeEmail($userEmail);
+        if ($userEmail === '') {
+            return [];
+        }
+
+        $cols = $this->where('user_email', $userEmail)
             ->where('email IS NOT NULL')
             ->where('email !=', '')
             ->findColumn('email');
+
+        return is_array($cols) ? array_values($cols) : [];
     }
 
-    /**
-     * OPTIONAL: Get author with user information
-     * Useful for getting complete author + user data
-     */
     public function getAuthorWithUser($email)
     {
-        $builder = $this->db->table('authors a');
-        return $builder
+        $email = UserIdentity::normalizeEmail($email);
+        if ($email === '') {
+            return null;
+        }
+
+        return $this->db->table('authors a')
             ->select('a.*, u.gf_name, u.gl_name, u.major, u.title')
-            ->join('user u', 'a.user_uid = u.uid', 'left')
+            ->join('user u', 'a.user_email = u.email', 'left')
             ->where('a.email', $email)
             ->get()
             ->getRowArray();
     }
 
-    /**
-     * OPTIONAL: Get all authors for a user with their info
-     * Shows all email addresses for a user
-     */
-    public function getUserAuthorProfiles($userUid)
+    public function getUserAuthorProfiles(string $userEmail)
     {
-        return $this->where('user_uid', $userUid)
+        return $this->where('user_email', UserIdentity::normalizeEmail($userEmail))
             ->where('email IS NOT NULL')
             ->orderBy('created_at', 'DESC')
             ->findAll();

@@ -2,103 +2,88 @@
 
 namespace App\Models;
 
+use App\Libraries\UserIdentity;
 use CodeIgniter\Model;
 
 class UserRoleModel extends Model
 {
-    protected $table = 'user_roles';
+    protected $table      = 'user_roles';
     protected $primaryKey = 'id';
     protected $returnType = 'array';
     protected $useTimestamps = false;
 
     protected $allowedFields = [
-        'user_id',
+        'user_email',
         'role_id',
         'faculty_id',
         'assigned_at',
-        'assigned_by'
     ];
 
-    /**
-     * Get all roles for a user
-     */
-    public function getUserRoles($userId)
+    public function getUserRoles(string $userEmail)
     {
+        $userEmail = UserIdentity::normalizeEmail($userEmail);
+
         return $this->select('user_roles.*, roles.name, roles.display_name, faculties.name as faculty_name, faculties.code as faculty_code')
             ->join('roles', 'roles.id = user_roles.role_id')
             ->join('faculties', 'faculties.id = user_roles.faculty_id', 'left')
-            ->where('user_roles.user_id', $userId)
+            ->where('user_roles.user_email', $userEmail)
             ->findAll();
     }
 
-    /**
-     * Check if user has a specific role
-     */
-    public function hasRole($userId, $roleName)
+    public function hasRole(string $userEmail, string $roleName)
     {
+        $userEmail = UserIdentity::normalizeEmail($userEmail);
+
         $result = $this->select('user_roles.*')
             ->join('roles', 'roles.id = user_roles.role_id')
-            ->where('user_roles.user_id', $userId)
+            ->where('user_roles.user_email', $userEmail)
             ->where('roles.name', $roleName)
             ->first();
 
-        return !empty($result);
+        return ! empty($result);
     }
 
-    /**
-     * Check if user has role with specific faculty
-     */
-    public function hasRoleInFaculty($userId, $roleName, $facultyId)
+    public function hasRoleInFaculty(string $userEmail, string $roleName, int $facultyId)
     {
+        $userEmail = UserIdentity::normalizeEmail($userEmail);
+
         $result = $this->select('user_roles.*')
             ->join('roles', 'roles.id = user_roles.role_id')
-            ->where('user_roles.user_id', $userId)
+            ->where('user_roles.user_email', $userEmail)
             ->where('roles.name', $roleName)
             ->where('user_roles.faculty_id', $facultyId)
             ->first();
 
-        return !empty($result);
+        return ! empty($result);
     }
 
-    /**
-     * Get all faculties a user can manage (for faculty_admin role)
-     */
-    public function getManagedFaculties($userId)
+    public function getManagedFaculties(string $userEmail)
     {
-        $results = $this->select('user_roles.faculty_id, faculties.name, faculties.code')
+        $userEmail = UserIdentity::normalizeEmail($userEmail);
+
+        return $this->select('user_roles.faculty_id, faculties.name, faculties.code')
             ->join('roles', 'roles.id = user_roles.role_id')
             ->join('faculties', 'faculties.id = user_roles.faculty_id')
-            ->where('user_roles.user_id', $userId)
+            ->where('user_roles.user_email', $userEmail)
             ->where('roles.name', 'faculty_admin')
             ->whereNotNull('user_roles.faculty_id')
             ->findAll();
-
-        return $results;
     }
 
-    /**
-     * Assign role to user
-     */
-    public function assignRole($userId, $roleId, $facultyId = null, $assignedBy = null)
+    public function assignRole(string $userEmail, int $roleId, ?int $facultyId = null)
     {
-        $data = [
-            'user_id' => $userId,
-            'role_id' => $roleId,
-            'faculty_id' => $facultyId,
+        return $this->insert([
+            'user_email'  => UserIdentity::normalizeEmail($userEmail),
+            'role_id'     => $roleId,
+            'faculty_id'  => $facultyId,
             'assigned_at' => date('Y-m-d H:i:s'),
-            'assigned_by' => $assignedBy
-        ];
-
-        return $this->insert($data);
+        ]);
     }
 
-    /**
-     * Remove role from user
-     */
-    public function removeRole($userId, $roleId, $facultyId = null)
+    public function removeRole(string $userEmail, int $roleId, ?int $facultyId = null)
     {
-        $builder = $this->where('user_id', $userId)
-                       ->where('role_id', $roleId);
+        $userEmail = UserIdentity::normalizeEmail($userEmail);
+        $builder   = $this->where('user_email', $userEmail)->where('role_id', $roleId);
 
         if ($facultyId !== null) {
             $builder->where('faculty_id', $facultyId);
@@ -107,50 +92,40 @@ class UserRoleModel extends Model
         return $builder->delete();
     }
 
-    /**
-     * Remove all roles from user
-     */
-    public function removeAllUserRoles($userId)
+    public function removeAllUserRoles(string $userEmail)
     {
-        return $this->where('user_id', $userId)->delete();
+        return $this->where('user_email', UserIdentity::normalizeEmail($userEmail))->delete();
     }
 
-    /**
-     * Get users by role
-     */
-    public function getUsersByRole($roleName)
+    public function getUsersByRole(string $roleName)
     {
-        return $this->select('user_roles.*, user.uid, user.email, user.gf_name, user.gl_name, user.thai_name, user.thai_lastname')
+        return $this->select('user_roles.*, user.email, user.gf_name, user.gl_name, user.thai_name, user.thai_lastname')
             ->join('roles', 'roles.id = user_roles.role_id')
-            ->join('user', 'user.uid = user_roles.user_id')
+            ->join('user', 'user.email = user_roles.user_email')
             ->where('roles.name', $roleName)
             ->where('user.active', 1)
             ->findAll();
     }
 
-    /**
-     * Update user roles (replace all existing with new set)
-     */
-    public function updateUserRoles($userId, $roles, $assignedBy = null)
+    public function updateUserRoles(string $userEmail, array $roles)
     {
-        // Remove all existing roles
-        $this->removeAllUserRoles($userId);
+        $userEmail = UserIdentity::normalizeEmail($userEmail);
+        $this->removeAllUserRoles($userEmail);
 
-        // Insert new roles
-        if (!empty($roles)) {
-            $batch = [];
-            foreach ($roles as $role) {
-                $batch[] = [
-                    'user_id' => $userId,
-                    'role_id' => $role['role_id'],
-                    'faculty_id' => $role['faculty_id'] ?? null,
-                    'assigned_at' => date('Y-m-d H:i:s'),
-                    'assigned_by' => $assignedBy
-                ];
-            }
-            return $this->insertBatch($batch);
+        if ($roles === []) {
+            return true;
         }
 
-        return true;
+        $batch = [];
+        foreach ($roles as $role) {
+            $batch[] = [
+                'user_email'  => $userEmail,
+                'role_id'     => $role['role_id'],
+                'faculty_id'  => $role['faculty_id'] ?? null,
+                'assigned_at' => date('Y-m-d H:i:s'),
+            ];
+        }
+
+        return $this->insertBatch($batch);
     }
 }

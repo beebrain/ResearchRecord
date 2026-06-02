@@ -7,6 +7,7 @@ use App\Models\UserModel;
 use App\Models\AuthorModel;
 use App\Services\OAuthService;
 use Config\NewscienceSso;
+use Config\NewsciencePortal;
 
 class AuthenController extends Controller
 {
@@ -35,13 +36,36 @@ class AuthenController extends Controller
             return redirect()->to('/dashboard');
         }
 
-        // Generate state for OAuth security
+        $oauthConfig  = config(\Config\UruPortalOAuth::class);
+        $portalConfig = config(NewsciencePortal::class);
+
+        if (! $oauthConfig->enabled) {
+            // หลัง logout หรือมี error — แสดงหน้า login ไม่ redirect วนกลับไป SSO ทันที
+            $isLogoutLanding = $this->request->getGet('logout') === '1';
+            if ($isLogoutLanding || session()->getFlashdata('error') || session()->getFlashdata('success')) {
+                return view('auth/login', [
+                    'title'    => 'Login - Research Publication Management',
+                    'auth_url' => $portalConfig->researchRecordLoginUrl(),
+                ]);
+            }
+
+            return redirect()->to($portalConfig->researchRecordLoginUrl());
+        }
+
+        // Local/dev: OAuth ตรงที่ RR
         $state = bin2hex(random_bytes(16));
         $this->session->set('oauth_state', $state);
 
+        $authUrl = null;
+        try {
+            $authUrl = $this->oauthService->getAuthUrl($state);
+        } catch (\Throwable $e) {
+            log_message('error', 'OAuth login URL failed: ' . $e->getMessage());
+        }
+
         $data = [
-            'title' => 'Login - Research Publication Management',
-            'auth_url' => $this->oauthService->getAuthUrl($state)
+            'title'    => 'Login - Research Publication Management',
+            'auth_url' => $authUrl,
         ];
 
         return view('auth/login', $data);
@@ -99,8 +123,7 @@ class AuthenController extends Controller
             $this->session->set('last_oauth_callback_at', time());
             $redirectTarget = $this->getPostLoginRedirect($userData);
             log_message('debug', sprintf(
-                'OAuth callback completed for UID:%s Email:%s - redirecting to %s',
-                $userData['uid'] ?? 'unknown',
+                'OAuth callback completed for Email:%s - redirecting to %s',
                 $userData['email'] ?? 'unknown',
                 $redirectTarget
             ));
@@ -193,29 +216,28 @@ class AuthenController extends Controller
                     if (empty($existingProfilePic)) {
                         // User has no picture - use API picture
                         $updateData['profile_picture'] = $apiUserData['profile_picture'];
-                        log_message('info', 'Setting profile picture from API for user with no picture: ' . $existingUser['uid']);
+                        log_message('info', 'Setting profile picture from API for user with no picture: ' . $existingUser['email']);
                     } elseif (!$isLocalUpload) {
                         // User has external API picture - update with fresh API picture
                         $updateData['profile_picture'] = $apiUserData['profile_picture'];
-                        log_message('info', 'Updating external API profile picture for user: ' . $existingUser['uid']);
+                        log_message('info', 'Updating external API profile picture for user: ' . $existingUser['email']);
                     } else {
                         // User has locally uploaded picture - preserve it
-                        log_message('info', 'Preserving locally uploaded profile picture for user: ' . $existingUser['uid']);
+                        log_message('info', 'Preserving locally uploaded profile picture for user: ' . $existingUser['email']);
                     }
                 }
 
                 // Update login_uid if it's null or empty
                 if (empty($existingUser['login_uid']) && !empty($loginUid)) {
                     $updateData['login_uid'] = $loginUid;
-                    log_message('info', 'Updated login_uid for existing user: ' . $existingUser['uid'] . ' -> ' . $loginUid);
+                    log_message('info', 'Updated login_uid for existing user: ' . $existingUser['email'] . ' -> ' . $loginUid);
                 }
 
-                $this->userModel->update($existingUser['uid'], $updateData);
+                $this->userModel->update($existingUser['email'], $updateData);
 
                 $userData = array_merge($existingUser, $updateData);
-                $userData['uid'] = $existingUser['uid'];
 
-                log_message('info', 'Updated existing user from API: ' . $existingUser['uid'] . ' (' . $email . ')');
+                log_message('info', 'Updated existing user from API: ' . $email);
 
                 // Update corresponding author record if exists
                 $this->updateAuthorFromAPI($userData);
@@ -226,14 +248,14 @@ class AuthenController extends Controller
 
                 $userId = $this->userModel->insertUserData($apiUserData);
 
-                if (!$userId) {
+                if (! $userId) {
                     throw new \Exception('Failed to create user record');
                 }
 
                 $userData = $this->userModel->find($userId);
-                if (!$userData) {
+                if (! $userData) {
                     $userData = $apiUserData;
-                    $userData['uid'] = $userId;
+                    $userData['email'] = $userId;
                     $userData['role'] = $userData['role'] ?? 'user';
                 }
 
@@ -267,26 +289,22 @@ class AuthenController extends Controller
     {
         try {
             $authorData = [
-                'name' => trim($userData['gf_name'] . ' ' . $userData['gl_name']),
-                'email' => $userData['email'],
-                'affiliation' => $userData['major'] ?? '',
-                'user_uid' => $userData['uid'],
-                'created_by' => $userData['uid']
+                'email'            => \App\Libraries\UserIdentity::normalizeEmail((string) $userData['email']),
+                'user_email'       => \App\Libraries\UserIdentity::normalizeEmail((string) $userData['email']),
+                'created_by_email' => \App\Libraries\UserIdentity::normalizeEmail((string) $userData['email']),
             ];
 
-            // Check if author already exists
             $existingAuthor = $this->authorModel->getAuthorByEmail($userData['email']);
 
-            if (!$existingAuthor) {
+            if (! $existingAuthor) {
                 $this->authorModel->insert($authorData);
-                log_message('info', 'Created author record for user: ' . $userData['uid']);
+                log_message('info', 'Created author record for user: ' . $authorData['email']);
             } else {
-                // Link existing author to user
-                $this->authorModel->linkAuthorToUser($existingAuthor['id'], $userData['uid']);
-                log_message('info', 'Linked existing author to user: ' . $userData['uid']);
+                $this->authorModel->linkAuthorToUser($existingAuthor['id'], $authorData['email']);
+                log_message('info', 'Linked existing author to user: ' . $authorData['email']);
             }
         } catch (\Exception $e) {
-            log_message('error', 'Failed to create/link author for user ' . $userData['uid'] . ': ' . $e->getMessage());
+            log_message('error', 'Failed to create/link author for user ' . ($userData['email'] ?? '') . ': ' . $e->getMessage());
         }
     }
 
@@ -305,10 +323,10 @@ class AuthenController extends Controller
                 ];
 
                 $this->authorModel->update($author['id'], $updateData);
-                log_message('info', 'Updated author record for user: ' . $userData['uid']);
+                log_message('info', 'Updated author record for user: ' . $userData['email']);
             }
         } catch (\Exception $e) {
-            log_message('error', 'Failed to update author for user ' . $userData['uid'] . ': ' . $e->getMessage());
+            log_message('error', 'Failed to update author for user ' . ($userData['email'] ?? '') . ': ' . $e->getMessage());
         }
     }
 
@@ -334,8 +352,8 @@ class AuthenController extends Controller
                 }
 
                 if (!empty($updateFields)) {
-                    $this->userModel->update($userData['uid'], $updateFields);
-                    log_message('info', 'Updated additional data for user: ' . $userData['uid']);
+                    $this->userModel->update(\App\Libraries\UserIdentity::normalizeEmail((string) ($userData['email'] ?? '')), $updateFields);
+                    log_message('info', 'Updated additional data for user: ' . ($userData['email'] ?? ''));
                 }
             }
         } catch (\Exception $e) {
@@ -351,10 +369,10 @@ class AuthenController extends Controller
     {
         $role = $userData['role'] ?? 'user';
         $managedFaculties = $userData['managed_faculties'] ?? null;
+        $loginMethod = ($accessToken !== null) ? 'oauth_api' : 'newscience_sso';
 
         $sessionData = [
-            'uid' => $userData['uid'],
-            'email' => $userData['email'],
+            'email' => \App\Libraries\UserIdentity::normalizeEmail((string) ($userData['email'] ?? '')),
             'name' => trim($userData['gf_name'] . ' ' . $userData['gl_name']),
             'thai_name' => trim(($userData['thai_name'] ?? '') . ' ' . ($userData['thai_lastname'] ?? '')),
             'title' => $userData['title'] ?? '',
@@ -364,7 +382,7 @@ class AuthenController extends Controller
             'profile_picture' => $userData['profile_picture'] ?? '',
             'logged_in' => true,
             'login_time' => time(),
-            'login_method' => 'oauth_api',
+            'login_method' => $loginMethod,
             'role' => $role,
             'managed_faculties' => $managedFaculties
         ];
@@ -372,11 +390,14 @@ class AuthenController extends Controller
         // Clear any stale admin flags before setting new session data
         $this->session->remove('backdoor_admin_auth');
 
+        $normEmail = \App\Libraries\UserIdentity::normalizeEmail((string) ($userData['email'] ?? ''));
+
         $sessionToSet = [
             'user_data' => $sessionData,
             'logged_in' => true,
-            'user_id' => $userData['uid'],
-            'user_role' => $role
+            'user_email' => $normEmail,
+            'user_id' => $normEmail,
+            'user_role' => $role,
         ];
 
         if ($accessToken) {
@@ -415,8 +436,8 @@ class AuthenController extends Controller
             return redirect()->to('/auth/login')->with('error', 'SSO จาก newScience ยังไม่เปิดใช้');
         }
 
-        $token = $this->request->getGet('token');
-        if (!$token || !is_string($token)) {
+        $token = $this->extractSsoToken();
+        if ($token === null) {
             log_message('warning', self::SSO_LOG_PREFIX . 'ssoEntry missing token');
             return redirect()->to('/auth/login')->with('error', 'ไม่พบ token จาก newScience');
         }
@@ -433,8 +454,8 @@ class AuthenController extends Controller
         $expectedSig = hash_hmac('sha256', $payloadB64, $config->sharedSecret, true);
         $signature = $this->base64UrlDecode($sigB64);
         if ($signature === null || !hash_equals($expectedSig, $signature)) {
-            log_message('warning', self::SSO_LOG_PREFIX . 'ssoEntry invalid signature');
-            return redirect()->to('/auth/login')->with('error', 'Token ไม่ถูกต้อง');
+            log_message('warning', self::SSO_LOG_PREFIX . 'ssoEntry invalid signature secret_len=' . strlen($config->sharedSecret) . ' token_len=' . strlen($token));
+            return redirect()->to('/auth/login')->with('error', 'Token ไม่ถูกต้อง (ตรวจ secret ระหว่าง newScience กับ Research Record)');
         }
 
         $payloadJson = $this->base64UrlDecode($payloadB64);
@@ -474,20 +495,45 @@ class AuthenController extends Controller
                 'edoc' => 1,
                 'profile_customer' => 'newscience_sso',
             ];
-            $uid = $this->userModel->insertUserData($newUser);
-            if (!$uid) {
+            $insertedEmail = $this->userModel->insertUserData($newUser);
+            if (!$insertedEmail) {
                 log_message('error', self::SSO_LOG_PREFIX . 'ssoEntry failed to create user email=' . $email);
                 return redirect()->to('/auth/login')->with('error', 'ไม่สามารถสร้างผู้ใช้ได้');
             }
-            $user = $this->userModel->find($uid);
-            log_message('info', self::SSO_LOG_PREFIX . 'ssoEntry created user uid=' . $uid . ' email=' . $email);
+            $user = $this->userModel->find($insertedEmail);
+            log_message('info', self::SSO_LOG_PREFIX . 'ssoEntry created user email=' . $email);
         }
 
         $userData = $user;
-        $userData['uid'] = (int) ($user['uid'] ?? 0);
         $this->setUserSession($userData, null);
-        log_message('info', self::SSO_LOG_PREFIX . 'ssoEntry success email=' . $email . ' uid=' . $userData['uid']);
+        log_message('info', self::SSO_LOG_PREFIX . 'ssoEntry success email=' . $email);
         return redirect()->to('/dashboard')->with('success', 'เข้าสู่ระบบจาก newScience สำเร็จ');
+    }
+
+    /**
+     * อ่าน token จาก query — รองรับ IIS/PHP ที่อาจทำให้ค่าใน URL เพี้ยน
+     */
+    private function extractSsoToken(): ?string
+    {
+        $token = $this->request->getGet('token');
+        if (is_string($token) && $token !== '') {
+            return $this->normalizeSsoToken($token);
+        }
+
+        $qs = $this->request->getServer('QUERY_STRING');
+        if (is_string($qs) && preg_match('/(?:^|&)token=([^&]+)/', $qs, $m)) {
+            return $this->normalizeSsoToken(rawurldecode($m[1]));
+        }
+
+        return null;
+    }
+
+    private function normalizeSsoToken(string $token): string
+    {
+        $token = trim($token);
+
+        // PHP แปลง + ใน query string เป็น space (กรณี encoding แบบ form)
+        return str_replace(' ', '+', $token);
     }
 
     /**
@@ -510,6 +556,17 @@ class AuthenController extends Controller
     public function logout()
     {
         try {
+            $skipNs = $this->request->getGet('skip_ns') === '1';
+            $returnUrl = $this->request->getGet('return_url');
+            $safeReturnUrl = null;
+            if (is_string($returnUrl) && $returnUrl !== '') {
+                // same-origin only
+                $base = rtrim(site_url(), '/');
+                if (strpos($returnUrl, $base . '/') === 0) {
+                    $safeReturnUrl = $returnUrl;
+                }
+            }
+
             $userData = $this->session->get('user_data');
 
             // Check if this is a backdoor/god mode session
@@ -519,7 +576,7 @@ class AuthenController extends Controller
             if ($userData) {
                 // Log the logout
                 $logType = $isGodMode ? 'God mode user logged out (ALL session cleared)' : 'User logged out';
-                log_message('info', $logType . ': ' . ($userData['email'] ?? 'unknown') . ' (ID: ' . ($userData['uid'] ?? 'unknown') . ')');
+                log_message('info', $logType . ': ' . ($userData['email'] ?? 'unknown'));
 
                 // Optional: Call API logout endpoint if available (not for backdoor sessions)
                 if (!$isGodMode) {
@@ -579,7 +636,17 @@ class AuthenController extends Controller
                 ? 'You have been logged out successfully. All god mode access has been cleared.'
                 : 'You have been logged out successfully!';
 
-            return redirect()->to('/auth/login')->with('success', $message);
+            // Production: logout RR แล้วต้อง logout NS ด้วย ไม่งั้นจะเด้ง SSO กลับมาล็อกอินทันที
+            $oauthConfig = config(\Config\UruPortalOAuth::class);
+            if (! $oauthConfig->enabled && ! $skipNs) {
+                $portal = config(NewsciencePortal::class);
+                $returnUrl = site_url('auth/login?logout=1');
+                $nsLogout = rtrim($portal->baseUrl, '/') . '/oauth/logout?return_url=' . rawurlencode($returnUrl);
+
+                return redirect()->to($nsLogout)->with('success', $message);
+            }
+
+            return redirect()->to($safeReturnUrl ?: '/auth/login?logout=1')->with('success', $message);
         } catch (\Exception $e) {
             log_message('error', 'Logout error: ' . $e->getMessage());
 
@@ -598,7 +665,7 @@ class AuthenController extends Controller
             }
 
             // Redirect to login anyway
-            return redirect()->to('/auth/login')->with('error', 'Logged out with errors.');
+            return redirect()->to('/auth/login?logout=1')->with('error', 'Logged out with errors.');
         }
     }
 
