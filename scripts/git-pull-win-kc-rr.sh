@@ -69,16 +69,10 @@ SSH_BASE=(
 )
 
 if [[ "$INIT" -eq 1 ]]; then
-  echo "=== init: clone + IIS (ครั้งแรก) ==="
-  INIT_PS="Import-Module WebAdministration; \
-\$root='${REPO_WIN}'; \$pub=\"\$root\\public\"; \
-if (-not (Test-Path \$root)) { git clone --branch ${BRANCH} ${REPO_URL} \$root }; \
-if (-not (Test-Path \"\$root\\.env\") -and (Test-Path \"\$root\\.env.production.example\")) { Copy-Item \"\$root\\.env.production.example\" \"\$root\\.env\" }; \
-if (-not (Get-WebApplication -Site '${IIS_SITE}' -Name '${IIS_APP}' -ErrorAction SilentlyContinue)) { \
-  New-WebApplication -Site '${IIS_SITE}' -Name '${IIS_APP}' -PhysicalPath \$pub -ApplicationPool '${IIS_APPPOOL}' }; \
-\$stub='C:\\inetpub\\newscience\\public\\recordresearch'; \
-if (Test-Path \$stub) { Rename-Item \$stub (\"\$stub.bak.\" + (Get-Date -Format 'yyyyMMdd_HHmmss')) }"
-  "${SSH_BASE[@]}" "powershell -NoProfile -Command \"${INIT_PS}\""
+  echo "=== init: clone repo (ครั้งแรก) ==="
+  # NOTE: IIS app creation varies by server/site naming; keep init minimal and safe.
+  REMOTE_INIT="if not exist ${REPO_WIN//\//\\\\} mkdir ${REPO_WIN//\//\\\\} && cd /d ${REPO_WIN//\//\\\\} && if not exist .git git clone --branch ${BRANCH} ${REPO_URL} . && if not exist .env if exist .env.production.example copy /Y .env.production.example .env"
+  "${SSH_BASE[@]}" "cmd /c \"${REMOTE_INIT}\""
 fi
 
 REMOTE_PULL="cd /d ${REPO_WIN} && git rev-parse --short HEAD && git fetch origin && git checkout ${BRANCH} && git pull origin ${BRANCH} && git rev-parse --short HEAD && git log -1 --oneline"
