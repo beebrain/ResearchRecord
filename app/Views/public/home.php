@@ -298,7 +298,7 @@
                     };
 
                     var teacherHtml = teachers.length
-                        ? '<div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">' + teachers.map(function (t) {
+                        ? '<div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3" id="teacherList">' + teachers.map(function (t) {
                             var thai = ((t.thai_name || '') + ' ' + (t.thai_lastname || '')).trim();
                             var en = ((t.gf_name || '') + ' ' + (t.gl_name || '')).trim();
                             var name = thai || en || (t.email || '');
@@ -309,7 +309,7 @@
                                 : (role === 'assistant') ? 'ผู้ช่วยผู้รับผิดชอบ'
                                 : 'อาจารย์';
                             return (
-                                '<div class="rounded-xl border border-slate-200 px-4 py-3">' +
+                                '<button type="button" class="teacher-pill w-full text-left rounded-xl border border-slate-200 px-4 py-3 hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600" data-teacher-email="' + esc(t.email || '') + '" data-teacher-name="' + esc(name) + '" aria-pressed="false">' +
                                     '<div class="flex items-start justify-between gap-3">' +
                                         '<div class="min-w-0">' +
                                             '<div class="font-medium text-slate-900 truncate">' + esc(name) + '</div>' +
@@ -318,21 +318,22 @@
                                         '</div>' +
                                         '<span class="shrink-0 rounded-lg bg-indigo-50 text-indigo-800 px-2 py-1 text-xs font-semibold">' + esc(badge) + '</span>' +
                                     '</div>' +
-                                '</div>'
+                                '</button>'
                             );
                         }).join('') + '</div>'
                         : '<div class="mt-3 text-sm text-slate-600">ยังไม่มีข้อมูลอาจารย์ผู้รับผิดชอบ</div>';
 
                     var pubHtml = pubs.length
-                        ? '<div class="mt-3 space-y-3">' + pubs.map(function (p) {
+                        ? '<div class="mt-3 space-y-3" id="pubList">' + pubs.map(function (p) {
                             var year = p.publication_year || '';
                             var type = p.publication_type || '';
                             var doi = (p.doi || '').trim();
                             var authors = (p.authors || '').trim();
                             var creator = (p.created_by_name || '').trim() || (p.created_by_email || '');
                             var source = p.source || '';
+                            var authorEmails = (p.author_emails || '').trim();
                             return (
-                                '<article class="rounded-xl border border-slate-200 px-4 py-3 hover:bg-slate-50 transition-colors">' +
+                                '<article class="pub-item rounded-xl border border-slate-200 px-4 py-3 hover:bg-slate-50 transition-colors" data-author-emails="' + esc(authorEmails) + '">' +
                                     '<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">' +
                                         '<div class="min-w-0">' +
                                             '<div class="font-medium text-slate-900">' + esc(p.title || '') + '</div>' +
@@ -365,14 +366,94 @@
                         '</div>' +
                         '<div class="mt-5 space-y-5">' +
                             '<section class="rounded-2xl border border-slate-200 p-4">' +
-                                '<div class="flex items-center justify-between"><h3 class="text-base font-semibold">รายชื่ออาจารย์</h3><div class="text-sm text-slate-600">พบ <span class="font-semibold text-slate-900">' + esc(teachers.length) + '</span> คน</div></div>' +
+                                '<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">' +
+                                '  <div>' +
+                                '    <h3 class="text-base font-semibold">รายชื่ออาจารย์</h3>' +
+                                '    <div id="teacherFilterHint" class="hidden text-sm text-slate-600 mt-1">กำลังกรองผลงานของ <span class="font-semibold text-slate-900" id="teacherFilterName"></span></div>' +
+                                '  </div>' +
+                                '  <div class="flex items-center gap-3 text-sm text-slate-600">' +
+                                '    <span>พบ <span class="font-semibold text-slate-900">' + esc(teachers.length) + '</span> คน</span>' +
+                                '    <button type="button" id="clearTeacherFilter" class="hidden rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600">แสดงทั้งหมด</button>' +
+                                '  </div>' +
+                                '</div>' +
                                 teacherHtml +
                             '</section>' +
                             '<section class="rounded-2xl border border-slate-200 p-4">' +
-                                '<div class="flex items-center justify-between"><h3 class="text-base font-semibold">ผลงานเผยแพร่ (อนุมัติแล้ว)</h3><div class="text-sm text-slate-600">ทั้งหมด <span class="font-semibold text-slate-900">' + esc(pubCount) + '</span></div></div>' +
+                                '<div class="flex items-center justify-between"><h3 class="text-base font-semibold">ผลงานเผยแพร่ (อนุมัติแล้ว)</h3><div class="text-sm text-slate-600"><span id="pubCountAllWrap">ทั้งหมด <span class="font-semibold text-slate-900" id="pubCountAll">' + esc(pubCount) + '</span></span><span id="pubCountFilteredWrap" class="hidden">พบ <span class="font-semibold text-slate-900" id="pubCountFiltered">0</span></span></div></div>' +
                                 pubHtml +
                             '</section>' +
                         '</div>';
+                    // wire teacher → filter publications (AJAX result only)
+                    setTimeout(function () {
+                        var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                        var tBtns = Array.prototype.slice.call(result.querySelectorAll('.teacher-pill'));
+                        var pItems = Array.prototype.slice.call(result.querySelectorAll('.pub-item'));
+                        var hint = result.querySelector('#teacherFilterHint');
+                        var hintName = result.querySelector('#teacherFilterName');
+                        var clearBtn = result.querySelector('#clearTeacherFilter');
+                        var countAllWrap = result.querySelector('#pubCountAllWrap');
+                        var countFilteredWrap = result.querySelector('#pubCountFilteredWrap');
+                        var countFilteredEl = result.querySelector('#pubCountFiltered');
+                        if (!tBtns.length || !pItems.length || !hint || !hintName || !clearBtn || !countAllWrap || !countFilteredWrap || !countFilteredEl) return;
+
+                        var activeEmail = '';
+                        var apply = function (email, name) {
+                            activeEmail = email || '';
+                            tBtns.forEach(function (b) {
+                                var on = (String(b.getAttribute('data-teacher-email') || '') === activeEmail) && activeEmail !== '';
+                                b.setAttribute('aria-pressed', on ? 'true' : 'false');
+                                b.classList.toggle('ring-2', on);
+                                b.classList.toggle('ring-indigo-600', on);
+                                b.classList.toggle('bg-indigo-50/60', on);
+                                b.classList.toggle('border-indigo-200', on);
+                            });
+
+                            var shown = 0;
+                            pItems.forEach(function (it) {
+                                var list = String(it.getAttribute('data-author-emails') || '');
+                                var has = activeEmail && ((',' + list + ',').indexOf(',' + activeEmail + ',') !== -1);
+                                var show = !activeEmail || has;
+                                if (show) shown++;
+                                if (!reduced) it.style.transition = 'opacity 180ms ease, transform 180ms ease';
+                                if (show) {
+                                    it.classList.remove('hidden');
+                                    if (!reduced) { it.style.opacity = '1'; it.style.transform = 'translateY(0px)'; }
+                                } else {
+                                    if (!reduced) {
+                                        it.style.opacity = '0'; it.style.transform = 'translateY(6px)';
+                                        setTimeout(function () { it.classList.add('hidden'); }, 180);
+                                    } else {
+                                        it.classList.add('hidden');
+                                    }
+                                }
+                            });
+
+                            if (activeEmail) {
+                                hint.classList.remove('hidden');
+                                hintName.textContent = name || activeEmail;
+                                clearBtn.classList.remove('hidden');
+                                countAllWrap.classList.add('hidden');
+                                countFilteredWrap.classList.remove('hidden');
+                                countFilteredEl.textContent = String(shown);
+                            } else {
+                                hint.classList.add('hidden');
+                                clearBtn.classList.add('hidden');
+                                countAllWrap.classList.remove('hidden');
+                                countFilteredWrap.classList.add('hidden');
+                            }
+                        };
+
+                        tBtns.forEach(function (b) {
+                            b.addEventListener('click', function () {
+                                var email = String(b.getAttribute('data-teacher-email') || '');
+                                var name = String(b.getAttribute('data-teacher-name') || '');
+                                apply(activeEmail === email ? '' : email, name);
+                                var pubList = result.querySelector('#pubList');
+                                if (pubList) pubList.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+                            });
+                        });
+                        clearBtn.addEventListener('click', function () { apply('', ''); });
+                    }, 0);
                     result.removeAttribute('aria-busy');
                 }).catch(function (e) {
                     result.className = 'mt-5 rounded-2xl border border-red-200 bg-red-50 p-5 text-red-800 shadow-sm';

@@ -105,7 +105,11 @@
                             default => 'อาจารย์',
                         };
                         ?>
-                        <div class="rounded-xl border border-slate-200 px-4 py-3">
+                        <button type="button"
+                            class="teacher-pill w-full text-left rounded-xl border border-slate-200 px-4 py-3 hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600"
+                            data-teacher-email="<?= esc((string) ($t['email'] ?? '')) ?>"
+                            data-teacher-name="<?= esc($thaiName !== '' ? $thaiName : $enName) ?>"
+                            aria-pressed="false">
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
                                     <div class="font-medium text-slate-900 truncate"><?= esc($thaiName !== '' ? $thaiName : $enName) ?></div>
@@ -123,7 +127,7 @@
                                     <?= esc($badge) ?>
                                 </span>
                             </div>
-                        </div>
+                        </button>
                     <?php endforeach; ?>
                 </div>
             <?php endif; ?>
@@ -131,16 +135,26 @@
 
         <section class="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
             <div class="flex items-center justify-between gap-4">
-                <h2 class="text-base font-semibold">ผลงานเผยแพร่ (อนุมัติแล้ว)</h2>
+                <div>
+                    <h2 class="text-base font-semibold">ผลงานเผยแพร่ (อนุมัติแล้ว)</h2>
+                    <div id="pubFilterHint" class="mt-1 hidden text-sm text-slate-600">
+                        กำลังแสดงเฉพาะผลงานของ <span class="font-semibold text-slate-900" id="pubFilterName"></span>
+                    </div>
+                </div>
                 <div class="text-sm text-slate-600">
-                    ทั้งหมด <span class="font-semibold text-slate-900"><?= (int) ($publicationCount ?? 0) ?></span> รายการ
+                    <span id="pubCountAllWrap">ทั้งหมด <span class="font-semibold text-slate-900" id="pubCountAll"><?= (int) ($publicationCount ?? 0) ?></span> รายการ</span>
+                    <span id="pubCountFilteredWrap" class="hidden">พบ <span class="font-semibold text-slate-900" id="pubCountFiltered">0</span> รายการ</span>
+                    <button type="button" id="pubClearFilter"
+                        class="ml-3 hidden rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600">
+                        แสดงทั้งหมด
+                    </button>
                 </div>
             </div>
 
             <?php if (empty($publications)): ?>
                 <div class="mt-4 text-sm text-slate-600">ยังไม่พบผลงานเผยแพร่ที่อนุมัติสำหรับหลักสูตรนี้</div>
             <?php else: ?>
-                <div class="mt-4 space-y-3">
+                <div class="mt-4 space-y-3" id="pubList">
                     <?php foreach ($publications as $p): ?>
                         <?php
                         $year    = (string) ($p['publication_year'] ?? '');
@@ -149,8 +163,10 @@
                         $authors = trim((string) ($p['authors'] ?? ''));
                         $creatorName  = trim((string) ($p['created_by_name'] ?? ''));
                         $creatorEmail = trim((string) ($p['created_by_email'] ?? ''));
+                        $authorEmails = trim((string) ($p['author_emails'] ?? ''));
                         ?>
-                        <article class="rounded-xl border border-slate-200 px-4 py-3 hover:bg-slate-50 transition-colors">
+                        <article class="pub-item rounded-xl border border-slate-200 px-4 py-3 hover:bg-slate-50 transition-colors"
+                            data-author-emails="<?= esc($authorEmails) ?>">
                             <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                                 <div class="min-w-0">
                                     <div class="font-medium text-slate-900">
@@ -281,6 +297,84 @@
                     submitEl.disabled = false;
                 }
             }
+
+            // filter publications by teacher click
+            var pubItems = Array.prototype.slice.call(document.querySelectorAll('.pub-item'));
+            var teacherBtns = Array.prototype.slice.call(document.querySelectorAll('.teacher-pill'));
+            var hint = document.getElementById('pubFilterHint');
+            var hintName = document.getElementById('pubFilterName');
+            var clearBtn = document.getElementById('pubClearFilter');
+            var countAllWrap = document.getElementById('pubCountAllWrap');
+            var countFilteredWrap = document.getElementById('pubCountFilteredWrap');
+            var countFilteredEl = document.getElementById('pubCountFiltered');
+            if (!pubItems.length || !teacherBtns.length || !hint || !hintName || !clearBtn || !countAllWrap || !countFilteredWrap || !countFilteredEl) return;
+
+            var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            var activeEmail = '';
+
+            var setActive = function (email, name) {
+                activeEmail = email || '';
+                teacherBtns.forEach(function (b) {
+                    var on = (String(b.getAttribute('data-teacher-email') || '') === activeEmail) && activeEmail !== '';
+                    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+                    b.classList.toggle('ring-2', on);
+                    b.classList.toggle('ring-indigo-600', on);
+                    b.classList.toggle('bg-indigo-50/60', on);
+                    b.classList.toggle('border-indigo-200', on);
+                });
+
+                var shown = 0;
+                pubItems.forEach(function (it) {
+                    var list = String(it.getAttribute('data-author-emails') || '');
+                    var has = activeEmail && ((',' + list + ',').indexOf(',' + activeEmail + ',') !== -1);
+                    var show = !activeEmail || has;
+                    if (show) shown++;
+
+                    if (!reduced) it.style.transition = 'opacity 180ms ease, transform 180ms ease';
+                    if (show) {
+                        it.classList.remove('hidden');
+                        if (!reduced) {
+                            it.style.opacity = '1';
+                            it.style.transform = 'translateY(0px)';
+                        }
+                    } else {
+                        if (!reduced) {
+                            it.style.opacity = '0';
+                            it.style.transform = 'translateY(6px)';
+                            setTimeout(function () { it.classList.add('hidden'); }, 180);
+                        } else {
+                            it.classList.add('hidden');
+                        }
+                    }
+                });
+
+                if (activeEmail) {
+                    hint.classList.remove('hidden');
+                    hintName.textContent = name || activeEmail;
+                    clearBtn.classList.remove('hidden');
+                    countAllWrap.classList.add('hidden');
+                    countFilteredWrap.classList.remove('hidden');
+                    countFilteredEl.textContent = String(shown);
+                } else {
+                    hint.classList.add('hidden');
+                    clearBtn.classList.add('hidden');
+                    countAllWrap.classList.remove('hidden');
+                    countFilteredWrap.classList.add('hidden');
+                }
+            };
+
+            teacherBtns.forEach(function (b) {
+                b.addEventListener('click', function () {
+                    var email = String(b.getAttribute('data-teacher-email') || '');
+                    var name = String(b.getAttribute('data-teacher-name') || '');
+                    setActive(activeEmail === email ? '' : email, name);
+                    var pubSection = document.getElementById('pubList');
+                    if (pubSection) {
+                        pubSection.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+                    }
+                });
+            });
+            clearBtn.addEventListener('click', function () { setActive('', ''); });
         })();
     </script>
 </body>
