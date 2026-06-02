@@ -6,9 +6,49 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ตรวจสอบหลักสูตรและผลงานเผยแพร่ | Research Record</title>
     <link rel="stylesheet" href="<?= asset_url('css/tailwind.min.css') ?>">
+    <link rel="stylesheet" href="<?= asset_url('css/sarabun.css') ?>">
+    <style>
+        :root{
+            --rr-ink:#0b1220;
+            --rr-muted:#475569;
+            --rr-ring:rgba(99,102,241,.55);
+            --rr-accent:#4f46e5;
+            --rr-sky:#0ea5e9;
+            --rr-emerald:#10b981;
+        }
+        html{scroll-behavior:smooth;}
+        body{font-family:"Sarabun",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;}
+        /* subtle grain overlay for depth */
+        .rr-grain:before{
+            content:"";
+            position:fixed;
+            inset:0;
+            pointer-events:none;
+            z-index:-1;
+            opacity:.18;
+            background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.45'/%3E%3C/svg%3E");
+            mix-blend-mode:multiply;
+        }
+        @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto;} }
+        .rr-card{position:relative; transform:translateY(0); transition:transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;}
+        .rr-card:hover{transform:translateY(-2px); box-shadow:0 14px 40px rgba(2,6,23,.10);}
+        .rr-kicker{letter-spacing:.12em; text-transform:uppercase;}
+        .rr-linkline{background-size:200% 2px; background-position:0 100%; background-repeat:no-repeat; background-image:linear-gradient(90deg, transparent 0%, rgba(79,70,229,.35) 35%, rgba(14,165,233,.35) 65%, transparent 100%); }
+        .rr-linkline:hover{background-position:100% 100%;}
+        /* louder color accents */
+        .rr-borderglow{border-color:rgba(99,102,241,.22); box-shadow:0 1px 0 rgba(255,255,255,.8), 0 18px 55px rgba(79,70,229,.10);}
+        .rr-rail{position:relative;}
+        .rr-rail:before{content:""; position:absolute; left:0; top:14px; bottom:14px; width:4px; border-radius:999px; background:linear-gradient(180deg, rgba(79,70,229,.95), rgba(14,165,233,.85), rgba(16,185,129,.85)); opacity:.95;}
+        .rr-pill{display:inline-flex; align-items:center; gap:.5rem; padding:.35rem .65rem; border-radius:999px; font-weight:700; font-size:.75rem;}
+        .rr-pill--indigo{background:rgba(79,70,229,.12); color:rgb(49,46,129); border:1px solid rgba(79,70,229,.18);}
+        .rr-pill--sky{background:rgba(14,165,233,.12); color:rgb(7,89,133); border:1px solid rgba(14,165,233,.18);}
+        .rr-pill--emerald{background:rgba(16,185,129,.12); color:rgb(6,95,70); border:1px solid rgba(16,185,129,.18);}
+        .rr-pop{transition:transform 160ms ease, box-shadow 160ms ease;}
+        .rr-pop:hover{transform:translateY(-1px) scale(1.01); box-shadow:0 10px 28px rgba(2,6,23,.10);}
+    </style>
 </head>
 
-<body class="bg-slate-50 text-slate-900 relative overflow-x-hidden">
+<body class="rr-grain bg-slate-50 text-slate-900 relative overflow-x-hidden">
     <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 bg-white px-3 py-2 rounded-lg shadow">
         ข้ามไปยังเนื้อหา
     </a>
@@ -17,20 +57,21 @@
         <div class="max-w-6xl mx-auto px-4 py-5 flex items-center justify-between gap-4">
             <div class="min-w-0">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 via-indigo-600 to-sky-500 text-white flex items-center justify-center shadow-sm ring-1 ring-white/30">
                         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                         </svg>
                     </div>
                     <div class="min-w-0">
-                        <h1 class="text-lg sm:text-xl font-semibold truncate">Research Record</h1>
+                        <div class="rr-kicker text-[11px] text-slate-500">URU • Research Record</div>
+                        <h1 class="text-lg sm:text-xl font-semibold truncate leading-tight">ตรวจสอบหลักสูตรและผลงานเผยแพร่</h1>
                         <p class="text-sm text-slate-600">หน้าสาธารณะสำหรับตรวจสอบคณะ/หลักสูตร อาจารย์ผู้รับผิดชอบ และผลงานเผยแพร่</p>
                     </div>
                 </div>
             </div>
             <div class="shrink-0">
                 <a href="<?= site_url('auth/login') ?>"
-                    class="inline-flex items-center gap-2 rounded-xl bg-slate-900 text-white px-4 py-2 text-sm font-medium hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900">
+                    class="inline-flex items-center gap-2 rounded-xl bg-slate-900 text-white px-4 py-2 text-sm font-medium hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 active:translate-y-[1px] transition-transform">
                     <span>เข้าสู่ระบบ</span>
                     <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path d="M10 17l5-5-5-5" />
@@ -40,9 +81,9 @@
         </div>
     </header>
 
-    <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 -top-32 -z-10">
+    <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 -top-36 -z-10">
         <div class="mx-auto max-w-6xl px-4">
-            <div class="h-48 rounded-[2rem] bg-gradient-to-r from-indigo-200/60 via-sky-200/40 to-emerald-200/50 blur-2xl"></div>
+            <div class="h-56 rounded-[2rem] bg-[radial-gradient(circle_at_18%_24%,rgba(79,70,229,.45),transparent_55%),radial-gradient(circle_at_62%_18%,rgba(14,165,233,.38),transparent_55%),radial-gradient(circle_at_82%_64%,rgba(16,185,129,.30),transparent_55%)] blur-2xl"></div>
         </div>
     </div>
 
@@ -54,7 +95,7 @@
         <?php endif; ?>
 
         <section class="mb-6">
-            <div class="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm relative overflow-hidden">
+            <div class="rr-card rr-borderglow rounded-2xl bg-white border border-slate-200 p-5 shadow-sm relative overflow-hidden">
                 <div aria-hidden="true" class="absolute -top-24 -right-24 h-56 w-56 rounded-full bg-indigo-100 blur-2xl"></div>
                 <div aria-hidden="true" class="absolute -bottom-24 -left-24 h-56 w-56 rounded-full bg-emerald-100 blur-2xl"></div>
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -62,8 +103,10 @@
                         <h2 class="text-base font-semibold">เลือกดูตามคณะและหลักสูตร</h2>
                         <p class="text-sm text-slate-600 mt-1">เลือกคณะ → เลือกหลักสูตร → กดค้นหา เพื่อดูรายชื่ออาจารย์ผู้รับผิดชอบ และผลงานเผยแพร่ (เฉพาะที่อนุมัติแล้ว)</p>
                     </div>
-                    <div class="text-sm text-slate-600">
-                        รวมคณะ: <span class="font-semibold text-slate-900"><?= is_array($faculties) ? count($faculties) : 0 ?></span>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="rr-pill rr-pill--indigo">คณะ <?= is_array($faculties) ? count($faculties) : 0 ?></span>
+                        <span class="rr-pill rr-pill--sky">ค้นหาแบบทันที</span>
+                        <span class="rr-pill rr-pill--emerald">ผลงานอนุมัติแล้ว</span>
                     </div>
                 </div>
 
@@ -71,20 +114,20 @@
                     <div class="md:col-span-5">
                         <label for="faculty" class="block text-sm font-medium text-slate-800">คณะ</label>
                         <select id="faculty"
-                            class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600">
+                            class="mt-2 w-full rounded-xl border border-slate-300 bg-white/90 px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 shadow-[inset_0_1px_0_rgba(255,255,255,.8)]">
                             <option value="">เลือกคณะ</option>
                         </select>
                     </div>
                     <div class="md:col-span-5">
                         <label for="curriculum" class="block text-sm font-medium text-slate-800">หลักสูตร</label>
                         <select id="curriculum" disabled
-                            class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 disabled:bg-slate-50 disabled:text-slate-500">
+                            class="mt-2 w-full rounded-xl border border-slate-300 bg-white/90 px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 disabled:bg-slate-50 disabled:text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,.8)]">
                             <option value="">เลือกหลักสูตร</option>
                         </select>
                     </div>
                     <div class="md:col-span-2 flex gap-2">
                         <button id="doSearch" type="submit" disabled
-                            class="w-full rounded-xl bg-indigo-600 text-white px-4 py-3 text-sm font-semibold hover:bg-indigo-700 disabled:bg-slate-300 disabled:text-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600">
+                            class="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-sky-600 text-white px-4 py-3 text-sm font-semibold hover:from-indigo-700 hover:to-sky-700 disabled:bg-slate-300 disabled:text-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600 active:translate-y-[1px] transition-transform">
                             ค้นหา
                         </button>
                         <button id="reset" type="button"
@@ -100,12 +143,12 @@
 
         <section class="space-y-4">
             <details class="rounded-2xl bg-white border border-slate-200 overflow-hidden shadow-sm">
-                <summary class="cursor-pointer select-none px-5 py-4 bg-slate-50/60 text-slate-900 font-semibold">
+                <summary class="cursor-pointer select-none px-5 py-4 bg-gradient-to-r from-indigo-50 via-sky-50 to-emerald-50 text-slate-900 font-semibold">
                     ดูรายการคณะและหลักสูตรทั้งหมด
                     <span class="ml-2 text-sm font-normal text-slate-600">(สำหรับการดูภาพรวม)</span>
                 </summary>
             <?php foreach (($faculties ?? []) as $faculty): ?>
-                <article class="rounded-2xl bg-white border border-slate-200 overflow-hidden">
+                <article class="rr-card rr-rail rounded-2xl bg-white border border-slate-200 overflow-hidden">
                     <div class="px-5 py-4 flex items-start justify-between gap-4 bg-slate-50/60">
                         <div class="min-w-0">
                             <h3 class="font-semibold text-slate-900 truncate"><?= esc($faculty['name'] ?? '') ?></h3>
@@ -125,7 +168,7 @@
                                 <?php foreach ($faculty['curriculums'] as $c): ?>
                                     <a href="<?= site_url('public/curriculum/' . (int) ($c['id'] ?? 0)) ?>"
                                         data-curriculum-name="<?= esc(($c['name'] ?? '') . ' ' . ($c['code'] ?? '') . ' ' . ($c['degree_level'] ?? '')) ?>"
-                                        class="group rounded-xl border border-slate-200 px-4 py-3 hover:border-indigo-200 hover:bg-indigo-50/40 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600">
+                                        class="rr-pop group rounded-xl border border-slate-200 px-4 py-3 hover:border-indigo-200 hover:bg-indigo-50/40 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600">
                                         <div class="flex items-start justify-between gap-3">
                                             <div class="min-w-0">
                                                 <div class="font-medium text-slate-900 group-hover:text-indigo-700 truncate">
@@ -133,10 +176,10 @@
                                                 </div>
                                                 <div class="mt-1 text-xs text-slate-600">
                                                     <span class="inline-flex items-center gap-2">
-                                                        <span class="rounded-lg bg-slate-100 px-2 py-0.5">
+                                                        <span class="rounded-lg bg-indigo-50 text-indigo-800 px-2 py-0.5 font-medium">
                                                             <?= esc($c['code'] ?? '-') ?>
                                                         </span>
-                                                        <span class="rounded-lg bg-slate-100 px-2 py-0.5">
+                                                        <span class="rounded-lg bg-emerald-50 text-emerald-800 px-2 py-0.5 font-medium">
                                                             <?= esc($c['degree_level'] ?? '-') ?>
                                                         </span>
                                                     </span>
