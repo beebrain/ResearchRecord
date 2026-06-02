@@ -336,6 +336,23 @@
                         });
                     };
 
+                    var accentFor = function (label) {
+                        var s = String(label || '').trim().toLowerCase();
+                        var h = 0;
+                        for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+                        var pick = h % 5;
+                        return pick === 1 ? 'rr-accent rr-accent--sky'
+                            : pick === 2 ? 'rr-accent rr-accent--emerald'
+                            : pick === 3 ? 'rr-accent rr-accent--amber'
+                            : pick === 4 ? 'rr-accent rr-accent--rose'
+                            : 'rr-accent';
+                    };
+                    var chip = function (label) {
+                        if (!label) return '';
+                        var cls = accentFor(label);
+                        return '<span class="' + cls + ' rr-chip mr-2"><span class="rr-chipDot" aria-hidden="true"></span>' + esc(label) + '</span>';
+                    };
+
                     var teacherHtml = teachers.length
                         ? '<div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3" id="teacherList">' + teachers.map(function (t) {
                             var thai = ((t.thai_name || '') + ' ' + (t.thai_lastname || '')).trim();
@@ -379,9 +396,9 @@
                                             (authors ? '<div class="text-sm text-slate-700 mt-1">' + esc(authors) + '</div>' : '') +
                                             (creator ? '<div class="text-xs text-slate-600 mt-1">บันทึกโดย: <span class="font-medium text-slate-800">' + esc(creator) + '</span></div>' : '') +
                                             '<div class="text-xs text-slate-600 mt-2">' +
-                                                (type ? '<span class="inline-flex items-center rounded-lg bg-slate-100 px-2 py-0.5 mr-2">' + esc(type) + '</span>' : '') +
-                                                (year ? '<span class="inline-flex items-center rounded-lg bg-slate-100 px-2 py-0.5 mr-2">ปี ' + esc(year) + '</span>' : '') +
-                                                (source ? '<span class="inline-flex items-center rounded-lg bg-slate-100 px-2 py-0.5 mr-2">' + esc(source) + '</span>' : '') +
+                                                chip(type) +
+                                                (year ? chip('ปี ' + year) : '') +
+                                                chip(source) +
                                             '</div>' +
                                         '</div>' +
                                         (doi ? '<div class="shrink-0"><a class="text-sm text-indigo-700 hover:text-indigo-900 underline" href="' + esc('https://doi.org/' + doi) + '" target="_blank" rel="noopener">DOI</a></div>' : '') +

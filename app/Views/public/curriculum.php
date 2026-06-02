@@ -41,6 +41,14 @@
 </head>
 
 <body class="rr-grain bg-slate-50 text-slate-900 relative overflow-x-hidden">
+    <?php
+    $chipAccents = ['rr-accent', 'rr-accent rr-accent--sky', 'rr-accent rr-accent--emerald', 'rr-accent rr-accent--amber', 'rr-accent rr-accent--rose'];
+    $accentFor = static function (string $label) use ($chipAccents): string {
+        $key = mb_strtolower(trim($label), 'UTF-8');
+        $idx = (int) (abs(crc32($key)) % count($chipAccents));
+        return $chipAccents[$idx] ?? 'rr-accent';
+    };
+    ?>
     <header class="border-b border-slate-200 bg-white sticky top-0 z-50 shadow-[0_1px_0_rgba(15,23,42,.06),0_14px_40px_rgba(2,6,23,.06)]">
         <div class="max-w-6xl mx-auto px-4 py-5 flex items-center justify-between gap-4">
             <div class="min-w-0">
@@ -213,13 +221,15 @@
                                     <?php endif; ?>
                                     <div class="text-xs text-slate-600 mt-2">
                                         <?php if ($type !== ''): ?>
-                                            <span class="inline-flex items-center rounded-lg bg-indigo-50 text-indigo-800 px-2 py-0.5 mr-2 font-medium"><?= esc($type) ?></span>
+                                            <span class="<?= esc($accentFor($type)) ?> rr-chip mr-2"><span class="rr-chipDot" aria-hidden="true"></span><?= esc($type) ?></span>
                                         <?php endif; ?>
                                         <?php if ($year !== ''): ?>
-                                            <span class="inline-flex items-center rounded-lg bg-emerald-50 text-emerald-800 px-2 py-0.5 mr-2 font-medium">ปี <?= esc($year) ?></span>
+                                            <?php $yLabel = 'ปี ' . $year; ?>
+                                            <span class="<?= esc($accentFor($yLabel)) ?> rr-chip mr-2"><span class="rr-chipDot" aria-hidden="true"></span><?= esc($yLabel) ?></span>
                                         <?php endif; ?>
                                         <?php if (!empty($p['source'])): ?>
-                                            <span class="inline-flex items-center rounded-lg bg-sky-50 text-sky-800 px-2 py-0.5 mr-2 font-medium"><?= esc($p['source']) ?></span>
+                                            <?php $src = (string) $p['source']; ?>
+                                            <span class="<?= esc($accentFor($src)) ?> rr-chip mr-2"><span class="rr-chipDot" aria-hidden="true"></span><?= esc($src) ?></span>
                                         <?php endif; ?>
                                     </div>
                                 </div>
