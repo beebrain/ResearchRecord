@@ -157,7 +157,8 @@
                                         ผลงานที่อนุมัติแล้ว: <span class="font-semibold text-slate-900"><?= (int) ($t['publication_count'] ?? 0) ?></span>
                                     </div>
                                 </div>
-                                <span class="shrink-0 rounded-lg bg-indigo-50 text-indigo-800 px-2 py-1 text-xs font-semibold">
+                                <span class="teacher-role shrink-0 rr-chip">
+                                    <span class="rr-chipDot" aria-hidden="true"></span>
                                     <?= esc($badge) ?>
                                 </span>
                             </div>
@@ -211,6 +212,7 @@
                                             <?= esc($authors) ?>
                                         </div>
                                     <?php endif; ?>
+                                    <div class="pub-teacher-chips mt-2 hidden flex flex-wrap gap-2"></div>
                                     <?php if ($creatorName !== '' || $creatorEmail !== ''): ?>
                                         <div class="text-xs text-slate-600 mt-1">
                                             บันทึกโดย: <span class="font-medium text-slate-800"><?= esc($creatorName !== '' ? $creatorName : $creatorEmail) ?></span>
@@ -348,6 +350,43 @@
             var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
             var activeEmail = '';
 
+            var accentForEmail = function (email) {
+                var s = String(email || '').trim().toLowerCase();
+                var h = 0;
+                for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+                var pick = h % 5;
+                return pick === 1 ? 'rr-accent rr-accent--sky'
+                    : pick === 2 ? 'rr-accent rr-accent--emerald'
+                    : pick === 3 ? 'rr-accent rr-accent--amber'
+                    : pick === 4 ? 'rr-accent rr-accent--rose'
+                    : 'rr-accent';
+            };
+
+            var teacherMap = {};
+            teacherBtns.forEach(function (b) {
+                var email = String(b.getAttribute('data-teacher-email') || '');
+                var name = String(b.getAttribute('data-teacher-name') || '');
+                if (!email) return;
+                var cls = accentForEmail(email);
+                teacherMap[email] = { name: name || email, cls: cls };
+                b.classList.add.apply(b.classList, cls.split(' '));
+            });
+
+            // decorate publications: show chips for teachers that appear in author_emails
+            pubItems.forEach(function (it) {
+                var chipRow = it.querySelector('.pub-teacher-chips');
+                if (!chipRow) return;
+                var list = String(it.getAttribute('data-author-emails') || '').split(',').map(function (x) { return String(x || '').trim(); }).filter(Boolean);
+                var found = [];
+                list.forEach(function (email) { if (teacherMap[email]) found.push(email); });
+                if (!found.length) return;
+                chipRow.classList.remove('hidden');
+                chipRow.innerHTML = found.map(function (email) {
+                    var t = teacherMap[email];
+                    return '<span class="' + t.cls + ' rr-chip"><span class="rr-chipDot" aria-hidden="true"></span>' + String(t.name || email).replace(/[&<>"']/g, function (ch) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',\"'\":'&#39;'}[ch]); }) + '</span>';
+                }).join('');
+            });
+
             var setActive = function (email, name) {
                 activeEmail = email || '';
                 teacherBtns.forEach(function (b) {
@@ -362,7 +401,7 @@
                 var shown = 0;
                 pubItems.forEach(function (it) {
                     var list = String(it.getAttribute('data-author-emails') || '');
-                    var has = activeEmail && ((',' + list + ',').indexOf(',' + activeEmail + ',') !== -1);
+                    var has = activeEmail && ((',' + list.replace(/\s+/g, '') + ',').indexOf(',' + String(activeEmail).replace(/\s+/g, '') + ',') !== -1);
                     var show = !activeEmail || has;
                     if (show) shown++;
 
