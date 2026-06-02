@@ -44,6 +44,22 @@
         .rr-rail:before{content:""; position:absolute; left:0; top:14px; bottom:14px; width:4px; border-radius:999px; background:var(--rr-rail); opacity:.95;}
         .rr-chip{display:inline-flex; align-items:center; gap:.45rem; padding:.35rem .65rem; border-radius:999px; font-weight:700; font-size:.75rem; background:var(--rr-chipBg); color:var(--rr-chipText); border:1px solid rgba(15,23,42,.10);}
         .rr-chipDot{width:.45rem; height:.45rem; border-radius:999px; background:var(--rr-rail); box-shadow:0 0 0 3px var(--rr-soft);}
+        /* teacher card accent (visible on name card) */
+        .teacher-pill{position:relative; overflow:hidden;}
+        .teacher-pill.rr-accent{background:var(--rr-soft); border-color:rgba(15,23,42,.10);}
+        .teacher-pill.rr-accent:before{
+            content:"";
+            position:absolute;
+            left:10px;
+            top:14px;
+            bottom:14px;
+            width:6px;
+            border-radius:999px;
+            background:var(--rr-rail);
+            box-shadow:0 0 0 3px var(--rr-soft);
+            opacity:.95;
+        }
+        .teacher-pill.rr-accent > div{padding-left:14px;}
         .rr-pop{transition:transform 160ms ease, box-shadow 160ms ease;}
         .rr-pop:hover{transform:translateY(-1px) scale(1.01); box-shadow:0 10px 28px rgba(2,6,23,.10);}
     </style>
