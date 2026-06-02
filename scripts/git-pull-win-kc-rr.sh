@@ -71,7 +71,9 @@ SSH_BASE=(
 if [[ "$INIT" -eq 1 ]]; then
   echo "=== init: clone repo (ครั้งแรก) ==="
   # NOTE: IIS app creation varies by server/site naming; keep init minimal and safe.
-  REMOTE_INIT="if not exist ${REPO_WIN//\//\\\\} mkdir ${REPO_WIN//\//\\\\} && cd /d ${REPO_WIN//\//\\\\} && if not exist .git git clone --branch ${BRANCH} ${REPO_URL} . && if not exist .env if exist .env.production.example copy /Y .env.production.example .env"
+  # If directory already has files (from tar/scp deploy), `git clone .` will fail.
+  # In that case, initialize git in-place and hard reset to remote branch.
+  REMOTE_INIT="if not exist ${REPO_WIN//\//\\\\} mkdir ${REPO_WIN//\//\\\\} && cd /d ${REPO_WIN//\//\\\\} && if not exist .git (git init && git remote add origin ${REPO_URL} && git fetch origin && git checkout -B ${BRANCH} origin/${BRANCH}) && if not exist .env if exist .env.production.example copy /Y .env.production.example .env"
   "${SSH_BASE[@]}" "cmd /c \"${REMOTE_INIT}\""
 fi
 
