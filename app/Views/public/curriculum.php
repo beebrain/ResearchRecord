@@ -28,11 +28,15 @@
         @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto;} }
         .rr-card{position:relative; transform:translateY(0); transition:transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;}
         .rr-card:hover{transform:translateY(-2px); box-shadow:0 14px 40px rgba(2,6,23,.10);}
-        .rr-borderglow{border-color:rgba(99,102,241,.22); box-shadow:0 1px 0 rgba(255,255,255,.8), 0 18px 55px rgba(79,70,229,.10);}
-        .rr-pill{display:inline-flex; align-items:center; gap:.5rem; padding:.35rem .65rem; border-radius:999px; font-weight:700; font-size:.75rem;}
-        .rr-pill--indigo{background:rgba(79,70,229,.12); color:rgb(49,46,129); border:1px solid rgba(79,70,229,.18);}
-        .rr-pill--sky{background:rgba(14,165,233,.12); color:rgb(7,89,133); border:1px solid rgba(14,165,233,.18);}
-        .rr-pill--emerald{background:rgba(16,185,129,.12); color:rgb(6,95,70); border:1px solid rgba(16,185,129,.18);}
+        /* chip-card system (no gradients) */
+        .rr-cardShell{border-color:rgba(15,23,42,.10); box-shadow:0 1px 0 rgba(255,255,255,.85), 0 18px 55px rgba(2,6,23,.06);}
+        .rr-accent{--rr-chipBg:rgba(79,70,229,.10); --rr-chipText:rgb(49,46,129); --rr-rail:rgb(79,70,229); --rr-soft:rgba(79,70,229,.10);}
+        .rr-accent--sky{--rr-chipBg:rgba(2,132,199,.12); --rr-chipText:rgb(7,89,133); --rr-rail:rgb(2,132,199); --rr-soft:rgba(2,132,199,.10);}
+        .rr-accent--emerald{--rr-chipBg:rgba(5,150,105,.12); --rr-chipText:rgb(6,95,70); --rr-rail:rgb(5,150,105); --rr-soft:rgba(5,150,105,.10);}
+        .rr-accent--amber{--rr-chipBg:rgba(245,158,11,.16); --rr-chipText:rgb(146,64,14); --rr-rail:rgb(245,158,11); --rr-soft:rgba(245,158,11,.10);}
+        .rr-accent--rose{--rr-chipBg:rgba(244,63,94,.14); --rr-chipText:rgb(159,18,57); --rr-rail:rgb(244,63,94); --rr-soft:rgba(244,63,94,.10);}
+        .rr-chip{display:inline-flex; align-items:center; gap:.45rem; padding:.35rem .65rem; border-radius:999px; font-weight:700; font-size:.75rem; background:var(--rr-chipBg); color:var(--rr-chipText); border:1px solid rgba(15,23,42,.10);}
+        .rr-chipDot{width:.45rem; height:.45rem; border-radius:999px; background:var(--rr-rail); box-shadow:0 0 0 3px var(--rr-soft);}
     </style>
 </head>
 
@@ -64,14 +68,8 @@
         </div>
     </header>
 
-    <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 -top-36 -z-10">
-        <div class="mx-auto max-w-6xl px-4">
-            <div class="h-56 rounded-[2rem] bg-[radial-gradient(circle_at_18%_24%,rgba(79,70,229,.45),transparent_55%),radial-gradient(circle_at_62%_18%,rgba(14,165,233,.38),transparent_55%),radial-gradient(circle_at_82%_64%,rgba(16,185,129,.30),transparent_55%)] blur-2xl"></div>
-        </div>
-    </div>
-
     <main class="max-w-6xl mx-auto px-4 py-8 space-y-6">
-        <section class="rr-card rr-borderglow rounded-2xl bg-white border border-slate-200 p-5 shadow-sm relative overflow-hidden">
+        <section class="rr-card rr-cardShell rounded-2xl bg-white border border-slate-200 p-5 shadow-sm relative overflow-hidden">
             <div aria-hidden="true" class="absolute -top-24 -right-24 h-56 w-56 rounded-full bg-indigo-100 blur-2xl"></div>
             <div aria-hidden="true" class="absolute -bottom-24 -left-24 h-56 w-56 rounded-full bg-emerald-100 blur-2xl"></div>
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -98,7 +96,7 @@
                 </div>
                 <div class="md:col-span-2 flex gap-2">
                     <button id="doSearch" type="submit" disabled
-                        class="w-full rounded-xl bg-indigo-600 text-white px-4 py-3 text-sm font-semibold hover:bg-indigo-700 disabled:bg-slate-300 disabled:text-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600">
+                        class="w-full rounded-xl bg-indigo-600 text-white px-4 py-3 text-sm font-semibold hover:bg-indigo-700 disabled:bg-slate-300 disabled:text-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600 active:translate-y-[1px] transition-transform">
                         ค้นหา
                     </button>
                     <a href="<?= site_url('/') ?>"
@@ -109,7 +107,7 @@
             </form>
         </section>
 
-        <section class="rr-card rr-borderglow rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
+        <section class="rr-card rr-cardShell rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
             <div class="flex items-center justify-between gap-4">
                 <h2 class="text-base font-semibold">อาจารย์ผู้รับผิดชอบหลักสูตร</h2>
                 <div class="text-sm text-slate-600">
@@ -161,7 +159,7 @@
             <?php endif; ?>
         </section>
 
-        <section class="rr-card rr-borderglow rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
+        <section class="rr-card rr-cardShell rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
             <div class="flex items-center justify-between gap-4">
                 <div>
                     <h2 class="text-base font-semibold">ผลงานเผยแพร่ (อนุมัติแล้ว)</h2>
