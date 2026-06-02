@@ -453,24 +453,19 @@
                         if (!tBtns.length || !pItems.length || !hint || !hintName || !clearBtn || !countAllWrap || !countFilteredWrap || !countFilteredEl) return;
 
                         var activeEmail = '';
-                        var accentForEmail = function (email) {
-                            var s = String(email || '').trim().toLowerCase();
-                            var h = 0;
-                            for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-                            var pick = h % 5;
-                            return pick === 1 ? 'rr-accent rr-accent--sky'
-                                : pick === 2 ? 'rr-accent rr-accent--emerald'
-                                : pick === 3 ? 'rr-accent rr-accent--amber'
-                                : pick === 4 ? 'rr-accent rr-accent--rose'
-                                : 'rr-accent';
-                        };
-
+                        var palette = [
+                            'rr-accent',
+                            'rr-accent rr-accent--sky',
+                            'rr-accent rr-accent--emerald',
+                            'rr-accent rr-accent--amber',
+                            'rr-accent rr-accent--rose'
+                        ];
                         var teacherMap = {};
-                        tBtns.forEach(function (b) {
+                        tBtns.forEach(function (b, idx) {
                             var email = String(b.getAttribute('data-teacher-email') || '');
                             var name = String(b.getAttribute('data-teacher-name') || '');
                             if (!email) return;
-                            var cls = accentForEmail(email);
+                            var cls = palette[idx % palette.length];
                             teacherMap[email] = { name: name || email, cls: cls };
                             b.classList.add.apply(b.classList, cls.split(' '));
                         });
