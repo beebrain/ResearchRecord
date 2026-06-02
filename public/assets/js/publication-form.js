@@ -409,10 +409,27 @@ function submitForm() {
 
 function handleSubmitSuccess(response) {
     if (response.success) {
-        // Clear form
+        const redirectUrl = response.redirect || '';
+        if (redirectUrl) {
+            Swal.fire({
+                title: 'Success! 🎉',
+                text: response.message || 'Publication added successfully!',
+                icon: 'success',
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#28a745',
+                timer: 2000,
+                timerProgressBar: true,
+            }).then(function () {
+                window.location.href = redirectUrl;
+            });
+            setTimeout(function () {
+                window.location.href = redirectUrl;
+            }, 2200);
+
+            return;
+        }
+
         clearPublicationForm();
-        
-        // Show success message
         Swal.fire({
             title: 'Success! 🎉',
             text: 'Publication added successfully!',
@@ -420,7 +437,7 @@ function handleSubmitSuccess(response) {
             confirmButtonText: 'OK',
             confirmButtonColor: '#28a745',
             timer: 3000,
-            timerProgressBar: true
+            timerProgressBar: true,
         });
     } else {
         Swal.fire('Error!', response.message || 'Failed to add publication', 'error');

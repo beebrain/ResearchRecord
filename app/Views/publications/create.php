@@ -72,9 +72,9 @@
         <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div class="flex items-center justify-between">
                 <h1 class="text-xl font-semibold text-gray-900">เพิ่มผลงานวิจัย</h1>
-                <a href="<?= site_url('publications') ?>"
+                <a href="<?= esc($cancel_url ?? site_url('publications/manage'), 'attr') ?>"
                     class="text-sm text-gray-600 hover:text-gray-900">
-                    ← กลับสู่แดชบอร์ด
+                    ← กลับ
                 </a>
             </div>
         </div>
@@ -111,21 +111,27 @@
             </div>
         <?php endif; ?>
 
+        <?php
+        $p = is_array($publication ?? null) ? $publication : [];
+        $isEdit = ! empty($is_edit) && (int) ($p['id'] ?? 0) > 0;
+        $formAction = $form_action ?? site_url('publications/store');
+        ?>
+
         <!-- Publication Form -->
         <div class="bg-white rounded-lg shadow-sm border">
 
             <!-- Form Header -->
             <div class="px-6 py-4 border-b border-gray-200">
                 <h2 class="text-lg font-semibold text-gray-900">รายละเอียดผลงานวิจัย</h2>
-                <p class="text-sm text-gray-600 mt-1">กรุณากรอกข้อมูลด้านล่างเพื่อเพิ่มผลงานวิจัยใหม่</p>
+                <p class="text-sm text-gray-600 mt-1"><?= $isEdit ? 'แก้ไขข้อมูลผลงานวิจัย' : 'กรุณากรอกข้อมูลด้านล่างเพื่อเพิ่มผลงานวิจัยใหม่' ?> — หลังบันทึกจะกลับหน้าที่มา (ถ้ามี)</p>
             </div>
 
             <!-- Form Content -->
-            <form id="publicationForm" action="<?= site_url('publications/store') ?>" method="POST">
+            <form id="publicationForm" action="<?= esc($formAction, 'attr') ?>" method="POST">
                 <?= csrf_field() ?>
 
                 <!-- Hidden field for file reference -->
-                <input type="hidden" id="ref_url" name="ref_url" value="">
+                <input type="hidden" id="ref_url" name="ref_url" value="<?= esc((string) ($p['ref_url'] ?? ''), 'attr') ?>">
 
                 <div class="p-6 space-y-8">
 
@@ -522,10 +528,10 @@
 
                 <!-- Form Actions -->
                 <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end">
-                    <button type="button" onclick="window.history.back()"
-                        class="mr-3 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                    <a href="<?= esc($cancel_url ?? site_url('publications/manage'), 'attr') ?>"
+                        class="mr-3 inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
                         ยกเลิก
-                    </button>
+                    </a>
                     <button type="button" onclick="submitForm(); return false;"
                         class="inline-flex items-center px-6 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                         <span id="submitText">บันทึกผลงาน</span>
@@ -549,6 +555,53 @@
         let authorCount = 1;
     </script>
     <script src="<?= base_url('assets/js/publication-form.js') ?>"></script>
+    <?php if ($isEdit): ?>
+    <script>
+    $(function () {
+        var pub = <?= json_encode($p, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
+        var scalarFields = ['title', 'source', 'volume', 'issue', 'pages', 'doi', 'isbn', 'publisher', 'book_title', 'chapter', 'editor', 'conference_name', 'conference_location', 'conference_date', 'url', 'abstract', 'keywords', 'notes'];
+        scalarFields.forEach(function (key) {
+            if (pub[key]) {
+                $('#' + key).val(pub[key]);
+            }
+        });
+        if (pub.publication_type) {
+            $('#publication_type').val(pub.publication_type);
+            $('.publication-type-card[data-type="' + pub.publication_type + '"]').trigger('click');
+        }
+        if (pub.publication_year) {
+            var y = parseInt(pub.publication_year, 10);
+            if (y > 0 && y < 2400) {
+                y += 543;
+            }
+            $('#publication_year').val(y);
+        }
+        if (pub.publication_month) {
+            var m = String(pub.publication_month);
+            if (m.length === 1) {
+                m = '0' + m;
+            }
+            $('#publication_month').val(m);
+        }
+        var authors = Array.isArray(pub.authors) ? pub.authors : [];
+        if (authors.length) {
+            $('#authorsContainer').empty();
+            authorCount = 0;
+            authors.forEach(function (a) {
+                addAuthor();
+                var $row = $('.author-row').last();
+                $row.find('[name*="[name]"]').val(a.author_name || a.name || '');
+                $row.find('[name*="[email]"]').val(a.user_email || a.email || '');
+                $row.find('[name*="[affiliation]"]').val(a.affiliation || '');
+                if (a.corresponding_author || a.corresponding) {
+                    $row.find('[name*="[corresponding]"]').prop('checked', true);
+                }
+            });
+            updateAuthorStatus();
+        }
+    });
+    </script>
+    <?php endif; ?>
     <script src="<?= base_url('assets/js/email-autocomplete.js') ?>"></script>
     <script src="<?= base_url('assets/js/author-search.js') ?>"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>

@@ -507,7 +507,10 @@ class AuthenController extends Controller
         $userData = $user;
         $this->setUserSession($userData, null);
         log_message('info', self::SSO_LOG_PREFIX . 'ssoEntry success email=' . $email);
-        return redirect()->to('/dashboard')->with('success', 'เข้าสู่ระบบจาก newScience สำเร็จ');
+
+        $entryPath = \App\Libraries\PublicationReturnNavigation::applySsoPayload($payload);
+
+        return redirect()->to($entryPath)->with('success', 'เข้าสู่ระบบจาก newScience สำเร็จ');
     }
 
     /**

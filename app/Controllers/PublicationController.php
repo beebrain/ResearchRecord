@@ -7,6 +7,7 @@ use App\Models\UserModel;
 use App\Models\AuthorModel;
 use App\Models\PublicationModel;
 use App\Models\PublicationAuthorModel;
+use App\Libraries\PublicationReturnNavigation;
 use App\Libraries\UserIdentity;
 
 class PublicationController extends Controller
@@ -117,10 +118,13 @@ class PublicationController extends Controller
             return redirect()->to('/auth/login');
         }
 
+        PublicationReturnNavigation::captureInternalReturnFromRequest();
+
         $data = [
-            'title' => 'Add Publication',
-            'user' => $userData,
-            'is_admin' => $this->isAdmin()
+            'title'       => 'Add Publication',
+            'user'        => $userData,
+            'is_admin'    => $this->isAdmin(),
+            'cancel_url'  => PublicationReturnNavigation::cancelUrl(),
         ];
 
         return view('publications/create', $data);
@@ -305,13 +309,13 @@ class PublicationController extends Controller
 
             if ($this->request->isAJAX()) {
                 return $this->response->setJSON([
-                    'success' => true,
-                    'message' => 'Publication created successfully',
-                    'redirect' => base_url('publications')
+                    'success'  => true,
+                    'message'  => 'Publication created successfully',
+                    'redirect' => PublicationReturnNavigation::ajaxRedirectUrl(),
                 ]);
             }
 
-            return redirect()->to('publications')->with('success', 'Publication created successfully');
+            return PublicationReturnNavigation::redirectAfterSave('Publication created successfully');
         } catch (\Exception $e) {
             $this->db->transRollback();
             log_message('error', 'Create publication error: ' . $e->getMessage());
@@ -393,14 +397,19 @@ class PublicationController extends Controller
 
         $publication['authors'] = $this->getPublicationAuthors($id);
 
+        PublicationReturnNavigation::captureInternalReturnFromRequest();
+
         $data = [
-            'title' => 'Edit Publication',
-            'user' => $userData,
-            'is_admin' => $this->isAdmin(),
-            'publication' => $publication
+            'title'        => 'Edit Publication',
+            'user'         => $userData,
+            'is_admin'     => $this->isAdmin(),
+            'publication'  => $publication,
+            'is_edit'      => true,
+            'form_action'  => site_url('publications/update/' . (int) $id),
+            'cancel_url'   => PublicationReturnNavigation::cancelUrl(),
         ];
 
-        return view('publications/edit', $data);
+        return view('publications/create', $data);
     }
 
     /**
@@ -535,14 +544,18 @@ class PublicationController extends Controller
             $this->db->transComplete();
 
             if ($this->request->isAJAX()) {
-                if (ob_get_level() > 0) ob_clean();
+                if (ob_get_level() > 0) {
+                    ob_clean();
+                }
+
                 return $this->response->setJSON([
-                    'success' => true,
-                    'message' => 'Publication updated successfully'
+                    'success'  => true,
+                    'message'  => 'Publication updated successfully',
+                    'redirect' => PublicationReturnNavigation::ajaxRedirectUrl(),
                 ]);
             }
 
-            return redirect()->to('publications')->with('success', 'Publication updated successfully');
+            return PublicationReturnNavigation::redirectAfterSave('Publication updated successfully');
         } catch (\Exception $e) {
             $this->db->transRollback();
             log_message('error', 'Update publication error: ' . $e->getMessage());
