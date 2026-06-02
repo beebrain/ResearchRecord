@@ -37,7 +37,7 @@
 </head>
 
 <body class="rr-grain bg-slate-50 text-slate-900 relative overflow-x-hidden">
-    <header class="border-b border-slate-200 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 sticky top-0 z-10">
+    <header class="border-b border-slate-200 bg-white sticky top-0 z-50 shadow-[0_1px_0_rgba(15,23,42,.06),0_14px_40px_rgba(2,6,23,.06)]">
         <div class="max-w-6xl mx-auto px-4 py-5 flex items-center justify-between gap-4">
             <div class="min-w-0">
                 <a href="<?= site_url('/') ?>" class="text-sm text-slate-600 hover:text-slate-900 inline-flex items-center gap-2 hover:underline decoration-indigo-300 underline-offset-4">
