@@ -943,7 +943,7 @@ class DashboardController extends Controller
             }
 
             // Call ngrok ORCID API endpoint
-            $apiUrl = "https://sweetmeal-loamless-wendy.ngrok-free.dev/webhook/sync-orcid?orcid_id=" . urlencode($orcidId);
+            $apiUrl = config(\Config\N8n::class)->syncOrcidUrl($orcidId);
 
             try {
                 $result = $this->makeHttpGetRequest($apiUrl, [
@@ -1390,7 +1390,7 @@ class DashboardController extends Controller
             $doiUrl = 'https://doi.org/' . $doi;
 
             // Call ngrok AI API (same endpoint as publication-ai.js)
-            $apiUrl = "https://sweetmeal-loamless-wendy.ngrok-free.dev/webhook/extract-article";
+            $apiUrl = config(\Config\N8n::class)->extractArticleUrl();
 
             try {
                 $result = $this->makeHttpPostRequest($apiUrl, ['url' => $doiUrl], [
@@ -1785,7 +1785,7 @@ class DashboardController extends Controller
             $ownerEmail = $this->sessionOwnerEmail($userData);
 
             // Call ngrok ORCID API to get works list
-            $apiUrl = "https://sweetmeal-loamless-wendy.ngrok-free.dev/webhook/sync-orcid?orcid_id=" . urlencode($orcidId);
+            $apiUrl = config(\Config\N8n::class)->syncOrcidUrl($orcidId);
 
             try {
                 $result = $this->makeHttpGetRequest($apiUrl, [

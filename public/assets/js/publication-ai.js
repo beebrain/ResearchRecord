@@ -25,8 +25,11 @@ const applyAIDataBtn = document.getElementById('applyAIData');
 const aiWaitingModal = document.getElementById('aiWaitingModal');
 const aiAutoFillMessage = document.getElementById('aiAutoFillMessage');
 
-//const AI_API_URL = 'https://beebrain.duckdns.org:5678/webhook/journal';
-const AI_API_URL = 'https://sweetmeal-loamless-wendy.ngrok-free.dev/webhook/extract-article';
+// n8n extract-article webhook — injected from server config (Config\N8n) via
+// window.N8N_EXTRACT_ARTICLE_URL; falls back to the shared newScience n8n host.
+const AI_API_URL = (typeof window !== 'undefined' && window.N8N_EXTRACT_ARTICLE_URL)
+    ? window.N8N_EXTRACT_ARTICLE_URL
+    : 'https://n8n.kidcbc.work/webhook/extract-article';
 
 // Export AI_API_URL for reuse in other files
 window.AI_API_URL = AI_API_URL;

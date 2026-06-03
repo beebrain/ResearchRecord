@@ -787,6 +787,7 @@
 
     <!-- File Upload & AI Assistant Scripts -->
     <script src="<?= base_url('assets/js/publication-upload.js?v=' . time()) ?>"></script>
+    <script>window.N8N_EXTRACT_ARTICLE_URL = <?= json_encode(config(\Config\N8n::class)->extractArticleUrl(), JSON_UNESCAPED_SLASHES) ?>;</script>
     <script src="<?= base_url('assets/js/publication-ai.js?v=' . time()) ?>"></script>
 </body>
 

@@ -3132,6 +3132,7 @@
         <script src="<?= base_url('assets/js/email-autocomplete.js') ?>"></script>
 
         <!-- Publication AI Script (for validation functions) -->
+        <script>window.N8N_EXTRACT_ARTICLE_URL = <?= json_encode(config(\Config\N8n::class)->extractArticleUrl(), JSON_UNESCAPED_SLASHES) ?>;</script>
         <script src="<?= base_url('assets/js/publication-ai.js?v=' . time()) ?>"></script>
 
         </main>
