@@ -384,12 +384,13 @@ class CvSyncApiController extends ApiController
             }
 
             $escaped = implode(',', array_map(fn (string $e): string => $this->db->escape($e), $identityEmails));
-            $removed = $this->db->table('publication_authors')
+            $this->db->table('publication_authors')
                 ->where('publication_id', $publicationId)
                 ->where("LOWER(TRIM(author_email)) IN ({$escaped})", null, false)
                 ->delete();
+            $removedCount = (int) $this->db->affectedRows();
 
-            return $this->response->setJSON(['success' => true, 'untagged' => true, 'removed' => (bool) $removed, 'publication_id' => $publicationId]);
+            return $this->response->setJSON(['success' => true, 'untagged' => true, 'removed' => $removedCount > 0, 'removed_count' => $removedCount, 'publication_id' => $publicationId]);
         } catch (\Throwable $e) {
             log_message('error', 'CvSyncApiController::untagAuthorByEmail ' . $e->getMessage());
 
