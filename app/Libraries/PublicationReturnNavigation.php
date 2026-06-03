@@ -35,6 +35,20 @@ class PublicationReturnNavigation
         }
     }
 
+    /** เปิดฟอร์มโดยตรงจาก NS (?return_after_save= URL เต็ม) */
+    public static function captureNsReturnFromRequest(): void
+    {
+        $ret = service('request')->getGet('return_after_save');
+        if (! is_string($ret) || trim($ret) === '') {
+            return;
+        }
+
+        $url = self::validateNsReturnUrl(trim($ret));
+        if ($url !== null) {
+            session()->set(self::SESSION_KEY, $url);
+        }
+    }
+
     public static function resolveEntryRedirect(mixed $path): string
     {
         $normalized = self::normalizeRrPath(is_string($path) ? $path : '');

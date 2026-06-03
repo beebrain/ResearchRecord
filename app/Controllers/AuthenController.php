@@ -510,7 +510,7 @@ class AuthenController extends Controller
 
         $entryPath = \App\Libraries\PublicationReturnNavigation::applySsoPayload($payload);
 
-        return redirect()->to($entryPath)->with('success', 'เข้าสู่ระบบจาก newScience สำเร็จ');
+        return redirect()->to(site_url(ltrim($entryPath, '/')))->with('success', 'เข้าสู่ระบบจาก newScience สำเร็จ');
     }
 
     /**

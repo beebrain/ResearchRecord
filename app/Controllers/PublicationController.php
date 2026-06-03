@@ -119,6 +119,7 @@ class PublicationController extends Controller
         }
 
         PublicationReturnNavigation::captureInternalReturnFromRequest();
+        PublicationReturnNavigation::captureNsReturnFromRequest();
 
         $data = [
             'title'       => 'Add Publication',
@@ -398,6 +399,7 @@ class PublicationController extends Controller
         $publication['authors'] = $this->getPublicationAuthors($id);
 
         PublicationReturnNavigation::captureInternalReturnFromRequest();
+        PublicationReturnNavigation::captureNsReturnFromRequest();
 
         $data = [
             'title'        => 'Edit Publication',
