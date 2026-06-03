@@ -177,6 +177,7 @@ class CvSyncApiController extends ApiController
                 $items[] = [
                     'external_key'       => $key,
                     'rr_publication_id'  => $id,
+                    'created_by_email'   => strtolower(trim((string) ($pub['created_by_email'] ?? ''))) ?: null,
                     'title'              => (string) ($pub['title'] ?? ''),
                     'publication_year'   => $pub['publication_year'] ?? null,
                     'publication_type'   => $pub['publication_type'] ?? null,
@@ -296,6 +297,114 @@ class CvSyncApiController extends ApiController
                 'message' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * POST /api/public/publication-delete-by-email?email=&exp=&sig=
+     * Body: { "publication_id": N }
+     *
+     * Deletes the whole publication (and its authors) — only when the signed
+     * identity is the recorder (created_by_email) of that publication.
+     */
+    public function deletePublicationByEmail(): ResponseInterface
+    {
+        $this->setCors();
+
+        try {
+            $email = $this->request->getGet('email') ?? $this->request->getPost('email');
+            $exp   = $this->request->getGet('exp') ?? $this->request->getPost('exp');
+            $sig   = $this->request->getGet('sig') ?? $this->request->getPost('sig');
+
+            $v = ResearchSyncHmac::verify($email, $exp, $sig);
+            if (!$v['ok']) {
+                return $this->response->setStatusCode(403)->setJSON(['success' => false, 'error' => $v['message'] ?? 'SYNC_AUTH_FAILED']);
+            }
+
+            $publicationId = $this->requestedPublicationId();
+            if ($publicationId <= 0) {
+                return $this->response->setStatusCode(400)->setJSON(['success' => false, 'error' => 'PUBLICATION_ID_REQUIRED']);
+            }
+
+            $pub = $this->publicationModel->find($publicationId);
+            if (!$pub) {
+                return $this->response->setJSON(['success' => true, 'deleted' => true, 'message' => 'Already deleted']);
+            }
+
+            $identityEmails = $this->publicationModel->identityEmailsFor((string) $v['email']);
+            $creator = strtolower(trim((string) ($pub['created_by_email'] ?? '')));
+            if ($creator === '' || !in_array($creator, $identityEmails, true)) {
+                return $this->response->setStatusCode(403)->setJSON(['success' => false, 'error' => 'NOT_RECORDER', 'message' => 'เฉพาะผู้บันทึกเท่านั้นที่ลบผลงานนี้ได้']);
+            }
+
+            $this->db->transStart();
+            $this->db->table('publication_authors')->where('publication_id', $publicationId)->delete();
+            $this->publicationModel->delete($publicationId);
+            $this->db->transComplete();
+            if ($this->db->transStatus() === false) {
+                throw new \RuntimeException('Delete publication transaction failed');
+            }
+
+            return $this->response->setJSON(['success' => true, 'deleted' => true, 'publication_id' => $publicationId]);
+        } catch (\Throwable $e) {
+            log_message('error', 'CvSyncApiController::deletePublicationByEmail ' . $e->getMessage());
+
+            return $this->response->setStatusCode(500)->setJSON(['success' => false, 'error' => 'SERVER_ERROR']);
+        }
+    }
+
+    /**
+     * POST /api/public/publication-untag-by-email?email=&exp=&sig=
+     * Body: { "publication_id": N }
+     *
+     * Removes only the signed identity's author tag. The publication and the
+     * other authors remain untouched.
+     */
+    public function untagAuthorByEmail(): ResponseInterface
+    {
+        $this->setCors();
+
+        try {
+            $email = $this->request->getGet('email') ?? $this->request->getPost('email');
+            $exp   = $this->request->getGet('exp') ?? $this->request->getPost('exp');
+            $sig   = $this->request->getGet('sig') ?? $this->request->getPost('sig');
+
+            $v = ResearchSyncHmac::verify($email, $exp, $sig);
+            if (!$v['ok']) {
+                return $this->response->setStatusCode(403)->setJSON(['success' => false, 'error' => $v['message'] ?? 'SYNC_AUTH_FAILED']);
+            }
+
+            $publicationId = $this->requestedPublicationId();
+            if ($publicationId <= 0) {
+                return $this->response->setStatusCode(400)->setJSON(['success' => false, 'error' => 'PUBLICATION_ID_REQUIRED']);
+            }
+
+            $identityEmails = $this->publicationModel->identityEmailsFor((string) $v['email']);
+            if ($identityEmails === []) {
+                return $this->response->setStatusCode(403)->setJSON(['success' => false, 'error' => 'IDENTITY_UNRESOLVED']);
+            }
+
+            $escaped = implode(',', array_map(fn (string $e): string => $this->db->escape($e), $identityEmails));
+            $removed = $this->db->table('publication_authors')
+                ->where('publication_id', $publicationId)
+                ->where("LOWER(TRIM(author_email)) IN ({$escaped})", null, false)
+                ->delete();
+
+            return $this->response->setJSON(['success' => true, 'untagged' => true, 'removed' => (bool) $removed, 'publication_id' => $publicationId]);
+        } catch (\Throwable $e) {
+            log_message('error', 'CvSyncApiController::untagAuthorByEmail ' . $e->getMessage());
+
+            return $this->response->setStatusCode(500)->setJSON(['success' => false, 'error' => 'SERVER_ERROR']);
+        }
+    }
+
+    private function requestedPublicationId(): int
+    {
+        $input = $this->request->getJSON(true);
+        if (!is_array($input)) {
+            $input = $this->request->getPost();
+        }
+
+        return (int) ($input['publication_id'] ?? $this->request->getGet('publication_id') ?? 0);
     }
 
     /**

@@ -392,6 +392,24 @@ class PublicationModel extends Model
     }
 
     /**
+     * Public identity-email expansion for permission checks (same set used when
+     * matching a person's publications by canonical email).
+     *
+     * @return list<string>
+     */
+    public function identityEmailsFor(string $email): array
+    {
+        $email = UserIdentity::normalizeEmail($email);
+        if ($email === '') {
+            return [];
+        }
+
+        $user = UserIdentity::resolveUserByEmail($email);
+
+        return $this->emailsForIdentity($email, $user);
+    }
+
+    /**
      * @param list<string> $emails
      *
      * @return list<string>

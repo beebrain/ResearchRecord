@@ -316,6 +316,9 @@ $routes->group('api/public', ['filter' => ApiKeyFilter::class], function ($route
     $routes->post('cv-bundle-by-email', 'CvSyncApiController::postCvBundleByEmail');
     $routes->get('publications-sync-bundle-by-email', 'CvSyncApiController::getPublicationsSyncBundleByEmail');
     $routes->post('publications-sync-bundle-by-email', 'CvSyncApiController::postPublicationsSyncBundleByEmail');
+    // newScience-initiated deletes: whole publication (recorder only) / untag self (tagged author)
+    $routes->post('publication-delete-by-email', 'CvSyncApiController::deletePublicationByEmail');
+    $routes->post('publication-untag-by-email', 'CvSyncApiController::untagAuthorByEmail');
 });
 
 // Legacy compatibility routes
