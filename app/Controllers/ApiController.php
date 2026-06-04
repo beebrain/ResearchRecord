@@ -577,7 +577,7 @@ class ApiController extends Controller
     }
 
     /**
-     * Curriculum detail by name (partial search). Token auth via CurriculumApiTokenFilter.
+     * Curriculum detail by name (partial search). Public endpoint.
      * Returns up to 5 responsible teachers and their approved publications.
      *
      * Route: GET /api/curriculum-detail-by-name?curriculum_name=...

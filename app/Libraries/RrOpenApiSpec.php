@@ -18,15 +18,14 @@ final class RrOpenApiSpec
             'openapi' => '3.0.3',
             'info'    => [
                 'title'       => 'Research Record API',
-                'description' => 'Interactive API documentation (Swagger UI). '
-                    . 'Authorize ด้วย `CURRICULUM_API_TOKEN` (header `X-Curriculum-Api-Token`).',
+                'description' => 'Interactive API documentation (Swagger UI). Public endpoints — ไม่ต้องใช้ token.',
                 'version'     => '1.0.0',
             ],
             'servers' => [
                 ['url' => $root, 'description' => 'Current Research Record server'],
             ],
             'tags' => [
-                ['name' => 'Curriculum', 'description' => 'หลักสูตร — CURRICULUM_API_TOKEN'],
+                ['name' => 'Curriculum', 'description' => 'หลักสูตร (public)'],
             ],
             'paths' => self::paths(),
             'components' => self::components(),
@@ -46,7 +45,7 @@ final class RrOpenApiSpec
                     'description' => 'ค้นหาหลักสูตรจากชื่อ (partial ได้) แล้วส่งกลับ '
                         . 'อาจารย์ผู้รับผิดชอบสูงสุด 5 คน พร้อมผลงานที่ **approve = 1** เท่านั้น.',
                     'operationId' => 'getCurriculumDetailByName',
-                    'security'    => [['curriculumApiToken' => []]],
+                    'security'    => [],
                     'parameters'  => [
                         [
                             'name'        => 'curriculum_name',
@@ -82,7 +81,6 @@ final class RrOpenApiSpec
                                 ],
                             ],
                         ],
-                        '401' => ['$ref' => '#/components/responses/UnauthorizedCurriculumToken'],
                         '500' => ['$ref' => '#/components/responses/ServerError'],
                     ],
                 ],

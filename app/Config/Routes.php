@@ -32,8 +32,8 @@ $routes->get('docs', 'ApiDocsController::index');
 $routes->get('docs/', 'ApiDocsController::index');
 $routes->get('api/openapi.json', 'ApiDocsController::openapi');
 
-// Curriculum detail API — token only (CURRICULUM_API_TOKEN), ไม่ใช้ session login
-$routes->get('api/curriculum-detail-by-name', 'ApiController::apiGetCurriculumDetailByName', ['filter' => 'curriculumapitoken']);
+// Curriculum detail API — public (ไม่ต้องใช้ token / session login)
+$routes->get('api/curriculum-detail-by-name', 'ApiController::apiGetCurriculumDetailByName');
 
 // Protected Dashboard Routes (requires auth)
 $routes->group('dashboard', ['filter' => 'auth'], function ($routes) {
