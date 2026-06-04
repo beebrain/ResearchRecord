@@ -39,7 +39,6 @@ class Filters extends BaseFilters
         'facultyadminauth' => \App\Filters\FacultyAdminAuthFilter::class,
         'superadminauth' => \App\Filters\SuperAdminAuthFilter::class,
         'apikey'             => \App\Filters\ApiKeyFilter::class,
-        'curriculumapitoken' => \App\Filters\CurriculumApiTokenFilter::class,
     ];
 
     /**

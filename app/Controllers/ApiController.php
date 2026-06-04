@@ -586,7 +586,7 @@ class ApiController extends Controller
     {
         $this->response->setHeader('Access-Control-Allow-Origin', '*');
         $this->response->setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-        $this->response->setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Curriculum-Api-Token, Authorization');
+        $this->response->setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
         if ($this->request->getMethod() === 'options') {
             return $this->response->setStatusCode(200);

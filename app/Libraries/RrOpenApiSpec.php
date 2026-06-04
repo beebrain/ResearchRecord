@@ -94,14 +94,6 @@ final class RrOpenApiSpec
     private static function components(): array
     {
         return [
-            'securitySchemes' => [
-                'curriculumApiToken' => [
-                    'type'        => 'apiKey',
-                    'in'          => 'header',
-                    'name'        => 'X-Curriculum-Api-Token',
-                    'description' => 'ค่าจาก CURRICULUM_API_TOKEN ใน .env (หรือ Authorization: Bearer <token>)',
-                ],
-            ],
             'schemas' => [
                 'CurriculumDetailResponse' => [
                     'type'       => 'object',
@@ -230,12 +222,6 @@ final class RrOpenApiSpec
                 ],
                 'CurriculumNotFound' => [
                     'description' => 'ไม่พบหลักสูตร',
-                    'content'     => [
-                        'application/json' => ['schema' => ['$ref' => '#/components/schemas/ErrorBody']],
-                    ],
-                ],
-                'UnauthorizedCurriculumToken' => [
-                    'description' => 'Token ไม่ถูกต้องหรือไม่ได้ส่ง',
                     'content'     => [
                         'application/json' => ['schema' => ['$ref' => '#/components/schemas/ErrorBody']],
                     ],
