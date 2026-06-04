@@ -577,7 +577,7 @@ class ApiController extends Controller
     }
 
     /**
-     * Curriculum detail by name (partial search). Public endpoint.
+     * Curriculum detail by name (partial search). Token auth via CurriculumApiTokenFilter.
      * Returns up to 5 responsible teachers and their approved publications.
      *
      * Route: GET /api/curriculum-detail-by-name?curriculum_name=...
@@ -586,7 +586,7 @@ class ApiController extends Controller
     {
         $this->response->setHeader('Access-Control-Allow-Origin', '*');
         $this->response->setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-        $this->response->setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        $this->response->setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Curriculum-Api-Token, Authorization');
 
         if ($this->request->getMethod() === 'options') {
             return $this->response->setStatusCode(200);

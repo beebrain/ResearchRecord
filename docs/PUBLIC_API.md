@@ -17,7 +17,7 @@ All public API routes are under: **`/api/public/...`**
 
 Public API routes use the **`apikey`** filter. You must send a valid API key with every request.
 
-Curriculum detail API is **public** — no authentication required. See [CURRICULUM_DETAIL_API.md](./CURRICULUM_DETAIL_API.md).
+Curriculum detail API uses a **separate token** — see [CURRICULUM_DETAIL_API.md](./CURRICULUM_DETAIL_API.md) (`CURRICULUM_API_TOKEN`, header `X-Curriculum-Api-Token`).
 
 | Method | Header / Source |
 |--------|------------------|

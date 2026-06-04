@@ -11,24 +11,49 @@
 | **`/docs`** | Swagger UI |
 | **`/api/openapi.json`** | OpenAPI 3.0 spec (JSON) |
 
-กด **Try it out** ได้เลย — ไม่ต้อง Authorize
+กด **Authorize** → ใส่ `X-Curriculum-Api-Token` ก่อน Try it out
 
 ---
 
 - **Controller:** `app/Controllers/ApiController.php` → `apiGetCurriculumDetailByName()`
-- **Auth:** **Public** — ไม่ต้องใช้ token หรือ session login
+- **Filter:** `app/Filters/CurriculumApiTokenFilter.php`
+- **Auth:** Token เฉพาะ (`CURRICULUM_API_TOKEN`) — **ไม่ใช้ session login**
 
 ---
 
-## Authentication
+## Authentication (Token)
 
-ไม่ต้องส่ง header อะไรเพิ่ม — เรียกได้ทันที
+### ตั้งค่า server (.env)
+
+```bash
+# สร้าง token ใหม่ (รันครั้งเดียว):
+# openssl rand -hex 32
+
+CURRICULUM_API_TOKEN=your-secret-token-here
+```
+
+### ส่ง token ใน request
+
+| วิธี | Header |
+|------|--------|
+| **แนะนำ** | `X-Curriculum-Api-Token: <token>` |
+| ทางเลือก | `Authorization: Bearer <token>` |
+
+**ไม่ต้อง login RR** — **ไม่ใช้** `X-API-KEY` ของ public API อื่น (เป็นคนละ token)
 
 ### ตัวอย่าง curl
 
 ```bash
-curl -s "https://your-rr-host/index.php/api/curriculum-detail-by-name?curriculum_name=เทคโนโลยีอาหาร"
+curl -s -H "X-Curriculum-Api-Token: YOUR_TOKEN" \
+  "https://your-rr-host/index.php/api/curriculum-detail-by-name?curriculum_name=เทคโนโลยีอาหาร"
 ```
+
+### Error
+
+| HTTP | error | เมื่อ |
+|------|-------|-------|
+| 401 | `UNAUTHORIZED` | ไม่ส่ง token / token ผิด |
+| 503 | `API_NOT_CONFIGURED` | ยังไม่ตั้ง `CURRICULUM_API_TOKEN` บน server |
 
 ---
 
@@ -238,7 +263,10 @@ const params = new URLSearchParams({
 });
 
 const res = await fetch(`/api/curriculum-detail-by-name?${params}`, {
-  headers: { Accept: 'application/json' },
+  headers: {
+    Accept: 'application/json',
+    'X-Curriculum-Api-Token': 'YOUR_TOKEN',
+  },
 });
 
 const data = await res.json();
@@ -253,14 +281,16 @@ if (res.status === 409) {
 ### 2. curl
 
 ```bash
-curl -s "http://localhost/ResearchRecord/public/index.php/api/curriculum-detail-by-name?curriculum_name=วิทยาการคอมพิวเตอร์" \
+curl -s -H "X-Curriculum-Api-Token: YOUR_TOKEN" \
+  "http://localhost/ResearchRecord/public/index.php/api/curriculum-detail-by-name?curriculum_name=วิทยาการคอมพิวเตอร์" \
   | jq .
 ```
 
 ### 3. กรณีชื่อซ้ำ — ระบุคณะ
 
 ```bash
-curl -s "http://localhost/ResearchRecord/public/index.php/api/curriculum-detail-by-name?curriculum_name=วิทยาการคอมพิวเตอร์&faculty_id=3" \
+curl -s -H "X-Curriculum-Api-Token: YOUR_TOKEN" \
+  "http://localhost/ResearchRecord/public/index.php/api/curriculum-detail-by-name?curriculum_name=วิทยาการคอมพิวเตอร์&faculty_id=3" \
   | jq .
 ```
 
@@ -270,6 +300,7 @@ curl -s "http://localhost/ResearchRecord/public/index.php/api/curriculum-detail-
 $.ajax({
   url: '/api/curriculum-detail-by-name',
   data: { curriculum_name: 'วิทยาการคอมพิวเตอร์', faculty_id: 3 },
+  headers: { 'X-Curriculum-Api-Token': 'YOUR_TOKEN' },
   dataType: 'json',
 }).done(function (data) {
   if (data.success) {
@@ -307,7 +338,7 @@ curriculum_name
 |-----|------|-------|--------|
 | `/api/public/publications-by-email` | API Key | email | ผลงาน 1 คน |
 | `/api/public/faculty-personnel` | API Key | faculty_id/code | บุคลากรทั้งคณะ |
-| **`/api/curriculum-detail-by-name`** | **Public (ไม่ใช้ token)** | **ชื่อหลักสูตร** | **หลักสูตร + ผู้รับผิดชอบ 5 คน + ผลงาน approve** |
+| **`/api/curriculum-detail-by-name`** | **Curriculum token** | **ชื่อหลักสูตร** | **หลักสูตร + ผู้รับผิดชอบ 5 คน + ผลงาน approve** |
 
 ดู public API เพิ่มเติม: [PUBLIC_API.md](./PUBLIC_API.md)
 
@@ -330,6 +361,7 @@ curriculum_name
 | `app/Models/CurriculumModel.php` | ค้นหาชื่อหลักสูตร |
 | `app/Models/UserModel.php` | `getCurriculumResponsibleTeachers()` |
 | `app/Models/PublicationModel.php` | `getApprovedPublicationsByCanonicalEmail()` |
+| `app/Filters/CurriculumApiTokenFilter.php` | ตรวจ `CURRICULUM_API_TOKEN` |
 
 ---
 
@@ -337,6 +369,5 @@ curriculum_name
 
 | วันที่ | รายการ |
 |--------|--------|
-| 2026-06-04 | เปิดเป็น **public endpoint** — ไม่ต้องใช้ token แล้ว |
 | 2026-05-30 | เปลี่ยน auth เป็น token (`CURRICULUM_API_TOKEN`) แทน session login |
 | 2026-05-30 | สร้างเอกสาร — endpoint `/api/curriculum-detail-by-name` |

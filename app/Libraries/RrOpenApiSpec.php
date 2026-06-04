@@ -18,14 +18,15 @@ final class RrOpenApiSpec
             'openapi' => '3.0.3',
             'info'    => [
                 'title'       => 'Research Record API',
-                'description' => 'Interactive API documentation (Swagger UI). Public endpoints — ไม่ต้องใช้ token.',
+                'description' => 'Interactive API documentation (Swagger UI). '
+                    . 'Authorize ด้วย `CURRICULUM_API_TOKEN` (header `X-Curriculum-Api-Token`).',
                 'version'     => '1.0.0',
             ],
             'servers' => [
                 ['url' => $root, 'description' => 'Current Research Record server'],
             ],
             'tags' => [
-                ['name' => 'Curriculum', 'description' => 'หลักสูตร (public)'],
+                ['name' => 'Curriculum', 'description' => 'หลักสูตร — CURRICULUM_API_TOKEN'],
             ],
             'paths' => self::paths(),
             'components' => self::components(),
@@ -45,7 +46,7 @@ final class RrOpenApiSpec
                     'description' => 'ค้นหาหลักสูตรจากชื่อ (partial ได้) แล้วส่งกลับ '
                         . 'อาจารย์ผู้รับผิดชอบสูงสุด 5 คน พร้อมผลงานที่ **approve = 1** เท่านั้น.',
                     'operationId' => 'getCurriculumDetailByName',
-                    'security'    => [],
+                    'security'    => [['curriculumApiToken' => []]],
                     'parameters'  => [
                         [
                             'name'        => 'curriculum_name',
@@ -81,6 +82,7 @@ final class RrOpenApiSpec
                                 ],
                             ],
                         ],
+                        '401' => ['$ref' => '#/components/responses/UnauthorizedCurriculumToken'],
                         '500' => ['$ref' => '#/components/responses/ServerError'],
                     ],
                 ],
@@ -94,6 +96,14 @@ final class RrOpenApiSpec
     private static function components(): array
     {
         return [
+            'securitySchemes' => [
+                'curriculumApiToken' => [
+                    'type'        => 'apiKey',
+                    'in'          => 'header',
+                    'name'        => 'X-Curriculum-Api-Token',
+                    'description' => 'ค่าจาก CURRICULUM_API_TOKEN ใน .env (หรือ Authorization: Bearer <token>)',
+                ],
+            ],
             'schemas' => [
                 'CurriculumDetailResponse' => [
                     'type'       => 'object',
@@ -222,6 +232,12 @@ final class RrOpenApiSpec
                 ],
                 'CurriculumNotFound' => [
                     'description' => 'ไม่พบหลักสูตร',
+                    'content'     => [
+                        'application/json' => ['schema' => ['$ref' => '#/components/schemas/ErrorBody']],
+                    ],
+                ],
+                'UnauthorizedCurriculumToken' => [
+                    'description' => 'Token ไม่ถูกต้องหรือไม่ได้ส่ง',
                     'content'     => [
                         'application/json' => ['schema' => ['$ref' => '#/components/schemas/ErrorBody']],
                     ],
