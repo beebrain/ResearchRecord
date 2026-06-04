@@ -965,7 +965,7 @@ class PublicationController extends Controller
             if (!$author) {
                 // Search in user table by email (partial match)
                 $user = $this->userModel->builder()
-                    ->select('email, thai_name, thai_lastname, gf_name, gl_name, titleThai')
+                    ->select('email, thai_name, thai_lastname, gf_name, gl_name, titleThai, major')
                     ->where('active', 1)
                     ->like('email', $email)
                     ->limit(1)
@@ -979,14 +979,18 @@ class PublicationController extends Controller
                         'id' => null,
                         'name' => !empty($thaiName) ? $thaiName : trim($user['gf_name'] . ' ' . $user['gl_name']),
                         'email' => $user['email'],
-                        'user_uid' => $user['email'],
+                        'user_email' => $user['email'],
                         'is_linked' => true,
-                        'affiliation' => 'มหาวิทยาลัยราชภัฏอุตรดิตถ์'
+                        'affiliation' => $user['major'] ?? '',
                     ];
                 }
             }
 
             if ($author) {
+                $affiliation = !empty($author['affiliation'])
+                    ? $author['affiliation']
+                    : 'มหาวิทยาลัยราชภัฏอุตรดิตถ์';
+
                 // Build response using data already retrieved
                 $response = [
                     'success' => true,
@@ -995,7 +999,7 @@ class PublicationController extends Controller
                         'id' => $author['id'],
                         'name' => $author['name'],
                         'email' => $author['email'],
-                        'affiliation' => 'มหาวิทยาลัยราชภัฏอุตรดิตถ์',
+                        'affiliation' => $affiliation,
                         'user_uid' => $author['user_email'] ?? ''
                     ]
                 ];
@@ -1003,8 +1007,8 @@ class PublicationController extends Controller
                 // Add user info if linked (data already available from JOIN)
                 if ($author['is_linked']) {
                     $response['user_info'] = [
-                        'full_name' => $author['name'],        // Already formatted in getAuthorlinkUser
-                        'major' => $author['affiliation'],     // Already available
+                        'full_name' => $author['name'],
+                        'major' => $author['affiliation'] ?? '',
                         'is_linked' => true
                     ];
 
