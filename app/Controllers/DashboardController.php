@@ -2672,12 +2672,12 @@ class DashboardController extends Controller
     public function updateProfilePicture()
     {
         if (!$this->session->get('logged_in')) {
-            return redirect()->to('/login');
+            return redirect()->to(site_url('login'));
         }
 
         $ownerEmail = $this->sessionOwnerEmail($this->session->get('user_data') ?? []);
         if ($ownerEmail === '') {
-            return redirect()->to('/login');
+            return redirect()->to(site_url('login'));
         }
 
         $rules = [
@@ -2816,7 +2816,7 @@ class DashboardController extends Controller
     public function addPublication()
     {
         if (!$this->session->get('logged_in')) {
-            return redirect()->to('/login');
+            return redirect()->to(site_url('login'));
         }
 
         $data = [
@@ -2892,7 +2892,7 @@ class DashboardController extends Controller
                 throw new \Exception('Transaction failed');
             }
 
-            return redirect()->to('/dashboard')
+            return redirect()->to(site_url('dashboard'))
                 ->with('success', 'Publication saved successfully!');
         } catch (\Exception $e) {
             log_message('error', 'Error saving publication: ' . $e->getMessage());
@@ -2908,14 +2908,14 @@ class DashboardController extends Controller
     public function editPublication($id)
     {
         if (!$this->session->get('logged_in')) {
-            return redirect()->to('/login');
+            return redirect()->to(site_url('login'));
         }
 
         $ownerEmail = $this->sessionOwnerEmail($this->session->get('user_data') ?? []);
         $publication = $this->publicationModel->getPublicationWithAuthors($id, $ownerEmail);
 
         if (!$publication) {
-            return redirect()->to('/dashboard')
+            return redirect()->to(site_url('dashboard'))
                 ->with('error', 'Publication not found or access denied');
         }
 
@@ -2934,7 +2934,7 @@ class DashboardController extends Controller
     public function updatePublication($id)
     {
         if (!$this->session->get('logged_in')) {
-            return redirect()->to('/login');
+            return redirect()->to(site_url('login'));
         }
 
         $ownerEmail = $this->sessionOwnerEmail();
@@ -2945,7 +2945,7 @@ class DashboardController extends Controller
             ->first();
 
         if (!$publication) {
-            return redirect()->to('/dashboard')
+            return redirect()->to(site_url('dashboard'))
                 ->with('error', 'Publication not found or access denied');
         }
 
@@ -3001,7 +3001,7 @@ class DashboardController extends Controller
                 throw new \Exception('Transaction failed');
             }
 
-            return redirect()->to('/dashboard')
+            return redirect()->to(site_url('dashboard'))
                 ->with('success', 'Publication updated successfully!');
         } catch (\Exception $e) {
             log_message('error', 'Error updating publication: ' . $e->getMessage());
@@ -3017,7 +3017,7 @@ class DashboardController extends Controller
     public function deletePublication($id)
     {
         if (!$this->session->get('logged_in')) {
-            return redirect()->to('/login');
+            return redirect()->to(site_url('login'));
         }
 
         $ownerEmail = $this->sessionOwnerEmail();
@@ -3028,15 +3028,15 @@ class DashboardController extends Controller
             ->first();
 
         if (!$publication) {
-            return redirect()->to('/dashboard')
+            return redirect()->to(site_url('dashboard'))
                 ->with('error', 'Publication not found or access denied');
         }
 
         if ($this->publicationModel->delete($id)) {
-            return redirect()->to('/dashboard')
+            return redirect()->to(site_url('dashboard'))
                 ->with('success', 'Publication deleted successfully!');
         } else {
-            return redirect()->to('/dashboard')
+            return redirect()->to(site_url('dashboard'))
                 ->with('error', 'Failed to delete publication');
         }
     }
@@ -3075,7 +3075,7 @@ class DashboardController extends Controller
     public function authors()
     {
         if (!$this->session->get('logged_in')) {
-            return redirect()->to('/login');
+            return redirect()->to(site_url('login'));
         }
 
         $ownerEmail = $this->sessionOwnerEmail();
@@ -3096,7 +3096,7 @@ class DashboardController extends Controller
     public function export($format = 'json')
     {
         if (!$this->session->get('logged_in')) {
-            return redirect()->to('/login');
+            return redirect()->to(site_url('login'));
         }
 
         $ownerEmail = $this->sessionOwnerEmail();
@@ -3108,7 +3108,7 @@ class DashboardController extends Controller
             case 'json':
                 return $this->exportJSON($publications);
             default:
-                return redirect()->to('/dashboard')->with('error', 'Invalid export format');
+                return redirect()->to(site_url('dashboard'))->with('error', 'Invalid export format');
         }
     }
 

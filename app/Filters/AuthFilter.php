@@ -22,7 +22,7 @@ class AuthFilter implements FilterInterface
                 return redirect()->to(config(NewsciencePortal::class)->researchRecordLoginUrl());
             }
 
-            return redirect()->to('/auth/login');
+            return redirect()->to(site_url('auth/login'));
         }
     }
 

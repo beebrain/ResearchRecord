@@ -33,7 +33,7 @@ class AuthenController extends Controller
     public function login()
     {
         if ($this->session->has('user_data') || $this->session->get('logged_in')) {
-            return redirect()->to('/dashboard');
+            return redirect()->to(site_url('dashboard'));
         }
 
         $oauthConfig  = config(\Config\UruPortalOAuth::class);
@@ -131,7 +131,7 @@ class AuthenController extends Controller
             return redirect()->to($redirectTarget)->with('success', 'Login successful! Welcome to Research Publication Management System.');
         } catch (\Exception $e) {
             log_message('error', 'OAuth Login Error: ' . $e->getMessage());
-            return redirect()->to('/auth/login')->with('error', 'Login failed: ' . $e->getMessage());
+            return redirect()->to(site_url('auth/login'))->with('error', 'Login failed: ' . $e->getMessage());
         }
     }
 
@@ -420,7 +420,7 @@ class AuthenController extends Controller
     {
         // All users (including admins) go to the general user dashboard
         // Admins will see a button to access the admin dashboard from there
-        return '/dashboard';
+        return site_url('dashboard');
     }
 
     /**
@@ -433,19 +433,19 @@ class AuthenController extends Controller
         $config = config(NewscienceSso::class);
         if (!$config->enabled || $config->sharedSecret === '') {
             log_message('warning', self::SSO_LOG_PREFIX . 'ssoEntry disabled or sharedSecret empty');
-            return redirect()->to('/auth/login')->with('error', 'SSO จาก newScience ยังไม่เปิดใช้');
+            return redirect()->to(site_url('auth/login'))->with('error', 'SSO จาก newScience ยังไม่เปิดใช้');
         }
 
         $token = $this->extractSsoToken();
         if ($token === null) {
             log_message('warning', self::SSO_LOG_PREFIX . 'ssoEntry missing token');
-            return redirect()->to('/auth/login')->with('error', 'ไม่พบ token จาก newScience');
+            return redirect()->to(site_url('auth/login'))->with('error', 'ไม่พบ token จาก newScience');
         }
 
         $parts = explode('.', $token, 2);
         if (count($parts) !== 2) {
             log_message('warning', self::SSO_LOG_PREFIX . 'ssoEntry invalid token format');
-            return redirect()->to('/auth/login')->with('error', 'Token ไม่ถูกต้อง');
+            return redirect()->to(site_url('auth/login'))->with('error', 'Token ไม่ถูกต้อง');
         }
 
         $payloadB64 = $parts[0];
@@ -455,25 +455,25 @@ class AuthenController extends Controller
         $signature = $this->base64UrlDecode($sigB64);
         if ($signature === null || !hash_equals($expectedSig, $signature)) {
             log_message('warning', self::SSO_LOG_PREFIX . 'ssoEntry invalid signature secret_len=' . strlen($config->sharedSecret) . ' token_len=' . strlen($token));
-            return redirect()->to('/auth/login')->with('error', 'Token ไม่ถูกต้อง (ตรวจ secret ระหว่าง newScience กับ Research Record)');
+            return redirect()->to(site_url('auth/login'))->with('error', 'Token ไม่ถูกต้อง (ตรวจ secret ระหว่าง newScience กับ Research Record)');
         }
 
         $payloadJson = $this->base64UrlDecode($payloadB64);
         if ($payloadJson === null) {
             log_message('warning', self::SSO_LOG_PREFIX . 'ssoEntry invalid payload encoding');
-            return redirect()->to('/auth/login')->with('error', 'Token ไม่ถูกต้อง');
+            return redirect()->to(site_url('auth/login'))->with('error', 'Token ไม่ถูกต้อง');
         }
 
         $payload = json_decode($payloadJson, true);
         if (!is_array($payload) || empty($payload['email'])) {
             log_message('warning', self::SSO_LOG_PREFIX . 'ssoEntry missing email in payload');
-            return redirect()->to('/auth/login')->with('error', 'Token ไม่มีข้อมูลผู้ใช้');
+            return redirect()->to(site_url('auth/login'))->with('error', 'Token ไม่มีข้อมูลผู้ใช้');
         }
 
         $exp = $payload['exp'] ?? 0;
         if ($exp < time()) {
             log_message('warning', self::SSO_LOG_PREFIX . 'ssoEntry token expired');
-            return redirect()->to('/auth/login')->with('error', 'Token หมดอายุ กรุณาเข้าใหม่จาก newScience');
+            return redirect()->to(site_url('auth/login'))->with('error', 'Token หมดอายุ กรุณาเข้าใหม่จาก newScience');
         }
 
         $email = trim($payload['email']);
@@ -498,7 +498,7 @@ class AuthenController extends Controller
             $insertedEmail = $this->userModel->insertUserData($newUser);
             if (!$insertedEmail) {
                 log_message('error', self::SSO_LOG_PREFIX . 'ssoEntry failed to create user email=' . $email);
-                return redirect()->to('/auth/login')->with('error', 'ไม่สามารถสร้างผู้ใช้ได้');
+                return redirect()->to(site_url('auth/login'))->with('error', 'ไม่สามารถสร้างผู้ใช้ได้');
             }
             $user = $this->userModel->find($insertedEmail);
             log_message('info', self::SSO_LOG_PREFIX . 'ssoEntry created user email=' . $email);
@@ -649,7 +649,7 @@ class AuthenController extends Controller
                 return redirect()->to($nsLogout)->with('success', $message);
             }
 
-            return redirect()->to($safeReturnUrl ?: '/auth/login?logout=1')->with('success', $message);
+            return redirect()->to($safeReturnUrl ?: site_url('auth/login?logout=1'))->with('success', $message);
         } catch (\Exception $e) {
             log_message('error', 'Logout error: ' . $e->getMessage());
 
@@ -668,7 +668,7 @@ class AuthenController extends Controller
             }
 
             // Redirect to login anyway
-            return redirect()->to('/auth/login?logout=1')->with('error', 'Logged out with errors.');
+            return redirect()->to(site_url('auth/login?logout=1'))->with('error', 'Logged out with errors.');
         }
     }
 
@@ -678,14 +678,14 @@ class AuthenController extends Controller
     public function checkAuth()
     {
         if (!$this->session->has('logged_in') || !$this->session->get('logged_in')) {
-            return redirect()->to('/auth/login');
+            return redirect()->to(site_url('auth/login'));
         }
 
         // Check token expiry
         $tokenExpires = $this->session->get('token_expires');
         if ($tokenExpires && time() > $tokenExpires) {
             $this->session->destroy();
-            return redirect()->to('/auth/login')->with('error', 'Session expired. Please login again.');
+            return redirect()->to(site_url('auth/login'))->with('error', 'Session expired. Please login again.');
         }
 
         return true;
@@ -697,7 +697,7 @@ class AuthenController extends Controller
     public function refreshUserData()
     {
         if (!$this->session->get('logged_in')) {
-            return redirect()->to('/auth/login');
+            return redirect()->to(site_url('auth/login'));
         }
 
         try {
@@ -759,7 +759,7 @@ class AuthenController extends Controller
         $this->requireAuth();
 
         if (!$this->isAdmin()) {
-            return redirect()->to('/dashboard')->with('error', 'Insufficient permissions');
+            return redirect()->to(site_url('dashboard'))->with('error', 'Insufficient permissions');
         }
     }
 

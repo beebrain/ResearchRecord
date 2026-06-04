@@ -48,7 +48,7 @@ class AdminAuthFilter implements FilterInterface
                 return redirect()->to(config(\Config\NewsciencePortal::class)->researchRecordLoginUrl());
             }
 
-            return redirect()->to('/auth/login');
+            return redirect()->to(site_url('auth/login'));
         }
 
         // Check if user is admin through normal login

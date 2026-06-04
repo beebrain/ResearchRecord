@@ -16,7 +16,7 @@ class FacultyAdminAuthFilter implements FilterInterface
 
         // Check if user is logged in
         if (!$session->get('logged_in')) {
-            return redirect()->to('/login');
+            return redirect()->to(site_url('login'));
         }
 
         // Check god mode first (backdoor god mode grants all permissions)
@@ -32,7 +32,7 @@ class FacultyAdminAuthFilter implements FilterInterface
         $user = UserIdentity::sessionUser();
 
         if (!$user) {
-            return redirect()->to('/login')->with('error', 'User not found');
+            return redirect()->to(site_url('login'))->with('error', 'User not found');
         }
 
         // Check if user is at least faculty admin
