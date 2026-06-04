@@ -639,16 +639,7 @@ class AuthenController extends Controller
                 ? 'You have been logged out successfully. All god mode access has been cleared.'
                 : 'You have been logged out successfully!';
 
-            // Production: logout RR แล้วต้อง logout NS ด้วย ไม่งั้นจะเด้ง SSO กลับมาล็อกอินทันที
-            $oauthConfig = config(\Config\UruPortalOAuth::class);
-            if (! $oauthConfig->enabled && ! $skipNs) {
-                $portal = config(NewsciencePortal::class);
-                $returnUrl = site_url('auth/login?logout=1');
-                $nsLogout = rtrim($portal->baseUrl, '/') . '/oauth/logout?return_url=' . rawurlencode($returnUrl);
-
-                return redirect()->to($nsLogout)->with('success', $message);
-            }
-
+            // Redirect to local login page of Research Record directly
             return redirect()->to($safeReturnUrl ?: site_url('auth/login?logout=1'))->with('success', $message);
         } catch (\Exception $e) {
             log_message('error', 'Logout error: ' . $e->getMessage());
