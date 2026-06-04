@@ -1010,6 +1010,7 @@ function generateAdmissionFormPDF(formData, useThaiFont = false) {
     
     // Approval Section: 2 Columns (Curriculum Head & Dean)
     const headDate = form.curriculum_head_approval_date ? formatDateFullThai(form.curriculum_head_approval_date) : '';
+    const deanDate = form.dean_approval_date ? formatDateFullThai(form.dean_approval_date) : '';
     
     content.push({
         columns: [
@@ -1041,6 +1042,12 @@ function generateAdmissionFormPDF(formData, useThaiFont = false) {
                     },
                     {
                         text: 'ประธานหลักสูตร',
+                        fontSize: 14,
+                        alignment: 'center',
+                        margin: [0, 0, 0, 3]
+                    },
+                    {
+                        text: headDate ? `${headDate}` : 'วัน เดือน ปี: ......../......../........',
                         fontSize: 14,
                         alignment: 'center',
                         margin: [0, 0, 0, 0]
@@ -1081,6 +1088,12 @@ function generateAdmissionFormPDF(formData, useThaiFont = false) {
                     },
                     {
                         text: 'คณบดี',
+                        fontSize: 14,
+                        alignment: 'center',
+                        margin: [0, 0, 0, 3]
+                    },
+                    {
+                        text: deanDate ? `${deanDate}` : 'วัน เดือน ปี: ......../......../........',
                         fontSize: 14,
                         alignment: 'center',
                         margin: [0, 0, 0, 0]

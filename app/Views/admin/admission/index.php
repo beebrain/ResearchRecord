@@ -195,6 +195,7 @@
                                     <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase" style="min-width: 250px;">หลักสูตร</th>
                                     <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500 uppercase" style="width: 100px;">ปีการศึกษา</th>
                                     <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase" style="width: 140px;">ความครบถ้วน</th>
+                                    <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase" style="width: 120px;">สถานะ</th>
                                     <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase" style="width: 150px; min-width: 150px;">อัปเดตล่าสุด</th>
                                     <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500 uppercase" style="width: 100px;">จัดการ</th>
                                 </tr>
@@ -202,7 +203,7 @@
                             <tbody id="forms-table-body" class="bg-white divide-y divide-gray-200">
                                 <?php if (empty($forms)): ?>
                                     <tr id="empty-row">
-                                        <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                                        <td colspan="8" class="px-6 py-12 text-center text-gray-500">
                                             <div class="text-4xl mb-2">📋</div>
                                             <p>ไม่พบข้อมูลแบบฟอร์มสำหรับปีการศึกษานี้</p>
                                             <button onclick="generateNewYear()" class="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg">สร้างแบบฟอร์มใหม่</button>
@@ -250,6 +251,26 @@
                                                     <span class="text-xs font-medium text-gray-600 whitespace-nowrap"><?= $percent ?>%</span>
                                                 </div>
                                             </td>
+                                            <td class="px-4 py-3 text-center whitespace-nowrap">
+                                                <?php
+                                                $status = $form['status'] ?? 'draft';
+                                                switch ($status) {
+                                                    case 'submitted':
+                                                        echo '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium status-submitted">ส่งแล้ว</span>';
+                                                        break;
+                                                    case 'approved':
+                                                        echo '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium status-approved">อนุมัติแล้ว</span>';
+                                                        break;
+                                                    case 'rejected':
+                                                        echo '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium status-rejected">ส่งกลับเพื่อแก้ไข</span>';
+                                                        break;
+                                                    case 'draft':
+                                                    default:
+                                                        echo '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium status-draft">ร่าง</span>';
+                                                        break;
+                                                }
+                                                ?>
+                                            </td>
                                             <td class="px-4 py-3 text-sm text-gray-500 text-center whitespace-nowrap"><?= date('d/m/Y H:i', strtotime($form['updated_at'])) ?></td>
                                             <td class="px-3 py-3 text-center">
                                                 <div class="flex justify-center gap-2">
@@ -280,7 +301,7 @@
                     <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
                 </div>
             </div>
-            <div class="p-4 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
+            <div class="p-4 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg" id="modalFooterActions">
                 <button onclick="closeModal()" class="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg">ยกเลิก</button>
                 <button onclick="saveForm()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">💾 บันทึก</button>
             </div>
@@ -311,13 +332,14 @@
     </script>
     <script src="<?= base_url('assets/js/app-routes.js') ?>?v=<?= @filemtime(FCPATH . 'assets/js/app-routes.js') ?: time() ?>"></script>
     <script>
+        const userRole = '<?= $userRole ?? "teacher" ?>';
         let currentFormId = null;
 
         const statusMap = {
             'draft': ['ฉบับร่าง', 'status-draft'],
             'submitted': ['ส่งแล้ว', 'status-submitted'],
             'approved': ['อนุมัติแล้ว', 'status-approved'],
-            'rejected': ['ไม่อนุมัติ', 'status-rejected']
+            'rejected': ['ส่งกลับเพื่อแก้ไข', 'status-rejected']
         };
 
         // Escape HTML to prevent XSS
@@ -333,21 +355,16 @@
         function formatDateToBE(ceDate) {
             // ตรวจสอบว่าเป็นค่าว่างหรือวันที่ไม่ถูกต้อง
             if (!ceDate || ceDate === '0000-00-00' || ceDate === 'null' || ceDate === 'undefined') {
-                // แสดงวันที่ปัจจุบันเป็น พ.ศ.
-                const today = new Date();
-                const day = String(today.getDate()).padStart(2, '0');
-                const month = String(today.getMonth() + 1).padStart(2, '0');
-                const beYear = today.getFullYear() + 543;
-                return `${day}/${month}/${beYear}`;
+                return '';
             }
             const parts = ceDate.split('-');
-            if (parts.length !== 3) return formatDateToBE(null); // ถ้ารูปแบบไม่ถูกต้อง ให้ใช้วันที่ปัจจุบัน
+            if (parts.length !== 3) return '';
             const year = parseInt(parts[0]);
             const month = parts[1];
             const day = parts[2];
             // ตรวจสอบว่าปีไม่ใช่ 0 หรือค่าที่ไม่ถูกต้อง
             if (year <= 0 || isNaN(year)) {
-                return formatDateToBE(null);
+                return '';
             }
             const beYear = year + 543;
             return `${day}/${month}/${beYear}`;
@@ -378,7 +395,7 @@
             const faculty = document.getElementById('faculty-filter').value;
 
             // Show loading
-            $('#forms-table-body').html('<tr><td colspan="7" class="px-6 py-8 text-center"><div class="animate-spin inline-block w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full"></div><p class="mt-2 text-gray-500">กำลังโหลด...</p></td></tr>');
+            $('#forms-table-body').html('<tr><td colspan="8" class="px-6 py-8 text-center"><div class="animate-spin inline-block w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full"></div><p class="mt-2 text-gray-500">กำลังโหลด...</p></td></tr>');
 
             // Update URL without reload
             const newUrl = appRoute('admin/admission') + '?year=' + year + (faculty ? '&faculty=' + faculty : '');
@@ -396,11 +413,11 @@
                         renderTable(result.forms);
                         updateStats(result.stats);
                     } else {
-                        $('#forms-table-body').html('<tr><td colspan="7" class="text-center text-red-500 py-8">เกิดข้อผิดพลาด</td></tr>');
+                        $('#forms-table-body').html('<tr><td colspan="8" class="text-center text-red-500 py-8">เกิดข้อผิดพลาด</td></tr>');
                     }
                 },
                 error: function() {
-                    $('#forms-table-body').html('<tr><td colspan="7" class="text-center text-red-500 py-8">ไม่สามารถโหลดข้อมูลได้</td></tr>');
+                    $('#forms-table-body').html('<tr><td colspan="8" class="text-center text-red-500 py-8">ไม่สามารถโหลดข้อมูลได้</td></tr>');
                 }
             });
         }
@@ -409,7 +426,7 @@
             if (!forms || forms.length === 0) {
                 $('#forms-table-body').html(`
                     <tr id="empty-row">
-                        <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                        <td colspan="8" class="px-6 py-12 text-center text-gray-500">
                             <div class="text-4xl mb-2">📋</div>
                             <p>ไม่พบข้อมูลแบบฟอร์มสำหรับปีการศึกษานี้</p>
                             <button onclick="generateNewYear()" class="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg">สร้างแบบฟอร์มใหม่</button>
@@ -449,6 +466,10 @@
                     bgColor = 'bg-red-100';
                 }
 
+                const status = form.status || 'draft';
+                const statusInfo = statusMap[status] || ['ฉบับร่าง', 'status-draft'];
+                const statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusInfo[1]}">${statusInfo[0]}</span>`;
+
                 html += `
                     <tr class="hover:bg-gray-50 transition-colors">
                         <td class="px-3 py-3 text-sm text-gray-900 text-center">${index + 1}</td>
@@ -463,6 +484,7 @@
                                 <span class="text-xs font-medium text-gray-600 whitespace-nowrap">${percent}%</span>
                             </div>
                         </td>
+                        <td class="px-4 py-3 text-center whitespace-nowrap">${statusBadge}</td>
                         <td class="px-4 py-3 text-sm text-gray-500 text-center whitespace-nowrap">${updatedAt}</td>
                         <td class="px-3 py-3 text-center">
                             <div class="flex justify-center gap-2">
@@ -577,6 +599,7 @@
 
             let html = `
                 <form id="admissionForm">
+                    <input type="hidden" name="status" id="admission_form_status" value="${form.status || 'draft'}">
                     <!-- Section 1: Curriculum Info -->
                     <div class="mb-6">
                         <h3 class="text-lg font-semibold text-blue-600 border-b-2 border-blue-500 pb-2 mb-4">๑. ข้อมูลหลักสูตร</h3>
@@ -613,7 +636,7 @@
                                        data-target="ministry_approval_date"
                                        value="${formatDateToBE(form.ministry_approval_date)}" 
                                        readonly>
-                                <input type="hidden" name="ministry_approval_date" id="ministry_approval_date" value="${form.ministry_approval_date || getCurrentDateCE()}">
+                                <input type="hidden" name="ministry_approval_date" id="ministry_approval_date" value="${form.ministry_approval_date || ''}">
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">สภามหาวิทยาลัยเห็นชอบ</label>
@@ -622,7 +645,7 @@
                                        data-target="university_approval_date"
                                        value="${formatDateToBE(form.university_approval_date)}" 
                                        readonly>
-                                <input type="hidden" name="university_approval_date" id="university_approval_date" value="${form.university_approval_date || getCurrentDateCE()}">
+                                <input type="hidden" name="university_approval_date" id="university_approval_date" value="${form.university_approval_date || ''}">
                             </div>
                         </div>
                     </div>
@@ -665,7 +688,7 @@
                                             <td class="px-3 py-2 text-center border">${i + 1}</td>
                                             <td class="px-2 py-1 border">
                                                 <select class="w-full px-2 py-1 border rounded text-sm bg-white" 
-                                                        onchange="updateTeacherPosition(${t.user_id}, this.value)">
+                                                        onchange="updateTeacherPosition('${t.user_id}', this.value)">
                                                     ${positionOptions.map(opt => `<option value="${opt}" ${currentPos === opt ? 'selected' : ''}>${opt}</option>`).join('')}
                                                 </select>
                                             </td>
@@ -1066,7 +1089,7 @@
                                            data-target="curriculum_head_approval_date_modal"
                                            value="${formatDateToBE(form.curriculum_head_approval_date)}" 
                                            readonly>
-                                    <input type="hidden" name="curriculum_head_approval_date" id="curriculum_head_approval_date_modal" value="${form.curriculum_head_approval_date || getCurrentDateCE()}">
+                                    <input type="hidden" name="curriculum_head_approval_date" id="curriculum_head_approval_date_modal" value="${form.curriculum_head_approval_date || ''}">
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อประธานหลักสูตร</label>
@@ -1247,6 +1270,31 @@
             // Load majors data after form is rendered
             toggleMajorSectionModal();
             loadMajorsDataModal(form);
+
+            // Build dynamic footer buttons based on status and userRole
+            let footerHtml = `<button onclick="closeModal()" class="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg">ยกเลิก</button>`;
+            const currentStatus = form.status || 'draft';
+            
+            if (userRole === 'superadmin' || userRole === 'chair' || userRole === 'teacher') {
+                if (currentStatus === 'draft' || currentStatus === 'rejected') {
+                    footerHtml += `<button onclick="saveForm()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">💾 บันทึกแบบร่าง</button>`;
+                    footerHtml += `<button onclick="saveForm('submitted')" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg">📤 ส่งแบบเสนอ</button>`;
+                } else {
+                    footerHtml += `<button onclick="saveForm()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">💾 บันทึก</button>`;
+                }
+            } else if (userRole === 'dean' || userRole === 'faculty_admin') {
+                if (currentStatus === 'submitted') {
+                    footerHtml += `<button onclick="saveForm('rejected')" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg">❌ ส่งกลับเพื่อแก้ไข</button>`;
+                    footerHtml += `<button onclick="saveForm('approved')" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg">✅ อนุมัติ</button>`;
+                    footerHtml += `<button onclick="saveForm()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">💾 บันทึก</button>`;
+                } else {
+                    footerHtml += `<button onclick="saveForm()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">💾 บันทึก</button>`;
+                }
+            } else {
+                footerHtml += `<button onclick="saveForm()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">💾 บันทึก</button>`;
+            }
+            
+            $('#modalFooterActions').html(footerHtml);
         }
 
         function updateTeacherPosition(userId, position) {

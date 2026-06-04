@@ -118,18 +118,18 @@ class StudentAdmissionFormModel extends Model
                                curriculum.name as curriculum_name_display,
                                curriculum.code as curriculum_code,
                                curriculum.degree_level,
-                               curriculum.chair_id,
+                               curriculum.chair_email,
                                faculties.name as faculty_name,
                                faculties.code as faculty_code,
-                               faculties.dean_id,
-                               chair.uid as chair_uid,
+                               faculties.dean_email,
+                               chair.email as chair_uid,
                                chair.titleThai as chair_title,
                                chair.title as chair_title_en,
                                chair.thai_name as chair_name,
                                chair.thai_lastname as chair_lastname,
                                chair.gf_name as chair_gf_name,
                                chair.gl_name as chair_gl_name,
-                               dean.uid as dean_uid,
+                               dean.email as dean_uid,
                                dean.titleThai as dean_title,
                                dean.title as dean_title_en,
                                dean.thai_name as dean_name,
@@ -138,8 +138,8 @@ class StudentAdmissionFormModel extends Model
                                dean.gl_name as dean_gl_name')
             ->join('curriculum', 'curriculum.id = student_admission_forms.curriculum_id', 'left')
             ->join('faculties', 'faculties.id = student_admission_forms.faculty_id', 'left')
-            ->join('user as chair', 'chair.uid = curriculum.chair_id', 'left')
-            ->join('user as dean', 'dean.uid = faculties.dean_id', 'left')
+            ->join('user as chair', 'chair.email = curriculum.chair_email', 'left')
+            ->join('user as dean', 'dean.email = faculties.dean_email', 'left')
             ->where('student_admission_forms.id', $id)
             ->first();
 
@@ -163,7 +163,7 @@ class StudentAdmissionFormModel extends Model
             }
 
             // Format chair name (ประธานหลักสูตร)
-            if (!empty($form['chair_id'])) {
+            if (!empty($form['chair_email'])) {
                 $chairName = '';
                 if (!empty($form['chair_name']) && !empty($form['chair_lastname'])) {
                     $title = !empty($form['chair_title']) ? $form['chair_title'] . ' ' : '';
@@ -179,7 +179,7 @@ class StudentAdmissionFormModel extends Model
             }
 
             // Format dean name (คณบดี) - store original values to avoid conflict
-            if (!empty($form['dean_id'])) {
+            if (!empty($form['dean_email'])) {
                 // IMPORTANT: When using SELECT with student_admission_forms.*, 
                 // the JOIN fields (dean.thai_name as dean_name) may be overridden by 
                 // student_admission_forms.dean_name (saved value). We need to preserve 
@@ -293,13 +293,33 @@ class StudentAdmissionFormModel extends Model
     }
 
     /**
-     * Get responsible teachers for a curriculum (from teacher_curriculum table)
+     * Get responsible teachers for a curriculum
+     * Tries to fetch from admission_form_teachers first, then falls back to teacher_curriculum table.
      */
     public function getTeachers(int $formId)
     {
         $db = \Config\Database::connect();
 
-        // First get the curriculum_id from the form
+        // First check if there are saved teachers in admission_form_teachers
+        $savedTeachers = $db->table('admission_form_teachers aft')
+            ->select('aft.id, aft.user_email as user_id, aft.user_email, aft.position,
+                      aft.full_name, aft.order_num,
+                      aft.pub_year_1, aft.pub_year_2, aft.pub_year_3, aft.pub_year_4, aft.pub_year_5,
+                      aft.admission_year,
+                      u.thai_name, u.thai_lastname, u.titleThai,
+                      CONCAT_WS(" ", u.gf_name, u.gl_name) as user_name_en,
+                      CONCAT_WS(" ", u.thai_name, u.thai_lastname) as user_name_th')
+            ->join('user u', 'u.email = aft.user_email', 'left')
+            ->where('aft.admission_form_id', $formId)
+            ->orderBy('aft.order_num', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        if (!empty($savedTeachers)) {
+            return $savedTeachers;
+        }
+
+        // Fallback to teacher_curriculum table
         $form = $this->find($formId);
         if (!$form || empty($form['curriculum_id'])) {
             return [];
@@ -307,20 +327,83 @@ class StudentAdmissionFormModel extends Model
 
         $curriculumId = $form['curriculum_id'];
 
-        // Get teachers from teacher_curriculum table
-        // Use CONCAT_WS and COALESCE to handle NULL values (titleThai may be NULL)
-        return $db->table('teacher_curriculum tc')
-            ->select('tc.id, tc.teacher_uid as user_id, tc.role as position,
+        $defaultTeachers = $db->table('teacher_curriculum tc')
+            ->select('tc.id, tc.teacher_email as user_id, tc.teacher_email as user_email, tc.role as position,
                       u.thai_name, u.thai_lastname, u.titleThai,
                       CONCAT_WS(" ", COALESCE(u.titleThai, ""), u.thai_name, u.thai_lastname) as full_name,
                       CONCAT_WS(" ", u.gf_name, u.gl_name) as user_name_en,
                       CONCAT_WS(" ", u.thai_name, u.thai_lastname) as user_name_th')
-            ->join('user u', 'u.uid = tc.teacher_uid')
+            ->join('user u', 'u.email = tc.teacher_email', 'inner')
             ->where('tc.curriculum_id', $curriculumId)
             ->orderBy('tc.role', 'ASC')
             ->orderBy('u.thai_name', 'ASC')
             ->get()
             ->getResultArray();
+
+        // Assign order_num and defaults to fallback teachers
+        foreach ($defaultTeachers as $index => &$teacher) {
+            $teacher['order_num'] = $index + 1;
+            $teacher['pub_year_1'] = 0;
+            $teacher['pub_year_2'] = 0;
+            $teacher['pub_year_3'] = 0;
+            $teacher['pub_year_4'] = 0;
+            $teacher['pub_year_5'] = 0;
+            $teacher['admission_year'] = null;
+        }
+
+        return $defaultTeachers;
+    }
+
+    /**
+     * Save responsible teachers for an admission form (from full edit page)
+     */
+    public function saveTeachers(int $formId, array $teachers)
+    {
+        $db = \Config\Database::connect();
+
+        // First delete existing teachers for this form
+        $db->table('admission_form_teachers')
+            ->where('admission_form_id', $formId)
+            ->delete();
+
+        $form = $this->find($formId);
+        if (!$form || empty($form['curriculum_id'])) {
+            return;
+        }
+        $curriculumId = $form['curriculum_id'];
+
+        $dbTeachers = $db->table('teacher_curriculum tc')
+            ->select('tc.teacher_email')
+            ->join('user u', 'u.email = tc.teacher_email', 'inner')
+            ->where('tc.curriculum_id', $curriculumId)
+            ->orderBy('tc.role', 'ASC')
+            ->orderBy('u.thai_name', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        $insertData = [];
+        foreach ($teachers as $orderNum => $teacherData) {
+            $index = $orderNum - 1;
+            $userEmail = $dbTeachers[$index]['teacher_email'] ?? null;
+
+            $insertData[] = [
+                'admission_form_id' => $formId,
+                'order_num'         => $orderNum,
+                'position'          => $teacherData['position'] ?? null,
+                'full_name'         => $teacherData['full_name'] ?? null,
+                'user_email'        => $userEmail,
+                'pub_year_1'        => isset($teacherData['pub_year_1']) ? (int)$teacherData['pub_year_1'] : 0,
+                'pub_year_2'        => isset($teacherData['pub_year_2']) ? (int)$teacherData['pub_year_2'] : 0,
+                'pub_year_3'        => isset($teacherData['pub_year_3']) ? (int)$teacherData['pub_year_3'] : 0,
+                'pub_year_4'        => isset($teacherData['pub_year_4']) ? (int)$teacherData['pub_year_4'] : 0,
+                'pub_year_5'        => isset($teacherData['pub_year_5']) ? (int)$teacherData['pub_year_5'] : 0,
+                'admission_year'    => !empty($teacherData['admission_year']) ? (int)$teacherData['admission_year'] : null,
+            ];
+        }
+
+        if (!empty($insertData)) {
+            $db->table('admission_form_teachers')->insertBatch($insertData);
+        }
     }
 
     /**
@@ -336,7 +419,7 @@ class StudentAdmissionFormModel extends Model
      * Get teacher publications for a form (from publications table via teacher user_id)
      * Uses the same matching logic as PublicationModel::getPublicationsByAuthor()
      * PRIMARY: Match by author_email from publication_authors
-     * SECONDARY: Match by UID (pa.uid or authors.user_uid)
+     * SECONDARY: Match by email address
      * Does not include publications by created_by alone (data entry ≠ author).
      */
     public function getTeacherPublications(int $formId)
@@ -348,7 +431,7 @@ class StudentAdmissionFormModel extends Model
 
         // Get teachers for this form
         $teachers = $this->getTeachers($formId);
-        $userIds = array_filter(array_column($teachers, 'user_id'));
+        $userIds = array_filter(array_column($teachers, 'user_id')); // user_id is teacher_email here
 
         $log->info("getTeacherPublications: Found " . count($teachers) . " teachers - " . json_encode([
             'form_id' => $formId,
@@ -370,29 +453,28 @@ class StudentAdmissionFormModel extends Model
         // Step 1: Get ALL emails for ALL teachers
         $allUserEmails = [];
         foreach ($userIds as $userId) {
-            // Get primary email from user table
-            $user = $db->table('user')
-                ->select('email')
-                ->where('uid', $userId)
-                ->get()
-                ->getRowArray();
-
-            if (!empty($user['email'])) {
-                $allUserEmails[] = $user['email'];
+            if (!empty($userId)) {
+                $email = strtolower(trim($userId));
+                if (!in_array($email, $allUserEmails)) {
+                    $allUserEmails[] = $email;
+                }
             }
 
             // Get all emails from authors table for this user
             $authorEmails = $db->table('authors')
                 ->select('email')
-                ->where('user_uid', $userId)
+                ->where('user_email', $userId)
                 ->where('email IS NOT NULL')
                 ->where('email !=', '')
                 ->get()
                 ->getResultArray();
 
             foreach ($authorEmails as $authorEmail) {
-                if (!empty($authorEmail['email']) && !in_array($authorEmail['email'], $allUserEmails)) {
-                    $allUserEmails[] = $authorEmail['email'];
+                if (!empty($authorEmail['email'])) {
+                    $email = strtolower(trim($authorEmail['email']));
+                    if (!in_array($email, $allUserEmails)) {
+                        $allUserEmails[] = $email;
+                    }
                 }
             }
         }
@@ -405,27 +487,22 @@ class StudentAdmissionFormModel extends Model
 
         // Step 2: Get distinct publication IDs where teachers are authors
         // PRIMARY: Match author_email with ALL user emails
-        // SECONDARY: Match by UID (pa.uid or authors.user_uid)
         $builder = $db->table('publication_authors pa');
         $builder->select('pa.publication_id')
             ->distinct()
             ->join('authors a', 'pa.author_id = a.id', 'left')
-            ->join('user u', 'pa.uid = u.uid', 'left');
+            ->join('user u', 'pa.author_email = u.email', 'left');
 
         if (!empty($allUserEmails)) {
             $builder->groupStart()
                 ->whereIn('pa.author_email', $allUserEmails)  // PRIMARY: author_email from publication_authors
                 ->orWhereIn('a.email', $allUserEmails)         // Also check authors.email
                 ->orWhereIn('u.email', $allUserEmails)          // Also check user.email from joined user
-                // SECONDARY: Also include UID match as fallback
-                ->orWhereIn('pa.uid', $userIds)
-                ->orWhereIn('a.user_uid', $userIds)
+                ->orWhereIn('a.user_email', $userIds)
                 ->groupEnd();
         } else {
-            // Fallback: If no emails found, search by UID only
             $builder->groupStart()
-                ->whereIn('pa.uid', $userIds)
-                ->orWhereIn('a.user_uid', $userIds)
+                ->whereIn('a.user_email', $userIds)
                 ->groupEnd();
         }
 
@@ -452,8 +529,6 @@ class StudentAdmissionFormModel extends Model
         }
 
         // Step 3: Get publications from publication_view
-        // publication_view already has aggregated author data, so we query it directly
-        // Use SELECT * to avoid field name issues, then filter what we need
         $publications = $db->table('publication_view')
             ->select('*')
             ->whereIn('id', $allIds)
@@ -470,28 +545,24 @@ class StudentAdmissionFormModel extends Model
                     'id' => $p['id'] ?? null,
                     'title' => substr($p['title'] ?? '', 0, 50) . '...',
                     'year' => $p['publication_year'] ?? null,
-                    'created_by' => $p['created_by'] ?? null
+                    'created_by_email' => $p['created_by_email'] ?? null
                 ];
             }, $publications)
         ], JSON_UNESCAPED_UNICODE));
 
         // Step 4: Map publications to teachers using EMAIL ONLY
-        // Create email-to-teacher mapping (one-time lookup)
         $emailToTeacherMap = [];
         foreach ($userIds as $teacherId) {
-            // Get all emails for this teacher
             $teacherEmails = [];
-
-            // Get email from user table
-            $user = $db->table('user')->select('email')->where('uid', $teacherId)->get()->getRowArray();
-            if (!empty($user['email'])) {
-                $email = strtolower(trim($user['email']));
+            
+            if (!empty($teacherId)) {
+                $email = strtolower(trim($teacherId));
                 $teacherEmails[] = $email;
                 $emailToTeacherMap[$email] = $teacherId;
             }
 
             // Get emails from authors table
-            $authorEmails = $db->table('authors')->select('email')->where('user_uid', $teacherId)->get()->getResultArray();
+            $authorEmails = $db->table('authors')->select('email')->where('user_email', $teacherId)->get()->getResultArray();
             foreach ($authorEmails as $ae) {
                 if (!empty($ae['email'])) {
                     $email = strtolower(trim($ae['email']));
@@ -520,12 +591,6 @@ class StudentAdmissionFormModel extends Model
                 ->get()
                 ->getResultArray();
 
-            $log->info("getTeacherPublications: All author emails from publication_authors - " . json_encode([
-                'form_id' => $formId,
-                'author_data_count' => count($authorData),
-                'author_data_sample' => array_slice($authorData, 0, 10)
-            ], JSON_UNESCAPED_UNICODE));
-
             // Build publication author map using EMAIL ONLY
             foreach ($authorData as $author) {
                 $pubId = $author['publication_id'];
@@ -550,10 +615,7 @@ class StudentAdmissionFormModel extends Model
 
             $log->info("getTeacherPublications: Created author mapping - " . json_encode([
                 'form_id' => $formId,
-                'mapped_publications' => count($publicationAuthorMap),
-                'mapping_details' => array_map(function ($pubId, $uids) {
-                    return ['publication_id' => $pubId, 'author_uids' => $uids];
-                }, array_keys($publicationAuthorMap), array_values($publicationAuthorMap))
+                'mapped_publications' => count($publicationAuthorMap)
             ], JSON_UNESCAPED_UNICODE));
         }
 
@@ -565,12 +627,10 @@ class StudentAdmissionFormModel extends Model
             $pubId = $pub['id'];
             $pubAuthorUids = $publicationAuthorMap[$pubId] ?? [];
 
-            // Check if any teacher is an author (via email match ONLY)
             $matchedTeacherIds = [];
             $matchReasons = [];
             foreach ($userIds as $teacherId) {
                 $isAuthor = in_array($teacherId, $pubAuthorUids);
-                // Note: We only match by email, not by created_by
 
                 if ($isAuthor) {
                     $matchedTeacherIds[] = $teacherId;
@@ -578,7 +638,7 @@ class StudentAdmissionFormModel extends Model
                         'is_author' => true,
                         'match_by_email' => true,
                         'pub_author_uids' => $pubAuthorUids,
-                        'pub_created_by' => $pub['created_by']
+                        'pub_created_by_email' => $pub['created_by_email'] ?? null
                     ];
                 }
             }
@@ -587,25 +647,17 @@ class StudentAdmissionFormModel extends Model
                 'publication_id' => $pubId,
                 'title' => substr($pub['title'] ?? '', 0, 50),
                 'matched_teachers' => $matchedTeacherIds,
-                'match_reasons' => $matchReasons,
-                'pub_author_uids' => $pubAuthorUids,
-                'pub_created_by' => $pub['created_by']
+                'pub_author_uids' => $pubAuthorUids
             ];
 
-            // Create a result entry for each matched teacher
             if (!empty($matchedTeacherIds)) {
                 foreach ($matchedTeacherIds as $teacherId) {
-                    // Get author name from publication_authors for this specific teacher
                     $authorName = null;
                     $authorNameTh = null;
 
-                    // Get teacher's emails for matching
                     $teacherEmails = [];
-                    $user = $db->table('user')->select('email')->where('uid', $teacherId)->get()->getRowArray();
-                    if (!empty($user['email'])) {
-                        $teacherEmails[] = strtolower(trim($user['email']));
-                    }
-                    $authorEmails = $db->table('authors')->select('email')->where('user_uid', $teacherId)->get()->getResultArray();
+                    $teacherEmails[] = strtolower(trim($teacherId));
+                    $authorEmails = $db->table('authors')->select('email')->where('user_email', $teacherId)->get()->getResultArray();
                     foreach ($authorEmails as $ae) {
                         if (!empty($ae['email'])) {
                             $email = strtolower(trim($ae['email']));
@@ -615,12 +667,11 @@ class StudentAdmissionFormModel extends Model
                         }
                     }
 
-                    // Find author name from publication_authors by email match
                     if (!empty($teacherEmails)) {
                         $authorData = $db->table('publication_authors pa')
-                            ->select('pa.author_name, pa.author_email, a.user_uid, u.thai_name, u.thai_lastname, u.titleThai')
+                            ->select('pa.author_name, pa.author_email, a.user_email, u.thai_name, u.thai_lastname, u.titleThai')
                             ->join('authors a', 'pa.author_id = a.id', 'left')
-                            ->join('user u', 'a.user_uid = u.uid', 'left')
+                            ->join('user u', 'a.user_email = u.email', 'left')
                             ->where('pa.publication_id', $pubId)
                             ->whereIn('LOWER(TRIM(pa.author_email))', array_map('strtolower', $teacherEmails))
                             ->orderBy('pa.author_order', 'ASC')
@@ -629,7 +680,6 @@ class StudentAdmissionFormModel extends Model
                             ->getRowArray();
 
                         if ($authorData) {
-                            // Use user's Thai name if available, otherwise use author_name
                             if (!empty($authorData['thai_name']) && !empty($authorData['thai_lastname'])) {
                                 $title = !empty($authorData['titleThai']) ? $authorData['titleThai'] . ' ' : '';
                                 $authorNameTh = $title . $authorData['thai_name'] . ' ' . $authorData['thai_lastname'];
@@ -640,7 +690,6 @@ class StudentAdmissionFormModel extends Model
                         }
                     }
 
-                    // Fallback to first author from authors_names_thai if not found
                     if (empty($authorNameTh)) {
                         $allAuthors = $pub['authors_names_thai'] ?? $pub['authors_names_th'] ?? '';
                         if (!empty($allAuthors)) {
@@ -660,20 +709,18 @@ class StudentAdmissionFormModel extends Model
                         'abstract' => $pub['abstract'] ?? null,
                         'authors_names_th' => $pub['authors_names_thai'] ?? $pub['authors_names_th'] ?? '',
                         'authors_names_en' => $pub['authors_names_en'] ?? '',
-                        'author_name_th' => $authorNameTh ?? '-',  // Individual author name for this teacher
-                        'author_name' => $authorName ?? '-',      // Individual author name (English/fallback)
+                        'author_name_th' => $authorNameTh ?? '-',
+                        'author_name' => $authorName ?? '-',
                         'approve' => $pub['approve'] ?? null,
-                        'author_uid' => $teacherId,  // Set to matched teacher ID
-                        'user_id' => $teacherId,     // Also include for backward compatibility
+                        'author_uid' => $teacherId,
+                        'user_id' => $teacherId,
                     ];
-                    // Count publications per teacher
                     if (!isset($teacherPublicationCount[$teacherId])) {
                         $teacherPublicationCount[$teacherId] = 0;
                     }
                     $teacherPublicationCount[$teacherId]++;
                 }
             }
-            // Note: We only match by email, not by created_by
         }
 
         $log->info("getTeacherPublications: Matching details - " . json_encode([
@@ -685,7 +732,7 @@ class StudentAdmissionFormModel extends Model
             'form_id' => $formId,
             'total_result_count' => count($result),
             'publications_per_teacher' => $teacherPublicationCount,
-            'result_sample' => array_slice($result, 0, 5, true), // First 5 results as sample
+            'result_sample' => array_slice($result, 0, 5, true),
             'all_result_ids' => array_map(function ($r) {
                 return [
                     'id' => $r['id'] ?? null,

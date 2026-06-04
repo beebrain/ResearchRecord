@@ -3259,13 +3259,26 @@ class AdminController extends Controller
         // Get statistics
         $stats = $admissionModel->getStatistics($selectedFaculty ? [$selectedFaculty] : null, $selectedYear);
 
+        // Determine role for status management
+        $userRole = 'teacher'; // default
+        if ($this->session->get('god_mode') === true || RoleHelper::isSuperAdmin($user)) {
+            $userRole = 'superadmin';
+        } elseif (RoleHelper::isFacultyAdmin($user)) {
+            $userRole = 'faculty_admin';
+        } elseif (RoleHelper::isDean($user)) {
+            $userRole = 'dean';
+        } elseif (RoleHelper::isChair($user)) {
+            $userRole = 'chair';
+        }
+
         return view('admin/admission/index', [
             'forms' => $forms,
             'years' => $years,
             'selectedYear' => $selectedYear,
             'faculties' => $faculties,
             'selectedFaculty' => $selectedFaculty,
-            'stats' => $stats
+            'stats' => $stats,
+            'userRole' => $userRole
         ]);
     }
 
@@ -3435,6 +3448,19 @@ class AdminController extends Controller
             // Update form data
             $userData = $this->session->get('user_data');
             $input['updated_by_email'] = UserIdentity::sessionEmail() ?: ($userData['email'] ?? null);
+
+            // Clean empty date values to NULL before update
+            $dateFields = ['ministry_approval_date', 'university_approval_date', 'curriculum_head_approval_date', 'dean_approval_date'];
+            foreach ($dateFields as $field) {
+                if (isset($input[$field]) && (trim($input[$field]) === '' || $input[$field] === 'null')) {
+                    $input[$field] = null;
+                }
+            }
+
+            // Set dean_approval_date if status is changing to approved
+            if (isset($input['status']) && $input['status'] === 'approved') {
+                $input['dean_approval_date'] = date('Y-m-d');
+            }
 
             // Remove teachers data to save separately
             $teachers = $input['teachers'] ?? [];
