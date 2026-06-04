@@ -56,7 +56,8 @@ class PublicationReturnNavigation
             return $normalized;
         }
 
-        return '/publications/create';
+        // login ผ่าน RR ปกติ (ไม่มี entry_redirect เจาะจง) → เข้า dashboard ก่อน
+        return '/dashboard';
     }
 
     public static function redirectAfterSave(string $successMessage = 'บันทึกผลงานสำเร็จ'): RedirectResponse
