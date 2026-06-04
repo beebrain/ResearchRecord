@@ -85,8 +85,13 @@
             </div>
             <div class="shrink-0">
                 <a href="<?= site_url('auth/login') ?>"
-                    class="inline-flex items-center gap-2 rounded-xl bg-slate-900 text-white px-4 py-2 text-sm font-medium hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 active:translate-y-[1px] transition-transform">
-                    เข้าสู่ระบบ
+                    class="group inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(79,70,229,0.15)] hover:bg-indigo-700 hover:shadow-[0_6px_20px_rgba(79,70,229,0.25)] hover:-translate-y-[1px] active:translate-y-[1px] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-200">
+                    <span>เข้าสู่ระบบ</span>
+                    <svg class="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                        <polyline points="10 17 15 12 10 7" />
+                        <line x1="15" y1="12" x2="3" y2="12" />
+                    </svg>
                 </a>
             </div>
         </div>
