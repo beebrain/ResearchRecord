@@ -778,9 +778,50 @@ function generateAdmissionFormPDF(formData, useThaiFont = false) {
         }
     }
     
+    // Per-branch qualifications when หลักสูตรมีวิชาเอก/แขนง
+    let branchMajors = [];
+    if (form.majors_detail) {
+        try {
+            branchMajors = typeof form.majors_detail === 'string' ? JSON.parse(form.majors_detail) : form.majors_detail;
+            if (!Array.isArray(branchMajors)) branchMajors = [];
+        } catch (e) {
+            branchMajors = [];
+        }
+    }
+    const useBranchQuals = String(form.has_major_minor) === '1' && branchMajors.length > 0;
+
+    if (useBranchQuals) {
+        branchMajors.forEach((m, idx) => {
+            content.push({
+                text: `${idx + 1}. ${m.major_name || '-'}`,
+                fontSize: 14,
+                bold: true,
+                margin: [30, 0, 0, 5]
+            });
+            const quals = Array.isArray(m.qualifications) ? m.qualifications.filter(q => q && String(q).trim()) : [];
+            if (quals.length > 0) {
+                quals.forEach((qual, i) => {
+                    content.push({
+                        text: `${i + 1}. ${qual}`,
+                        fontSize: 14,
+                        margin: [40, 0, 0, 3]
+                    });
+                });
+            } else {
+                content.push({
+                    text: 'ไม่ได้ระบุ',
+                    fontSize: 14,
+                    margin: [40, 0, 0, 3],
+                    color: '#999999'
+                });
+            }
+            content.push({ text: '', margin: [0, 0, 0, 8] });
+        });
+    } else {
+
     // Display qualifications - show based on selected target groups
     let hasAnyQualification = false;
-    
+
     // มัธยมศึกษาตอนปลาย
     if (targetHighschool === 1 || highschoolQuals.length > 0) {
         hasAnyQualification = true;
@@ -848,7 +889,9 @@ function generateAdmissionFormPDF(formData, useThaiFont = false) {
             color: '#999999'
         });
     }
-    
+
+    } // end else (global qualifications)
+
     content.push({ text: '', margin: [0, 0, 0, 15] });
     
     // Section 8: Current Student Count

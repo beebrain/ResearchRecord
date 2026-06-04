@@ -48,6 +48,7 @@ class StudentAdmissionFormModel extends Model
         'studying_count3',
         'has_major_minor',
         'major_count',
+        'majors_detail',
         'admission_plan_count',
         'target_highschool',
         'target_highschool_count',

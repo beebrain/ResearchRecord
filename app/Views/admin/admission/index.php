@@ -946,7 +946,15 @@
                     <!-- Section 7: Qualifications with Add/Remove -->
                     <div class="mb-6">
                         <h3 class="text-lg font-semibold text-blue-600 border-b-2 border-blue-500 pb-2 mb-4">๗. คุณสมบัติของผู้เรียน</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                        <!-- Per-branch qualifications (shown when หลักสูตรมีวิชาเอก/แขนง) -->
+                        <div id="qual-branch-section" style="display:none">
+                            <p class="text-sm text-gray-500 mb-3">กำหนดคุณสมบัติผู้เรียนแยกตามวิชาเอก/แขนงที่เพิ่มในข้อ ๖</p>
+                            <div id="qual-branch-list"></div>
+                        </div>
+
+                        <!-- Global qualifications (shown when หลักสูตรไม่มีวิชาเอก/แขนง) -->
+                        <div id="qual-global-section" class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <!-- Highschool Qualifications -->
                             <div class="p-4 bg-blue-50 rounded-lg">
                                 <div class="flex justify-between items-center mb-3">
@@ -1270,6 +1278,8 @@
             // Load majors data after form is rendered
             toggleMajorSectionModal();
             loadMajorsDataModal(form);
+            // Build per-branch qualification cards from saved majors_detail (Section 7)
+            initBranchQualifications(form);
 
             // Build dynamic footer buttons based on status and userRole
             let footerHtml = `<button onclick="closeModal()" class="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg">ยกเลิก</button>`;
@@ -1364,6 +1374,7 @@
             if (hasMajor && $('#majors-list-modal .major-item').length === 0) {
                 addMajorModal();
             }
+            syncBranchQualifications();
         }
 
         function addMajorModal() {
@@ -1372,7 +1383,7 @@
             const html = `
                 <div class="major-item flex gap-2 items-center">
                     <span class="text-gray-500">${index + 1}.</span>
-                    <input type="text" class="major-name flex-1 px-3 py-2 border rounded" placeholder="ชื่อวิชาเอก">
+                    <input type="text" class="major-name flex-1 px-3 py-2 border rounded" placeholder="ชื่อวิชาเอก" oninput="updateBranchLabels()">
                     <span class="text-gray-600">จำนวน</span>
                     <input type="number" class="major-count w-20 px-3 py-2 border rounded" placeholder="0">
                     <span class="text-gray-600">คน</span>
@@ -1380,6 +1391,7 @@
                 </div>
             `;
             list.append(html);
+            syncBranchQualifications();
         }
 
         function removeMajorModal(btn) {
@@ -1387,6 +1399,7 @@
             if (list.find('.major-item').length > 1) {
                 $(btn).closest('.major-item').remove();
                 updateMajorNumbersModal();
+                syncBranchQualifications();
             } else {
                 Swal.fire('แจ้งเตือน', 'ต้องมีอย่างน้อย 1 วิชาเอก', 'warning');
             }
@@ -1417,7 +1430,7 @@
                     const html = `
                         <div class="major-item flex gap-2 items-center">
                             <span class="text-gray-500">${index + 1}.</span>
-                            <input type="text" class="major-name flex-1 px-3 py-2 border rounded" placeholder="ชื่อวิชาเอก" value="${major.major_name || ''}">
+                            <input type="text" class="major-name flex-1 px-3 py-2 border rounded" placeholder="ชื่อวิชาเอก" value="${escapeHtml(major.major_name || '')}" oninput="updateBranchLabels()">
                             <span class="text-gray-600">จำนวน</span>
                             <input type="number" class="major-count w-20 px-3 py-2 border rounded" placeholder="0" value="${major.admission_count || ''}">
                             <span class="text-gray-600">คน</span>
@@ -1444,6 +1457,101 @@
                 if (val) items.push(val);
             });
             return items;
+        }
+
+        // ===== Per-branch qualifications (Section 7 when หลักสูตรมีวิชาเอก/แขนง) =====
+
+        function branchQualRowHtml(value, idx) {
+            return `
+                <div class="flex gap-2 branch-qual-item">
+                    <span class="text-gray-500 mt-2 text-sm">${idx + 1}.</span>
+                    <input type="text" class="flex-1 px-3 py-2 border rounded-lg branch-qual-input text-sm" value="${escapeHtml(value || '')}" placeholder="ระบุคุณสมบัติ">
+                    <button type="button" onclick="removeBranchQual(this)" class="px-2 py-1 text-red-600 hover:bg-red-50 rounded">🗑️</button>
+                </div>`;
+        }
+
+        // อ่านคุณสมบัติรายแขนงจาก DOM ปัจจุบัน (เรียงตามลำดับการ์ด) เพื่อกันข้อมูลหายตอน rebuild
+        function readBranchQualsFromDOM() {
+            const result = [];
+            $('#qual-branch-list .branch-qual-card').each(function() {
+                const quals = [];
+                $(this).find('.branch-qual-input').each(function() {
+                    const v = $(this).val().trim();
+                    if (v) quals.push(v);
+                });
+                result.push(quals);
+            });
+            return result;
+        }
+
+        // สร้างการ์ดคุณสมบัติรายแขนงใหม่จากรายการวิชาเอกในข้อ ๖ (รักษาค่าที่พิมพ์ไว้ตาม index)
+        function syncBranchQualifications(initialQualsByIndex) {
+            const hasMajor = $('input[name="has_major_minor"]:checked').val() === '1';
+            $('#qual-global-section').toggle(!hasMajor);
+            $('#qual-branch-section').toggle(hasMajor);
+            if (!hasMajor) return;
+
+            const existing = initialQualsByIndex || readBranchQualsFromDOM();
+            const list = $('#qual-branch-list');
+            list.empty();
+
+            const majorItems = $('#majors-list-modal .major-item');
+            if (majorItems.length === 0) {
+                list.html('<p class="text-gray-500 text-sm">เพิ่มวิชาเอก/แขนงในข้อ ๖ ก่อน เพื่อกำหนดคุณสมบัติรายแขนง</p>');
+                return;
+            }
+
+            majorItems.each(function(index) {
+                const name = $(this).find('.major-name').val().trim() || `แขนงที่ ${index + 1}`;
+                const quals = (existing[index] && existing[index].length) ? existing[index] : [''];
+                const rows = quals.map((q, qi) => branchQualRowHtml(q, qi)).join('');
+                list.append(`
+                    <div class="branch-qual-card p-3 mb-3 bg-blue-50 border border-blue-200 rounded-lg" data-branch-index="${index}">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="font-medium text-blue-700 branch-label">${index + 1}. ${escapeHtml(name)}</span>
+                            <button type="button" onclick="addBranchQual(this)" class="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700">+ เพิ่มคุณสมบัติ</button>
+                        </div>
+                        <div class="branch-qual-list space-y-2">${rows}</div>
+                    </div>`);
+            });
+        }
+
+        // อัปเดตเฉพาะชื่อหัวการ์ด (ไม่ rebuild ทั้งหมด เพื่อไม่ให้ focus หลุดตอนพิมพ์)
+        function updateBranchLabels() {
+            if (!$('#qual-branch-section').is(':visible')) return;
+            $('#majors-list-modal .major-item').each(function(index) {
+                const name = $(this).find('.major-name').val().trim() || `แขนงที่ ${index + 1}`;
+                $(`#qual-branch-list .branch-qual-card[data-branch-index="${index}"] .branch-label`).text(`${index + 1}. ${name}`);
+            });
+        }
+
+        function addBranchQual(btn) {
+            const listEl = $(btn).closest('.branch-qual-card').find('.branch-qual-list');
+            listEl.append(branchQualRowHtml('', listEl.find('.branch-qual-item').length));
+        }
+
+        function removeBranchQual(btn) {
+            const item = $(btn).closest('.branch-qual-item');
+            const listEl = item.parent();
+            if (listEl.find('.branch-qual-item').length > 1) {
+                item.remove();
+            } else {
+                item.find('input').val('');
+            }
+            listEl.find('.branch-qual-item > span').each(function(i) { $(this).text((i + 1) + '.'); });
+        }
+
+        // เรียกหลังโหลดวิชาเอกเสร็จ: สร้างการ์ดรายแขนงจาก majors_detail.qualifications
+        function initBranchQualifications(form) {
+            let majors = [];
+            try {
+                majors = form.majors_detail
+                    ? (typeof form.majors_detail === 'string' ? JSON.parse(form.majors_detail) : form.majors_detail)
+                    : [];
+            } catch (e) { majors = []; }
+            if (!Array.isArray(majors)) majors = [];
+            const qualsByIndex = majors.map(m => (Array.isArray(m.qualifications) ? m.qualifications : []));
+            syncBranchQualifications(qualsByIndex);
         }
 
         let viewFormId = null;
@@ -1649,15 +1757,32 @@
                 section5Html += `<p class="mt-3 text-sm text-gray-500">รวมทั้งหมด ${publications.length} ผลงาน</p>`;
             }
 
+            // Parse majors detail (วิชาเอก/แขนง + คุณสมบัติรายแขนง)
+            let viewMajors = [];
+            try {
+                viewMajors = form.majors_detail
+                    ? (typeof form.majors_detail === 'string' ? JSON.parse(form.majors_detail) : form.majors_detail)
+                    : [];
+            } catch (e) { viewMajors = []; }
+            if (!Array.isArray(viewMajors)) viewMajors = [];
+            const hasMajorMinor = String(form.has_major_minor) === '1' && viewMajors.length > 0;
+
             // Build Section 6: Target Groups
             let section6Html = '';
+            if (hasMajorMinor) {
+                section6Html += '<p class="font-medium text-gray-700 mb-1">วิชาเอก/แขนง:</p>';
+                section6Html += viewMajors.map((m, i) =>
+                    `<p class="text-sm">${i+1}. ${escapeHtml(m.major_name || '-')} — รับ ${m.admission_count || 0} คน</p>`
+                ).join('');
+                section6Html += '<div class="mt-2"></div>';
+            }
             if (form.target_highschool) {
                 section6Html += `<p>✅ มัธยมศึกษาตอนปลาย: ${form.target_highschool_count || '-'} คน</p>`;
             }
             if (form.target_diploma) {
                 section6Html += `<p>✅ ปวส./อนุปริญญา: ${form.target_diploma_count || '-'} คน</p>`;
             }
-            if (!form.target_highschool && !form.target_diploma) {
+            if (!hasMajorMinor && !form.target_highschool && !form.target_diploma) {
                 section6Html = '<p class="text-gray-500">ไม่ได้ระบุ</p>';
             }
 
@@ -1668,6 +1793,32 @@
             let qualDiplomaHtml = qualDiploma.length > 0 ?
                 qualDiploma.map((q, i) => `<p class="text-sm">${i+1}. ${q}</p>`).join('') :
                 '<p class="text-gray-500 text-sm">ไม่ได้ระบุ</p>';
+
+            // Section 7 body: per-branch (when มีวิชาเอก/แขนง) or global มัธยม/ปวส.
+            let section7Html;
+            if (hasMajorMinor) {
+                section7Html = viewMajors.map((m, i) => {
+                    const quals = Array.isArray(m.qualifications) ? m.qualifications.filter(q => q && q.trim()) : [];
+                    const qualsHtml = quals.length > 0
+                        ? quals.map((q, qi) => `<p class="text-sm ml-3">${qi+1}. ${escapeHtml(q)}</p>`).join('')
+                        : '<p class="text-gray-500 text-sm ml-3">ไม่ได้ระบุ</p>';
+                    return `<div class="mb-3">
+                        <p class="font-medium text-blue-700 mb-1">${i+1}. ${escapeHtml(m.major_name || '-')}</p>
+                        ${qualsHtml}
+                    </div>`;
+                }).join('');
+            } else {
+                section7Html = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <p class="font-medium text-blue-700 mb-1">มัธยม:</p>
+                        ${qualHighschoolHtml}
+                    </div>
+                    <div>
+                        <p class="font-medium text-purple-700 mb-1">ปวส.:</p>
+                        ${qualDiplomaHtml}
+                    </div>
+                </div>`;
+            }
 
             let html = `
                 <div class="space-y-6">
@@ -1811,16 +1962,7 @@
                     <!-- Section 7: Qualifications -->
                     <div class="border-l-4 border-blue-500 pl-4">
                         <h3 class="text-lg font-semibold text-blue-600 mb-2">๗. คุณสมบัติของผู้เรียน</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <p class="font-medium text-blue-700 mb-1">มัธยม:</p>
-                                ${qualHighschoolHtml}
-                            </div>
-                            <div>
-                                <p class="font-medium text-purple-700 mb-1">ปวส.:</p>
-                                ${qualDiplomaHtml}
-                            </div>
-                        </div>
+                        ${section7Html}
                     </div>
 
                     <!-- Section 8: Current Students -->
@@ -1984,15 +2126,21 @@
             data.qualification_highschool = JSON.stringify(getQualificationsArray('highschool'));
             data.qualification_diploma = JSON.stringify(getQualificationsArray('diploma'));
 
-            // Handle majors detail - convert array to JSON
+            // Handle majors detail - convert array to JSON (รวมคุณสมบัติรายแขนงจากข้อ ๗)
             const majors = [];
-            $('#majors-list-modal .major-item').each(function() {
+            $('#majors-list-modal .major-item').each(function(index) {
                 const majorName = $(this).find('.major-name').val().trim();
                 const admissionCount = $(this).find('.major-count').val();
                 if (majorName) {
+                    const quals = [];
+                    $(`#qual-branch-list .branch-qual-card[data-branch-index="${index}"] .branch-qual-input`).each(function() {
+                        const v = $(this).val().trim();
+                        if (v) quals.push(v);
+                    });
                     majors.push({
                         major_name: majorName,
-                        admission_count: admissionCount ? parseInt(admissionCount) : 0
+                        admission_count: admissionCount ? parseInt(admissionCount) : 0,
+                        qualifications: quals
                     });
                 }
             });
