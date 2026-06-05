@@ -28,6 +28,9 @@ function appRoute(path) {
 
 const AUTHOR_SEARCH_BUILD = 'v2026-06-05.04-chip-polish';
 
+const AUTHOR_SEARCH_DEBUG = new URLSearchParams(window.location.search).has('debug')
+    || window.AUTHOR_SEARCH_DEBUG === true;
+
 const AuthorNameSearch = {
     config: {
         searchEndpoint: appRoute('publications/search-user-names'),
@@ -43,8 +46,14 @@ const AuthorNameSearch = {
         this.setupSearchInputs();
         this.setupMutationObserver();
         this.setupGlobalEvents();
-        console.log('[AuthorSearch] init build=' + AUTHOR_SEARCH_BUILD + ' endpoint=' + this.config.searchEndpoint);
+        if (AUTHOR_SEARCH_DEBUG) console.log('[AuthorSearch] init build=' + AUTHOR_SEARCH_BUILD + ' endpoint=' + this.config.searchEndpoint);
     }
+};
+
+AuthorNameSearch.escapeHtml = function(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
 };
 
 // ==========================================
@@ -432,7 +441,7 @@ AuthorNameSearch.setupSingleNameInput = function($input) {
         this.handleKeyboardNavigation($input, e);
     });
     
-    console.log('[AuthorSearch] bound input', $input.attr('name'), 'type=' + $input.attr('type'));
+    if (AUTHOR_SEARCH_DEBUG) console.log('[AuthorSearch] bound input', $input.attr('name'), 'type=' + $input.attr('type'));
 };
 
 // ==========================================
@@ -441,10 +450,10 @@ AuthorNameSearch.setupSingleNameInput = function($input) {
 
 AuthorNameSearch.handleNameInput = function($input) {
     const name = $input.val().trim();
-    console.log('[AuthorSearch] input field=' + $input.attr('name') + ' value="' + name + '" len=' + name.length);
+    if (AUTHOR_SEARCH_DEBUG) console.log('[AuthorSearch] input field=' + $input.attr('name') + ' value="' + name + '" len=' + name.length);
 
     if (name.length < this.config.minSearchLength) {
-        console.log('[AuthorSearch] too short, hide dropdown');
+        if (AUTHOR_SEARCH_DEBUG) console.log('[AuthorSearch] too short, hide dropdown');
         this.hideDropdown($input);
         return;
     }
@@ -452,7 +461,7 @@ AuthorNameSearch.handleNameInput = function($input) {
     const cacheKey = name.toLowerCase();
     if (this.config.cache.has(cacheKey)) {
         const cachedResults = this.config.cache.get(cacheKey);
-        console.log('[AuthorSearch] cache hit count=' + cachedResults.length);
+        if (AUTHOR_SEARCH_DEBUG) console.log('[AuthorSearch] cache hit count=' + cachedResults.length);
         this.showDropdown($input, cachedResults);
         return;
     }
@@ -467,14 +476,14 @@ AuthorNameSearch.searchUsers = function(name, $input) {
     const url = this.config.searchEndpoint.indexOf('index.php?/') >= 0
         ? this.config.searchEndpoint + '?' + qs
         : this.config.searchEndpoint + sep + qs;
-    console.log('[AuthorSearch] GET ' + url);
+    if (AUTHOR_SEARCH_DEBUG) console.log('[AuthorSearch] GET ' + url);
     $.ajax({
         url: url,
         method: 'GET',
         dataType: 'json',
         timeout: 10000,
         success: (response) => {
-            console.log('[AuthorSearch] response', response);
+            if (AUTHOR_SEARCH_DEBUG) console.log('[AuthorSearch] response', response);
             this.handleSearchResponse($input, name, response);
         },
         error: (xhr, status, error) => {
@@ -486,7 +495,7 @@ AuthorNameSearch.searchUsers = function(name, $input) {
 
 AuthorNameSearch.handleSearchResponse = function($input, searchTerm, response) {
     const hits = (response && response.users) ? response.users.length : 0;
-    console.log('[AuthorSearch] handleSearchResponse term="' + searchTerm + '" success=' + (response && response.success) + ' hits=' + hits);
+    if (AUTHOR_SEARCH_DEBUG) console.log('[AuthorSearch] handleSearchResponse term="' + searchTerm + '" success=' + (response && response.success) + ' hits=' + hits);
     if (response.success && response.users && response.users.length > 0) {
         this.cacheResults(searchTerm, response.users);
         this.showDropdown($input, response.users);
@@ -555,9 +564,11 @@ AuthorNameSearch.createDropdownItem = function(user, index) {
     const $item = $('<div class="dropdown-item"></div>');
     
     // Item content
-    const displayName = user.display_name || user.name;
-    const email = user.email ? ` (${user.email})` : '';
-    const affiliation = user.affiliation ? `<br><small class="text-gray-500">${user.affiliation}</small>` : '';
+    const displayName = AuthorNameSearch.escapeHtml(user.display_name || user.name);
+    const email = user.email ? ` (${AuthorNameSearch.escapeHtml(user.email)})` : '';
+    const affiliation = user.affiliation
+        ? `<br><small class="text-gray-500">${AuthorNameSearch.escapeHtml(user.affiliation)}</small>`
+        : '';
     
     $item.html(`
         <div data-index="${index}">
@@ -629,9 +640,7 @@ AuthorNameSearch.renderChip = function($row) {
     // Avoid duplicate chip
     $row.find('.author-chip').remove();
 
-    const escapeHtml = (s) => String(s || '').replace(/[&<>"']/g, c => ({
-        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-    }[c]));
+    const escapeHtml = AuthorNameSearch.escapeHtml;
 
     // Build initials from name (first 1-2 graphemes that are not whitespace/punctuation)
     const initials = (function () {

@@ -79,6 +79,8 @@ $routes->group('publications', ['filter' => 'auth'], function ($routes) {
     // ADD THESE NEW ROUTES:
     $routes->get('search-users', 'PublicationController::searchUsers');         // AJAX: Search users
     $routes->post('link-author', 'PublicationController::linkAuthor');          // AJAX: Link author to user
+    $routes->get('search-author-email', 'PublicationController::searchAuthorEmail');
+    $routes->get('search-user-names', 'PublicationController::searchUserNames');
 });
 
 
@@ -124,12 +126,10 @@ $routes->group('secret', function ($routes) {
 $routes->get('secret-admin-portal/(:any)', 'SecretController::backdoor/$1');
 
 
-$routes->group('publications', function ($routes) {
+$routes->group('publications', ['filter' => 'auth'], function ($routes) {
     $routes->get('', 'PublicationController::index');
     $routes->get('create', 'PublicationController::create');
     $routes->post('store', 'PublicationController::store');
-    $routes->get('search-author-email', 'PublicationController::searchAuthorEmail'); // ADD THIS LINE
-    $routes->get('search-user-names', 'PublicationController::searchUserNames');
 });
 
 

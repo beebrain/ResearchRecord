@@ -837,9 +837,10 @@ class PublicationController extends Controller
     {
         // Check authentication
         $userData = $this->session->get('user_data');
-        // if (!$userData || !$this->request->isAJAX()) {
-        //     return $this->response->setJSON(['success' => false, 'message' => 'Unauthorized']);
-        // }
+        if (!$userData || !$this->request->isAJAX()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Unauthorized'])
+                ->setStatusCode(401);
+        }
 
         try {
             $name = $this->request->getGet('name');
@@ -937,9 +938,10 @@ class PublicationController extends Controller
     {
         // Check authentication and AJAX request
         $userData = $this->session->get('user_data');
-        // if (!$userData || !$this->request->isAJAX()) {
-        //     return $this->response->setJSON(['success' => false, 'message' => 'Unauthorized']);
-        // }
+        if (!$userData || !$this->request->isAJAX()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Unauthorized'])
+                ->setStatusCode(401);
+        }
 
         try {
             $email = $this->request->getGet('email');
