@@ -26,7 +26,7 @@ function appRoute(path) {
     return `${base}/index.php?/${path.replace(/^\//, '')}`;
 }
 
-const AUTHOR_SEARCH_BUILD = 'v2026-06-05.03-chip+silent';
+const AUTHOR_SEARCH_BUILD = 'v2026-06-05.04-chip-polish';
 
 const AuthorNameSearch = {
     config: {
@@ -189,58 +189,137 @@ AuthorNameSearch.injectCriticalCSS = function() {
         }
 
         .author-chip {
+            position: relative;
             display: flex;
             align-items: flex-start;
             justify-content: space-between;
-            gap: 0.75rem;
-            padding: 0.75rem 1rem;
-            background: linear-gradient(to right, #ecfdf5, #f0fdf4);
-            border: 1px solid #10b981;
-            border-radius: 0.5rem;
-            box-shadow: 0 1px 2px rgba(16, 185, 129, 0.08);
+            gap: 0.875rem;
+            padding: 0.875rem 1rem;
+            background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+            border: 1px solid #a7f3d0;
+            border-left: 3px solid #10b981;
+            border-radius: 0.625rem;
+            box-shadow: 0 1px 2px rgba(16, 185, 129, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
             margin-bottom: 0.75rem;
+            transition: box-shadow 0.18s ease, transform 0.18s ease;
+            animation: authorChipIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        .author-chip__body { display: flex; gap: 0.625rem; min-width: 0; }
-        .author-chip__check {
+        .author-chip:hover {
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.10), 0 1px 3px rgba(0, 0, 0, 0.04);
+        }
+        @keyframes authorChipIn {
+            from { opacity: 0; transform: translateY(-3px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .author-chip__body {
+            display: flex;
+            gap: 0.75rem;
+            min-width: 0;
+            flex: 1;
+            align-items: flex-start;
+        }
+        .author-chip__avatar {
             flex-shrink: 0;
-            width: 1.5rem; height: 1.5rem;
+            width: 2.25rem;
+            height: 2.25rem;
             border-radius: 9999px;
-            background: #10b981;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
             color: white;
-            display: inline-flex; align-items: center; justify-content: center;
-            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
             font-size: 0.875rem;
+            letter-spacing: 0.02em;
+            box-shadow: 0 1px 2px rgba(5, 150, 105, 0.25);
+            position: relative;
         }
-        .author-chip__text { min-width: 0; }
+        .author-chip__avatar::after {
+            content: '';
+            position: absolute;
+            right: -2px;
+            bottom: -2px;
+            width: 0.875rem;
+            height: 0.875rem;
+            background: #10b981 url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='20 6 9 17 4 12'/></svg>") center/0.625rem 0.625rem no-repeat;
+            border: 2px solid #f0fdf4;
+            border-radius: 9999px;
+        }
+        .author-chip__text { min-width: 0; flex: 1; }
         .author-chip__name {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
             font-weight: 600;
             color: #064e3b;
             font-size: 0.95rem;
             line-height: 1.3;
             word-break: break-word;
         }
-        .author-chip__email {
+        .author-chip__badge {
+            flex-shrink: 0;
+            font-size: 0.625rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            color: #065f46;
+            background: rgba(16, 185, 129, 0.14);
+            padding: 0.125rem 0.4rem;
+            border-radius: 9999px;
+            line-height: 1.4;
+        }
+        .author-chip__meta {
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
             color: #047857;
             font-size: 0.8125rem;
-            margin-top: 0.125rem;
+            margin-top: 0.25rem;
             word-break: break-all;
         }
+        .author-chip__meta svg {
+            flex-shrink: 0;
+            width: 0.875rem;
+            height: 0.875rem;
+            color: #10b981;
+        }
         .author-chip__affil {
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
             color: #6b7280;
             font-size: 0.75rem;
-            margin-top: 0.125rem;
+            margin-top: 0.1875rem;
+        }
+        .author-chip__affil svg {
+            flex-shrink: 0;
+            width: 0.8125rem;
+            height: 0.8125rem;
+            color: #9ca3af;
         }
         .author-chip__remove {
             flex-shrink: 0;
             background: transparent;
             border: 0;
             color: #6b7280;
-            padding: 0.25rem;
+            padding: 0.375rem;
             border-radius: 0.375rem;
             cursor: pointer;
             line-height: 0;
+            transition: background-color 0.15s ease, color 0.15s ease;
+            align-self: flex-start;
         }
         .author-chip__remove:hover { background: rgba(220, 38, 38, 0.08); color: #b91c1c; }
+        .author-chip__remove:focus-visible {
+            outline: 2px solid #10b981;
+            outline-offset: 2px;
+        }
+        @media (max-width: 640px) {
+            .author-chip { padding: 0.75rem; gap: 0.625rem; }
+            .author-chip__avatar { width: 2rem; height: 2rem; font-size: 0.8125rem; }
+            .author-chip__name { font-size: 0.9rem; }
+            .author-chip__badge { display: none; }
+        }
         </style>
     `;
     
@@ -554,14 +633,28 @@ AuthorNameSearch.renderChip = function($row) {
         '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
     }[c]));
 
+    // Build initials from name (first 1-2 graphemes that are not whitespace/punctuation)
+    const initials = (function () {
+        const parts = String(data.name || '').trim().split(/\s+/).filter(Boolean);
+        if (parts.length === 0) return '?';
+        if (parts.length === 1) return Array.from(parts[0]).slice(0, 2).join('').toUpperCase();
+        return (Array.from(parts[0])[0] + Array.from(parts[parts.length - 1])[0]).toUpperCase();
+    })();
+
+    const mailIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>';
+    const orgIcon  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/><path d="M9 9v.01"/><path d="M9 12v.01"/><path d="M9 15v.01"/><path d="M9 18v.01"/></svg>';
+
     const $chip = $(`
         <div class="author-chip" role="status" aria-label="ผู้แต่งที่จับคู่ในระบบ">
             <div class="author-chip__body">
-                <span class="author-chip__check" aria-hidden="true">✓</span>
+                <span class="author-chip__avatar" aria-hidden="true">${escapeHtml(initials)}</span>
                 <div class="author-chip__text">
-                    <div class="author-chip__name">${escapeHtml(data.name)}</div>
-                    ${data.email ? `<div class="author-chip__email">${escapeHtml(data.email)}</div>` : ''}
-                    ${data.affiliation ? `<div class="author-chip__affil">${escapeHtml(data.affiliation)}</div>` : ''}
+                    <div class="author-chip__name">
+                        <span>${escapeHtml(data.name)}</span>
+                        <span class="author-chip__badge">ผู้ใช้ในระบบ</span>
+                    </div>
+                    ${data.email ? `<div class="author-chip__meta">${mailIcon}<span>${escapeHtml(data.email)}</span></div>` : ''}
+                    ${data.affiliation ? `<div class="author-chip__affil">${orgIcon}<span>${escapeHtml(data.affiliation)}</span></div>` : ''}
                 </div>
             </div>
             <button type="button" class="author-chip__remove" title="แก้ไข/เปลี่ยนผู้แต่ง" aria-label="แก้ไขผู้แต่ง">
