@@ -3506,6 +3506,8 @@ class AdminController extends Controller
             return $this->response->setJSON(['success' => false, 'message' => 'Not found']);
         }
 
+        log_message('info', sprintf('ADMISSION_PDF_SERVER admission/get id=%s user=%s', $id, UserIdentity::sessionEmail() ?: 'unknown'));
+
         return $this->response->setJSON(['success' => true, 'data' => $form]);
     }
 
@@ -3598,6 +3600,8 @@ class AdminController extends Controller
     public function admissionPdfSummary()
     {
         $formId = $this->request->getGet('form_id');
+        $who = UserIdentity::sessionEmail() ?: 'unknown';
+        log_message('info', sprintf('ADMISSION_PDF_SERVER pdf-summary page requested form_id=%s user=%s', $formId ?? '-', $who));
 
         if (!$formId) {
             return redirect()->to(base_url('index.php/admin/admission'))->with('error', 'ไม่พบรหัสแบบฟอร์ม');
@@ -3608,6 +3612,7 @@ class AdminController extends Controller
         $form = $admissionModel->find($formId);
 
         if (!$form) {
+            log_message('warning', sprintf('ADMISSION_PDF_SERVER form not found form_id=%s user=%s', $formId, $who));
             return redirect()->to(base_url('index.php/admin/admission'))->with('error', 'ไม่พบข้อมูลแบบฟอร์ม');
         }
 
