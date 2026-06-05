@@ -555,9 +555,10 @@ function generateAdmissionFormPDF(formData, useThaiFont = false) {
     });
     
     // Program type - display only selected type
-    const hasMajorMinor = form.has_major_minor || 0;
-    
-    if (hasMajorMinor === 1) {
+    // ใช้ String(...) === '1' ให้ตรงกับ section ๗ (ค่าจาก DB/JSON เป็น string '1')
+    const hasMajorMinor = String(form.has_major_minor) === '1';
+
+    if (hasMajorMinor) {
         content.push({
             text: 'หลักสูตรมีวิชาเอก/แขนง',
             fontSize: 14,

@@ -901,15 +901,15 @@
                         <div class="mb-4">
                             <div class="flex items-center gap-4 mb-2">
                                 <label class="flex items-center gap-2">
-                                    <input type="radio" name="has_major_minor" value="0" ${!(form.has_major_minor || 0) ? 'checked' : ''} onchange="toggleMajorSectionModal()"> หลักสูตรไม่มีวิชาเอก/แขนง
+                                    <input type="radio" name="has_major_minor" value="0" ${String(form.has_major_minor) === '1' ? '' : 'checked'} onchange="toggleMajorSectionModal()"> หลักสูตรไม่มีวิชาเอก/แขนง
                                 </label>
                                 <label class="flex items-center gap-2">
-                                    <input type="radio" name="has_major_minor" value="1" ${(form.has_major_minor || 0) ? 'checked' : ''} onchange="toggleMajorSectionModal()"> หลักสูตรมีวิชาเอก/แขนง
+                                    <input type="radio" name="has_major_minor" value="1" ${String(form.has_major_minor) === '1' ? 'checked' : ''} onchange="toggleMajorSectionModal()"> หลักสูตรมีวิชาเอก/แขนง
                                 </label>
                             </div>
-                            
+
                             <!-- Majors Detail -->
-                            <div id="major-section-modal" class="p-4 bg-gray-50 rounded-lg mt-3" style="display: ${(form.has_major_minor || 0) ? 'block' : 'none'}">
+                            <div id="major-section-modal" class="p-4 bg-gray-50 rounded-lg mt-3" style="display: ${String(form.has_major_minor) === '1' ? 'block' : 'none'}">
                                 <div class="flex justify-between items-center mb-3">
                                     <label class="font-medium text-gray-700">รายละเอียดวิชาเอกแต่ละตัว</label>
                                     <button type="button" onclick="addMajorModal()" class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm">+ เพิ่ม</button>
