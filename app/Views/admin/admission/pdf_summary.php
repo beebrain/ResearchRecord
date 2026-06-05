@@ -98,6 +98,32 @@
         const urlParams = new URLSearchParams(window.location.search);
         const FORM_ID = urlParams.get('form_id');
 
+        // ส่ง log การสร้าง PDF ไปเก็บที่ server (CI log) เพื่อตรวจสอบ error ย้อนหลัง
+        function pdfLog(level, message, context) {
+            try {
+                console[(level === 'error' || level === 'warning') ? 'error' : 'log']('[PDF]', message, context || '');
+            } catch (e) {}
+            try {
+                const body = JSON.stringify({ level: level, message: String(message), form_id: FORM_ID, context: context || null });
+                fetch(appRoute('admin/admission/log-client'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: body,
+                    keepalive: true
+                }).catch(function () {});
+            } catch (e) {}
+        }
+        window.__pdfLog = pdfLog;
+
+        // จับ error ที่หลุดจาก try/catch (เช่น error ภายใน pdfMake worker)
+        window.addEventListener('error', function (e) {
+            pdfLog('error', 'window.onerror: ' + (e.message || '') + ' @' + (e.filename || '') + ':' + (e.lineno || ''));
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+            const r = e && e.reason;
+            pdfLog('error', 'unhandledrejection: ' + ((r && r.message) || r || 'unknown'));
+        });
+
         // Update status function
         function updateStatus(message, step) {
             document.getElementById('status-text').textContent = message;
@@ -114,6 +140,7 @@
                 }
 
                 console.log('Starting auto PDF generation for form:', FORM_ID);
+                pdfLog('info', 'เริ่มสร้าง PDF', { ua: navigator.userAgent });
                 updateStatus('กำลังโหลดข้อมูลแบบฟอร์ม...', 'ขั้นตอนที่ 1/3');
 
                 // Fetch form data
@@ -126,16 +153,23 @@
                 });
 
                 if (!response.ok) {
+                    pdfLog('error', 'โหลดข้อมูลแบบฟอร์มไม่สำเร็จ (HTTP ' + response.status + ')');
                     throw new Error('ไม่สามารถโหลดข้อมูลได้');
                 }
 
                 const result = await response.json();
 
                 if (!result.success || !result.data) {
+                    pdfLog('error', 'ข้อมูลแบบฟอร์มไม่ถูกต้อง: ' + (result.message || 'ไม่พบข้อมูล'));
                     throw new Error(result.message || 'ไม่พบข้อมูลแบบฟอร์ม');
                 }
 
                 console.log('Form data loaded:', result.data);
+                pdfLog('info', 'โหลดข้อมูลสำเร็จ', {
+                    has_major_minor: result.data.has_major_minor,
+                    major_count: result.data.major_count,
+                    has_majors_detail: !!result.data.majors_detail
+                });
                 updateStatus('กำลังโหลดฟอนต์ภาษาไทย...', 'ขั้นตอนที่ 2/3');
 
                 // Wait a moment for fonts to load
@@ -167,6 +201,7 @@
                     }
                 }
                 console.log('Font loaded:', fontLoaded);
+                pdfLog('info', 'โหลดฟอนต์เสร็จ fontLoaded=' + fontLoaded);
 
                 updateStatus('กำลังสร้างเอกสาร PDF...', 'ขั้นตอนที่ 3/3');
 
@@ -174,6 +209,7 @@
                 if (typeof window.generateAdmissionFormPDF === 'function') {
                     // ปิดหน้าต่างนี้เฉพาะหลัง PDF ถูกเรนเดอร์เสร็จจริง (กัน race ตอนฟอนต์ไทยใหญ่/เครื่องช้า)
                     window.__onPdfReady = function (blobUrl, fileName) {
+                        pdfLog('info', 'PDF พร้อม/ดาวน์โหลดแล้ว: ' + (fileName || ''));
                         updateStatus('ดาวน์โหลดเอกสารเรียบร้อยแล้ว', 'เสร็จสิ้น');
                         const detail = document.getElementById('progress-detail');
                         if (detail) {
@@ -201,6 +237,9 @@
 
             } catch (error) {
                 console.error('PDF generation error:', error);
+                pdfLog('error', 'PDF generation error: ' + ((error && error.message) || error), {
+                    stack: (error && error.stack) ? String(error.stack).substring(0, 800) : null
+                });
                 document.querySelector('.loader').style.display = 'none';
                 updateStatus('เกิดข้อผิดพลาด!', '');
                 document.getElementById('progress-detail').innerHTML = `
@@ -216,7 +255,16 @@
         }
 
         // Wait for scripts to load before starting PDF generation
+        let __waitTries = 0;
         function waitForScripts() {
+            __waitTries++;
+            // หลังรอ ~10 วินาที (100 ครั้ง) ยังโหลดไม่ครบ → log error เพื่อตรวจสอบ asset
+            if (__waitTries > 100) {
+                pdfLog('error', 'สคริปต์โหลดไม่ครบใน 10 วินาที: pdfMake=' + (typeof pdfMake) + ' generateAdmissionFormPDF=' + (typeof window.generateAdmissionFormPDF));
+                updateStatus('โหลดสคริปต์สร้าง PDF ไม่สำเร็จ', '');
+                return;
+            }
+
             // Check if both pdfMake and admission-form-pdf.js are loaded
             if (typeof pdfMake === 'undefined') {
                 console.log('Waiting for pdfMake to load...');

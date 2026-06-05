@@ -3506,6 +3506,49 @@ class AdminController extends Controller
     }
 
     /**
+     * รับ log จากฝั่ง client (ขั้นตอนการสร้าง PDF) มาเขียนลง CI log
+     * เพื่อตรวจสอบ error การสร้าง PDF ที่เกิดบนเบราว์เซอร์ผู้ใช้
+     * POST /admin/admission/log-client  body: { level, message, form_id, context }
+     */
+    public function admissionLogClient()
+    {
+        $input = $this->request->getJSON(true) ?? $this->request->getPost();
+
+        $allowedLevels = ['debug', 'info', 'warning', 'error'];
+        $level = strtolower((string) ($input['level'] ?? 'info'));
+        if (! in_array($level, $allowedLevels, true)) {
+            $level = 'info';
+        }
+
+        $message = trim((string) ($input['message'] ?? ''));
+        if ($message === '') {
+            return $this->response->setJSON(['success' => false, 'message' => 'empty message']);
+        }
+        // จำกัดความยาวกัน log บวม
+        $message = mb_substr($message, 0, 1000);
+
+        $formId  = $input['form_id'] ?? '-';
+        $context = $input['context'] ?? null;
+        if (is_array($context) || is_object($context)) {
+            $context = json_encode($context, JSON_UNESCAPED_UNICODE);
+        }
+        $context = $context !== null ? mb_substr((string) $context, 0, 1000) : '';
+
+        $userData = $this->session->get('user_data');
+        $who = UserIdentity::sessionEmail() ?: ($userData['email'] ?? 'unknown');
+
+        log_message($level, sprintf(
+            'ADMISSION_PDF_CLIENT [form:%s] [user:%s] %s%s',
+            $formId,
+            $who,
+            $message,
+            $context !== '' ? ' | ctx=' . $context : ''
+        ));
+
+        return $this->response->setJSON(['success' => true]);
+    }
+
+    /**
      * View admission form (read-only)
      */
     public function admissionView($id = null)

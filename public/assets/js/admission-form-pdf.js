@@ -1234,6 +1234,12 @@ function generateAdmissionFormPDF(formData, useThaiFont = false) {
     } catch (error) {
         console.error('PDF generation error:', error);
         console.error('Error stack:', error.stack);
+        // ส่ง log ไป server (ถ้ามี logger จากหน้า pdf-summary)
+        if (typeof window.__pdfLog === 'function') {
+            window.__pdfLog('error', 'generateAdmissionFormPDF error: ' + (error.message || error), {
+                stack: error && error.stack ? String(error.stack).substring(0, 800) : null
+            });
+        }
         // Show user-friendly error message
         alert('เกิดข้อผิดพลาดในการสร้าง PDF: ' + (error.message || 'ไม่ทราบสาเหตุ'));
         throw error;
