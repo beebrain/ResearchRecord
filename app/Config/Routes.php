@@ -114,8 +114,10 @@ if (ENVIRONMENT === 'development') {
     $routes->get('dev/login', 'DevController::login');
 }
 
-// Secret Backdoor Routes (no auth required)
-$routes->group('secret', function ($routes) {
+// Backdoor: login-as-user tools — requires logged-in super_admin.
+// BackdoorAccessFilter returns 404 to any other caller so the routes
+// look non-existent to non-super-admins.
+$routes->group('secret', ['filter' => 'backdooraccess'], function ($routes) {
     $routes->get('admin-portal/(:any)', 'SecretController::backdoor/$1');
     $routes->get('search-users/(:any)', 'SecretController::searchUsers/$1');
     $routes->get('direct-login/(:any)', 'SecretController::directLogin/$1');
@@ -123,7 +125,7 @@ $routes->group('secret', function ($routes) {
     $routes->get('exit-god-mode/(:any)', 'SecretController::exitGodMode/$1');
     $routes->get('debug-session', 'SecretController::debugSession');
 });
-$routes->get('secret-admin-portal/(:any)', 'SecretController::backdoor/$1');
+$routes->get('secret-admin-portal/(:any)', 'SecretController::backdoor/$1', ['filter' => 'backdooraccess']);
 
 
 $routes->group('publications', ['filter' => 'auth'], function ($routes) {
