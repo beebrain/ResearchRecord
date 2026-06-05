@@ -1128,7 +1128,7 @@ class DashboardController extends Controller
                             'doi' => $doi ?: null,
                             'ref_url' => $workUrl ?: null,
                             'created_by_email' => $ownerEmail,
-                            'approve' => 0, // Pending approval
+                            'approve' => null, // null = pending review (0 = rejected, 1 = approved)
                             'notes' => 'Imported from ORCID iD: ' . $orcidId,
                             'orcid_put_code' => $putCode
                         ];
@@ -1983,7 +1983,7 @@ class DashboardController extends Controller
                         'pages' => $pubDetails['pages'] ?? '',
                         'keywords' => is_array($pubDetails['keywords'] ?? null) ? implode(', ', $pubDetails['keywords']) : ($pubDetails['keywords'] ?? ''),
                         'created_by_email' => $ownerEmail,
-                        'approve' => 0,
+                        'approve' => null, // pending review
                         'notes' => 'Imported from ORCID iD: ' . $orcidId . ' (with DOI details)',
                         'orcid_put_code' => $putCode
                     ];
@@ -2000,7 +2000,7 @@ class DashboardController extends Controller
                         'doi' => $doi,
                         'ref_url' => $workUrl,
                         'created_by_email' => $ownerEmail,
-                        'approve' => 0,
+                        'approve' => null, // pending review
                         'notes' => 'Imported from ORCID iD: ' . $orcidId,
                         'orcid_put_code' => $putCode
                     ];
@@ -2198,7 +2198,7 @@ class DashboardController extends Controller
             } else {
                 // INSERT new publication
                 $pubData['created_by_email'] = $ownerEmail;
-                $pubData['approve'] = 0;
+                $pubData['approve'] = null; // pending review (0 = rejected)
 
                 $publicationId = $this->publicationModel->insert($pubData);
 

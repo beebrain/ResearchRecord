@@ -508,7 +508,7 @@ class CvSyncApiController extends ApiController
             'notes'            => trim((string) ($pub['notes'] ?? '')) ?: null,
             'ref_url'          => trim((string) ($pub['ref_url'] ?? '')) ?: null,
             'created_by_email' => UserIdentity::normalizeEmail((string) ($user['email'] ?? '')),
-            'approve'          => 0,
+            'approve'          => null, // pending review (3-level: null/0/1)
         ];
         $syncFields = $this->publicationSyncFields($pub, $hash);
         $data = array_merge($data, $syncFields);
