@@ -434,17 +434,7 @@ class StudentAdmissionFormModel extends Model
         $teachers = $this->getTeachers($formId);
         $userIds = array_filter(array_column($teachers, 'user_id')); // user_id is teacher_email here
 
-        $log->info("getTeacherPublications: Found " . count($teachers) . " teachers - " . json_encode([
-            'form_id' => $formId,
-            'teacher_count' => count($teachers),
-            'user_ids' => $userIds,
-            'teachers' => array_map(function ($t) {
-                return [
-                    'user_id' => $t['user_id'] ?? null,
-                    'name' => ($t['thai_name'] ?? '') . ' ' . ($t['thai_lastname'] ?? '')
-                ];
-            }, $teachers)
-        ], JSON_UNESCAPED_UNICODE));
+        $log->info("getTeacherPublications: form {$formId} teacher_count=" . count($teachers));
 
         if (empty($userIds)) {
             $log->warning("getTeacherPublications: No teachers found for form ID {$formId}");
@@ -480,11 +470,7 @@ class StudentAdmissionFormModel extends Model
             }
         }
 
-        $log->info("getTeacherPublications: Collected emails for teachers - " . json_encode([
-            'form_id' => $formId,
-            'email_count' => count($allUserEmails),
-            'emails' => $allUserEmails
-        ], JSON_UNESCAPED_UNICODE));
+        $log->info("getTeacherPublications: form {$formId} email_count=" . count($allUserEmails));
 
         // Step 2: Get distinct publication IDs where teachers are authors
         // PRIMARY: Match author_email with ALL user emails
@@ -510,19 +496,9 @@ class StudentAdmissionFormModel extends Model
         $publicationIds = $builder->get()->getResultArray();
         $ids = array_column($publicationIds, 'publication_id');
 
-        $log->info("getTeacherPublications: Found publications by author match - " . json_encode([
-            'form_id' => $formId,
-            'publication_count' => count($ids),
-            'publication_ids' => $ids
-        ], JSON_UNESCAPED_UNICODE));
-
         $allIds = array_values(array_unique(array_map('intval', $ids)));
 
-        $log->info("getTeacherPublications: Total unique publication IDs - " . json_encode([
-            'form_id' => $formId,
-            'total_count' => count($allIds),
-            'all_ids' => $allIds
-        ], JSON_UNESCAPED_UNICODE));
+        $log->info("getTeacherPublications: form {$formId} matched_pub_ids=" . count($allIds));
 
         if (empty($allIds)) {
             $log->warning("getTeacherPublications: No publications found for form ID {$formId}");
@@ -538,18 +514,7 @@ class StudentAdmissionFormModel extends Model
             ->get()
             ->getResultArray();
 
-        $log->info("getTeacherPublications: Retrieved publications from publication_view - " . json_encode([
-            'form_id' => $formId,
-            'publication_count' => count($publications),
-            'publication_titles' => array_map(function ($p) {
-                return [
-                    'id' => $p['id'] ?? null,
-                    'title' => substr($p['title'] ?? '', 0, 50) . '...',
-                    'year' => $p['publication_year'] ?? null,
-                    'created_by_email' => $p['created_by_email'] ?? null
-                ];
-            }, $publications)
-        ], JSON_UNESCAPED_UNICODE));
+        $log->info("getTeacherPublications: form {$formId} retrieved_publications=" . count($publications));
 
         // Step 4: Map publications to teachers using EMAIL ONLY
         $emailToTeacherMap = [];

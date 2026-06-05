@@ -143,7 +143,8 @@
                 pdfLog('info', 'เริ่มสร้าง PDF', { ua: navigator.userAgent });
                 updateStatus('กำลังโหลดข้อมูลแบบฟอร์ม...', 'ขั้นตอนที่ 1/3');
 
-                // Fetch form data
+                // Fetch form data (วัดเวลา + ขนาด response เพื่อหา bottleneck)
+                const __t0 = performance.now();
                 const response = await fetch(appRoute('admin/admission/get/' + FORM_ID), {
                     method: 'GET',
                     headers: {
@@ -157,7 +158,11 @@
                     throw new Error('ไม่สามารถโหลดข้อมูลได้');
                 }
 
-                const result = await response.json();
+                const __rawText = await response.text();
+                const __tFetch = Math.round(performance.now() - __t0);
+                const result = JSON.parse(__rawText);
+                const __tParse = Math.round(performance.now() - __t0) - __tFetch;
+                pdfLog('info', `fetch+download admission/get = ${__tFetch}ms, parse = ${__tParse}ms, size = ${(__rawText.length/1024).toFixed(0)}KB`);
 
                 if (!result.success || !result.data) {
                     pdfLog('error', 'ข้อมูลแบบฟอร์มไม่ถูกต้อง: ' + (result.message || 'ไม่พบข้อมูล'));
