@@ -1163,6 +1163,11 @@ class PublicationController extends Controller
 
             // Process authors to get proper names (without titleThai for edit form)
             foreach ($authors as &$author) {
+                // Flag whether this author is linked to a system user — used by
+                // the edit form to render a "matched" chip instead of plain inputs.
+                $author['is_user_matched'] = !empty($author['user_thai_name'])
+                    || !empty($author['author_user_thai_name']);
+
                 // Priority: uid from user table > author_id from authors+user > name from publication_authors
                 if (!empty($author['author_email']) && !empty($author['user_thai_name'])) {
                     // Use user table Thai name (direct link via author_email) - WITHOUT titleThai

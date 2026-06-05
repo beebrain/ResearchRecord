@@ -598,14 +598,32 @@
             authors.forEach(function (a) {
                 addAuthor();
                 var $row = $('.author-row').last();
-                $row.find('[name*="[name]"]').val(a.author_name || a.name || '');
-                $row.find('[name*="[email]"]').val(a.user_email || a.email || '');
-                $row.find('[name*="[affiliation]"]').val(a.affiliation || '');
+                var nameVal = a.author_name || a.name || '';
+                var emailVal = a.author_email || a.user_email || a.email || '';
+                var affilVal = a.author_affiliation || a.affiliation || '';
+                $row.find('[name*="[name]"]').val(nameVal);
+                $row.find('[name*="[email]"]').val(emailVal);
+                $row.find('[name*="[affiliation]"]').val(affilVal);
                 if (a.corresponding_author || a.corresponding) {
                     $row.find('[name*="[corresponding]"]').prop('checked', true);
                 }
+                if (a.is_user_matched) {
+                    $row.data('matched-user', {
+                        name: nameVal, email: emailVal, affiliation: affilVal
+                    });
+                }
             });
             updateAuthorStatus();
+            // Render chip for any pre-matched authors after JS modules init
+            setTimeout(function () {
+                if (window.AuthorNameSearch && typeof AuthorNameSearch.renderChip === 'function') {
+                    $('.author-row').each(function () {
+                        if ($(this).data('matched-user')) {
+                            AuthorNameSearch.renderChip($(this));
+                        }
+                    });
+                }
+            }, 100);
         }
     });
     </script>
