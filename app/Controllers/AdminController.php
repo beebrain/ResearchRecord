@@ -3271,6 +3271,10 @@ class AdminController extends Controller
             $userRole = 'chair';
         }
 
+        // กัน browser ใช้ HTML เก่า/ไม่ครบใน cache (ซึ่งทำให้ฟังก์ชัน inline เช่น openViewModal ใช้ไม่ได้)
+        $this->response->setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+        $this->response->setHeader('Pragma', 'no-cache');
+
         return view('admin/admission/index', [
             'forms' => $forms,
             'years' => $years,

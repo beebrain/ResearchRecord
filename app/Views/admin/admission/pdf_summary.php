@@ -35,8 +35,8 @@
         }
     </script>
 
-    <!-- Admission Form PDF Script -->
-    <script src="<?= base_url('assets/js/admission-form-pdf.js') ?>"></script>
+    <!-- Admission Form PDF Script (cache-bust ด้วย filemtime เพื่อให้ได้โค้ดล่าสุดเสมอ) -->
+    <script src="<?= base_url('assets/js/admission-form-pdf.js') ?>?v=<?= @filemtime(FCPATH . 'assets/js/admission-form-pdf.js') ?: time() ?>"></script>
 
     <style>
         .loader {
