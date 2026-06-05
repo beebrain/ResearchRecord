@@ -9,6 +9,14 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <meta name="csrf-token" content="<?= csrf_hash() ?>">
 
+    <script>
+        // CI4-generated endpoints — site_url() picks the right URL form
+        // per environment (index.php?/... locally, index.php/... on IIS).
+        window.API_ENDPOINTS = window.API_ENDPOINTS || {};
+        window.API_ENDPOINTS.searchUserNames = '<?= site_url('publications/search-user-names') ?>';
+        window.API_ENDPOINTS.searchAuthorEmail = '<?= site_url('publications/search-author-email') ?>';
+    </script>
+
     <!-- Shared Admin Styles -->
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= base_url('assets/css/admin-common.css') ?>">

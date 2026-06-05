@@ -26,6 +26,8 @@ function appRoute(path) {
     return `${base}/index.php?/${path.replace(/^\//, '')}`;
 }
 
+const AUTHOR_SEARCH_BUILD = 'v2026-06-05.03-chip+silent';
+
 const AuthorNameSearch = {
     config: {
         searchEndpoint: appRoute('publications/search-user-names'),
@@ -35,13 +37,13 @@ const AuthorNameSearch = {
         cache: new Map(),
         maxCacheSize: 50
     },
-    
+
     init() {
         this.injectCriticalCSS();
         this.setupSearchInputs();
         this.setupMutationObserver();
         this.setupGlobalEvents();
-        console.log('✅ Author Name Search initialized');
+        console.log('[AuthorSearch] init build=' + AUTHOR_SEARCH_BUILD + ' endpoint=' + this.config.searchEndpoint);
     }
 };
 
@@ -351,7 +353,7 @@ AuthorNameSearch.setupSingleNameInput = function($input) {
         this.handleKeyboardNavigation($input, e);
     });
     
-    console.log('Name input setup complete:', $input.attr('name'));
+    console.log('[AuthorSearch] bound input', $input.attr('name'), 'type=' + $input.attr('type'));
 };
 
 // ==========================================
@@ -360,25 +362,23 @@ AuthorNameSearch.setupSingleNameInput = function($input) {
 
 AuthorNameSearch.handleNameInput = function($input) {
     const name = $input.val().trim();
-    
-    // Clear dropdown if input is too short
+    console.log('[AuthorSearch] input field=' + $input.attr('name') + ' value="' + name + '" len=' + name.length);
+
     if (name.length < this.config.minSearchLength) {
+        console.log('[AuthorSearch] too short, hide dropdown');
         this.hideDropdown($input);
         return;
     }
-    
-    // Check cache first
+
     const cacheKey = name.toLowerCase();
     if (this.config.cache.has(cacheKey)) {
         const cachedResults = this.config.cache.get(cacheKey);
+        console.log('[AuthorSearch] cache hit count=' + cachedResults.length);
         this.showDropdown($input, cachedResults);
         return;
     }
-    
-    // Show loading
+
     this.showLoading($input);
-    
-    // Search users
     this.searchUsers(name, $input);
 };
 
@@ -388,27 +388,28 @@ AuthorNameSearch.searchUsers = function(name, $input) {
     const url = this.config.searchEndpoint.indexOf('index.php?/') >= 0
         ? this.config.searchEndpoint + '?' + qs
         : this.config.searchEndpoint + sep + qs;
+    console.log('[AuthorSearch] GET ' + url);
     $.ajax({
         url: url,
         method: 'GET',
         dataType: 'json',
         timeout: 10000,
         success: (response) => {
+            console.log('[AuthorSearch] response', response);
             this.handleSearchResponse($input, name, response);
         },
         error: (xhr, status, error) => {
-            console.error('User name search failed:', error);
+            console.error('[AuthorSearch] ajax error status=' + status + ' http=' + xhr.status + ' body=', xhr.responseText);
             this.showError($input, 'Search failed');
         }
     });
 };
 
 AuthorNameSearch.handleSearchResponse = function($input, searchTerm, response) {
+    const hits = (response && response.users) ? response.users.length : 0;
+    console.log('[AuthorSearch] handleSearchResponse term="' + searchTerm + '" success=' + (response && response.success) + ' hits=' + hits);
     if (response.success && response.users && response.users.length > 0) {
-        // Cache results
         this.cacheResults(searchTerm, response.users);
-        
-        // Show dropdown
         this.showDropdown($input, response.users);
     } else {
         // Silent on empty: email-autocomplete shows the "New author" badge
