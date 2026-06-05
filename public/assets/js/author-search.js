@@ -411,7 +411,10 @@ AuthorNameSearch.handleSearchResponse = function($input, searchTerm, response) {
         // Show dropdown
         this.showDropdown($input, response.users);
     } else {
-        this.showNoResults($input);
+        // Silent on empty: email-autocomplete shows the "New author" badge
+        // when appropriate; a "No users found" popup is noisy and confusing
+        // for legitimate non-system authors.
+        this.hideDropdown($input);
     }
 };
 
