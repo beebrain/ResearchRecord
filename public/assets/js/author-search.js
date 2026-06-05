@@ -176,15 +176,69 @@ AuthorNameSearch.injectCriticalCSS = function() {
                 max-height: 150px;
                 font-size: 0.875rem;
             }
-            
+
             .dropdown-item > div {
                 padding: 0.5rem;
             }
-            
+
             .dropdown-item small {
                 font-size: 0.6875rem;
             }
         }
+
+        .author-chip {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: linear-gradient(to right, #ecfdf5, #f0fdf4);
+            border: 1px solid #10b981;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 2px rgba(16, 185, 129, 0.08);
+            margin-bottom: 0.75rem;
+        }
+        .author-chip__body { display: flex; gap: 0.625rem; min-width: 0; }
+        .author-chip__check {
+            flex-shrink: 0;
+            width: 1.5rem; height: 1.5rem;
+            border-radius: 9999px;
+            background: #10b981;
+            color: white;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-weight: 700;
+            font-size: 0.875rem;
+        }
+        .author-chip__text { min-width: 0; }
+        .author-chip__name {
+            font-weight: 600;
+            color: #064e3b;
+            font-size: 0.95rem;
+            line-height: 1.3;
+            word-break: break-word;
+        }
+        .author-chip__email {
+            color: #047857;
+            font-size: 0.8125rem;
+            margin-top: 0.125rem;
+            word-break: break-all;
+        }
+        .author-chip__affil {
+            color: #6b7280;
+            font-size: 0.75rem;
+            margin-top: 0.125rem;
+        }
+        .author-chip__remove {
+            flex-shrink: 0;
+            background: transparent;
+            border: 0;
+            color: #6b7280;
+            padding: 0.25rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            line-height: 0;
+        }
+        .author-chip__remove:hover { background: rgba(220, 38, 38, 0.08); color: #b91c1c; }
         </style>
     `;
     
@@ -195,9 +249,10 @@ AuthorNameSearch.injectCriticalCSS = function() {
 // Setup Functions
 // ==========================================
 
+AuthorNameSearch.SEARCHABLE_SELECTOR = 'input[name*="[name]"], input[name*="[email]"]';
+
 AuthorNameSearch.setupSearchInputs = function() {
-    // Setup existing name inputs
-    $('input[name*="[name]"]').each((index, input) => {
+    $(this.SEARCHABLE_SELECTOR).each((index, input) => {
         this.setupSingleNameInput($(input));
     });
 };
@@ -207,22 +262,21 @@ AuthorNameSearch.setupMutationObserver = function() {
         mutations.forEach((mutation) => {
             mutation.addedNodes.forEach((node) => {
                 if (node.nodeType === 1) {
-                    const $nameInputs = $(node).find('input[name*="[name]"]');
-                    $nameInputs.each((index, input) => {
+                    const $inputs = $(node).find(this.SEARCHABLE_SELECTOR);
+                    $inputs.each((index, input) => {
                         this.setupSingleNameInput($(input));
                     });
                 }
             });
         });
     });
-    
-    const container = document.getElementById('authorsContainer');
-    if (container) {
-        observer.observe(container, {
-            childList: true,
-            subtree: true
-        });
-    }
+
+    ['authorsContainer', 'edit_authors_container'].forEach(id => {
+        const container = document.getElementById(id);
+        if (container) {
+            observer.observe(container, { childList: true, subtree: true });
+        }
+    });
 };
 
 AuthorNameSearch.setupGlobalEvents = function() {
@@ -329,13 +383,14 @@ AuthorNameSearch.handleNameInput = function($input) {
 };
 
 AuthorNameSearch.searchUsers = function(name, $input) {
+    const qs = 'name=' + encodeURIComponent(name) + '&limit=' + encodeURIComponent(this.config.maxResults);
+    const sep = this.config.searchEndpoint.indexOf('?') >= 0 ? '&' : '?';
+    const url = this.config.searchEndpoint.indexOf('index.php?/') >= 0
+        ? this.config.searchEndpoint + '?' + qs
+        : this.config.searchEndpoint + sep + qs;
     $.ajax({
-        url: this.config.searchEndpoint,
+        url: url,
         method: 'GET',
-        data: { 
-            name: name,
-            limit: this.config.maxResults
-        },
         dataType: 'json',
         timeout: 10000,
         success: (response) => {
@@ -451,39 +506,86 @@ AuthorNameSearch.setupDropdownEvents = function($input, $dropdown) {
 
 AuthorNameSearch.selectUser = function($input, user) {
     const $row = $input.closest('.author-row');
-    
-    // Fill name
-    $input.val(user.display_name || user.name);
-    $input.addClass('auto-filled');
-    
-    // Fill email if available
+
+    const displayName = user.display_name || user.name || '';
+    $row.find('input[name*="[name]"]').val(displayName).addClass('auto-filled');
     const $emailInput = $row.find('input[name*="[email]"]');
     if ($emailInput.length && user.email) {
         $emailInput.val(user.email).addClass('auto-filled');
     }
-    
-    // Fill affiliation if available
     const $affiliationInput = $row.find('input[name*="[affiliation]"]');
     if ($affiliationInput.length && user.affiliation) {
         $affiliationInput.val(user.affiliation).addClass('auto-filled');
     }
-    
-    // Store user data
-    $input.data({
-        'user-id': user.id,
-        'user-uid': user.uid
+
+    $row.data('matched-user', {
+        id: user.id, uid: user.uid,
+        name: displayName, email: user.email || '', affiliation: user.affiliation || ''
     });
-    
-    // Hide dropdown
+
     this.hideDropdown($input);
-    
-    // Focus next field
-    const $nextInput = $emailInput.length ? $emailInput : $affiliationInput;
-    if ($nextInput.length && !$nextInput.hasClass('auto-filled')) {
-        setTimeout(() => $nextInput.focus(), 100);
+    this.renderChip($row);
+};
+
+AuthorNameSearch.renderChip = function($row) {
+    const user = $row.data('matched-user');
+    if (!user) {
+        const $name = $row.find('input[name*="[name]"]').val() || '';
+        const $email = $row.find('input[name*="[email]"]').val() || '';
+        const $affil = $row.find('input[name*="[affiliation]"]').val() || '';
+        if (!$name) return;
+        $row.data('matched-user', { name: $name, email: $email, affiliation: $affil });
     }
-    
-    console.log('User selected:', user.display_name || user.name);
+    const data = $row.data('matched-user');
+
+    // Hide editable grid + add hint
+    $row.find('.grid').hide();
+    $row.find('input[name*="[name]"], input[name*="[email]"], input[name*="[affiliation]"]')
+        .attr('type', 'hidden');
+
+    // Avoid duplicate chip
+    $row.find('.author-chip').remove();
+
+    const escapeHtml = (s) => String(s || '').replace(/[&<>"']/g, c => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+
+    const $chip = $(`
+        <div class="author-chip" role="status" aria-label="ผู้แต่งที่จับคู่ในระบบ">
+            <div class="author-chip__body">
+                <span class="author-chip__check" aria-hidden="true">✓</span>
+                <div class="author-chip__text">
+                    <div class="author-chip__name">${escapeHtml(data.name)}</div>
+                    ${data.email ? `<div class="author-chip__email">${escapeHtml(data.email)}</div>` : ''}
+                    ${data.affiliation ? `<div class="author-chip__affil">${escapeHtml(data.affiliation)}</div>` : ''}
+                </div>
+            </div>
+            <button type="button" class="author-chip__remove" title="แก้ไข/เปลี่ยนผู้แต่ง" aria-label="แก้ไขผู้แต่ง">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+    `);
+
+    $chip.find('.author-chip__remove').on('click', (e) => {
+        e.preventDefault();
+        AuthorNameSearch.removeChip($row, true);
+    });
+
+    $row.prepend($chip);
+};
+
+AuthorNameSearch.removeChip = function($row, clearInputs) {
+    $row.find('.author-chip').remove();
+    $row.find('.grid').show();
+    $row.find('input[name*="[name]"]').attr('type', 'text');
+    $row.find('input[name*="[email]"]').attr('type', 'email');
+    $row.find('input[name*="[affiliation]"]').attr('type', 'text');
+    if (clearInputs) {
+        $row.find('input[name*="[name]"], input[name*="[email]"], input[name*="[affiliation]"]')
+            .val('').removeClass('auto-filled');
+        $row.removeData('matched-user');
+        setTimeout(() => $row.find('input[name*="[name]"]').focus(), 50);
+    }
 };
 
 AuthorNameSearch.hideDropdown = function($input) {

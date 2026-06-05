@@ -145,10 +145,12 @@ EmailAutoComplete.handleEmailInput = function($input) {
 };
 
 EmailAutoComplete.searchAuthor = function(email, $input) {
+    const url = this.config.apiEndpoint.indexOf('index.php?/') >= 0
+        ? this.config.apiEndpoint + '?email=' + encodeURIComponent(email)
+        : this.config.apiEndpoint + (this.config.apiEndpoint.indexOf('?') >= 0 ? '&' : '?') + 'email=' + encodeURIComponent(email);
     $.ajax({
-        url: this.config.apiEndpoint,
+        url: url,
         method: 'GET',
-        data: { email: email },
         dataType: 'json',
         timeout: 10000,
         success: (response) => {
@@ -199,8 +201,20 @@ EmailAutoComplete.fillAuthorData = function($input, author) {
         'author-id': author.id,
         'user-uid': author.user_uid
     });
-    
+
     $input.addClass('auto-filled');
+
+    // Render chip card so the matched author is shown like an inline badge
+    if (window.AuthorNameSearch && typeof AuthorNameSearch.renderChip === 'function') {
+        $row.data('matched-user', {
+            id: author.id,
+            uid: author.user_uid,
+            name: $nameInput.val() || author.name || '',
+            email: $input.val() || author.email || '',
+            affiliation: $affiliationInput.val() || author.affiliation || ''
+        });
+        AuthorNameSearch.renderChip($row);
+    }
 };
 
 EmailAutoComplete.clearAuthorData = function($input) {
