@@ -1194,36 +1194,42 @@ function generateAdmissionFormPDF(formData, useThaiFont = false) {
             throw new Error('ไม่สามารถสร้าง PDF instance ได้');
         }
         
-        // Try to open in new window first
-        // If blocked by browser, will fallback to download
-        try {
-            pdfDocGenerator.getBlob((blob) => {
+        // Render แล้วส่งไฟล์ด้วยการ "ดาวน์โหลด" ผ่าน anchor — เชื่อถือได้ทุกเบราว์เซอร์
+        // (ไม่พึ่ง nested window.open ที่มักโดน popup blocker บน production)
+        pdfDocGenerator.getBlob((blob) => {
+            try {
                 if (!blob) {
-                    console.error('PDF blob is null or undefined');
                     throw new Error('ไม่สามารถสร้าง PDF blob ได้');
                 }
-                
-                // Create blob URL
+
                 const blobUrl = URL.createObjectURL(blob);
-                
-                // Try to open in new window
-                const newWindow = window.open(blobUrl, '_blank');
-                
-                // If popup was blocked, download instead
-                if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
-                    console.warn('Popup blocked, downloading PDF instead');
-                    pdfDocGenerator.download(fileName);
-                } else {
-                    console.log('PDF opened in new window:', fileName);
-                    // Clean up blob URL after a delay
-                    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = fileName;
+                a.rel = 'noopener';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                console.log('PDF download triggered:', fileName);
+
+                // เก็บ blob URL ไว้ให้ผู้ใช้กดเปิด/ดาวน์โหลดซ้ำได้ และคืนหน่วยความจำภายหลัง
+                window.__lastPdfBlobUrl = blobUrl;
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 120000);
+
+                // แจ้งหน้า generation ว่าไฟล์พร้อมแล้ว (เพื่อปิดหน้าต่างได้อย่างปลอดภัย)
+                if (typeof window.__onPdfReady === 'function') {
+                    window.__onPdfReady(blobUrl, fileName);
                 }
-            });
-        } catch (openError) {
-            console.warn('Failed to open PDF, downloading instead:', openError);
-            // Fallback to download
-            pdfDocGenerator.download(fileName);
-        }
+            } catch (deliverError) {
+                console.error('PDF delivery error:', deliverError);
+                try {
+                    pdfDocGenerator.download(fileName);
+                    if (typeof window.__onPdfReady === 'function') window.__onPdfReady(null, fileName);
+                } catch (_) {
+                    if (typeof window.__onPdfError === 'function') window.__onPdfError(deliverError);
+                }
+            }
+        });
         
     } catch (error) {
         console.error('PDF generation error:', error);

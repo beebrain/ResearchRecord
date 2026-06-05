@@ -2025,7 +2025,7 @@
         function generatePDFForCurrentForm() {
             if (viewFormId) {
                 const pdfUrl = appRoute('admin/admission/pdf-summary') + '?form_id=' + viewFormId;
-                window.open(pdfUrl, '_blank', 'width=600,height=400');
+                window.open(pdfUrl, '_blank');
             }
         }
 
@@ -2258,7 +2258,7 @@
 
             // Open PDF generation page in new window
             const pdfUrl = appRoute('admin/admission/pdf-summary') + '?form_id=' + id;
-            window.open(pdfUrl, '_blank', 'width=600,height=400');
+            window.open(pdfUrl, '_blank');
         }
 
         // Make generatePDF available globally

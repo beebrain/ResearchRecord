@@ -172,16 +172,29 @@
 
                 // Generate PDF using the global function
                 if (typeof window.generateAdmissionFormPDF === 'function') {
+                    // ปิดหน้าต่างนี้เฉพาะหลัง PDF ถูกเรนเดอร์เสร็จจริง (กัน race ตอนฟอนต์ไทยใหญ่/เครื่องช้า)
+                    window.__onPdfReady = function (blobUrl, fileName) {
+                        updateStatus('ดาวน์โหลดเอกสารเรียบร้อยแล้ว', 'เสร็จสิ้น');
+                        const detail = document.getElementById('progress-detail');
+                        if (detail) {
+                            const openLink = blobUrl
+                                ? `<a href="${blobUrl}" target="_blank" class="text-blue-600 underline">เปิดดู PDF</a> &nbsp;`
+                                : '';
+                            detail.innerHTML = `
+                                <div class="text-green-600 text-sm mt-2">
+                                    เอกสาร "${fileName || 'PDF'}" ถูกสร้าง/ดาวน์โหลดแล้ว
+                                </div>
+                                <div class="mt-3">${openLink}
+                                    <button onclick="window.close()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors">ปิดหน้าต่าง</button>
+                                </div>`;
+                        }
+                        // ปิดอัตโนมัติหลังจากแน่ใจว่าไฟล์ถูกส่งแล้ว
+                        setTimeout(() => { try { window.close(); } catch (e) {} }, 4000);
+                    };
+                    window.__onPdfError = function (err) {
+                        throw new Error((err && err.message) || 'สร้าง PDF ไม่สำเร็จ');
+                    };
                     window.generateAdmissionFormPDF(result.data, fontLoaded);
-
-                    // PDF should open in new window automatically
-                    setTimeout(() => {
-                        updateStatus('เอกสารถูกสร้างเรียบร้อยแล้ว', 'เสร็จสิ้น');
-                        // Show message that PDF is opening, then close this loading window
-                        setTimeout(() => {
-                            window.close();
-                        }, 1500);
-                    }, 1000);
                 } else {
                     throw new Error('ไม่พบฟังก์ชันสร้าง PDF');
                 }
