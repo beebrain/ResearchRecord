@@ -3597,9 +3597,10 @@ class AdminController extends Controller
      * Route: GET /admin/admission/pdf-summary
      * Displays dedicated page for PDF generation using pdfMake
      */
-    public function admissionPdfSummary()
+    public function admissionPdfSummary($formId = null)
     {
-        $formId = $this->request->getGet('form_id');
+        // form_id มาทาง path segment (รองรับ query-string routing) หรือ fallback ?form_id=
+        $formId = $formId ?? $this->request->getGet('form_id');
         $who = UserIdentity::sessionEmail() ?: 'unknown';
         log_message('info', sprintf('ADMISSION_PDF_SERVER pdf-summary page requested form_id=%s user=%s', $formId ?? '-', $who));
 
@@ -3616,7 +3617,7 @@ class AdminController extends Controller
             return redirect()->to(base_url('index.php/admin/admission'))->with('error', 'ไม่พบข้อมูลแบบฟอร์ม');
         }
 
-        return view('admin/admission/pdf_summary');
+        return view('admin/admission/pdf_summary', ['formId' => (string) $formId]);
     }
 
     /**

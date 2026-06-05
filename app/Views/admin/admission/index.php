@@ -398,7 +398,7 @@
             $('#forms-table-body').html('<tr><td colspan="8" class="px-6 py-8 text-center"><div class="animate-spin inline-block w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full"></div><p class="mt-2 text-gray-500">กำลังโหลด...</p></td></tr>');
 
             // Update URL without reload
-            const newUrl = appRoute('admin/admission') + '&year=' + year + (faculty ? '&faculty=' + faculty : '');
+            const newUrl = appRoute('admin/admission') + '?year=' + year + (faculty ? '&faculty=' + faculty : '');
             window.history.pushState({}, '', newUrl);
 
             $.ajax({
@@ -541,7 +541,7 @@
                     success: function(result) {
                         if (result.success) {
                             Swal.fire('สำเร็จ!', `สร้างแบบฟอร์ม ${result.count} รายการ`, 'success').then(() => {
-                                window.location.href = appRoute('admin/admission') + '&year=' + year;
+                                window.location.href = appRoute('admin/admission') + '?year=' + year;
                             });
                         } else {
                             Swal.fire('ผิดพลาด', result.message, 'error');
@@ -2024,7 +2024,7 @@
 
         function generatePDFForCurrentForm() {
             if (viewFormId) {
-                const pdfUrl = appRoute('admin/admission/pdf-summary') + '&form_id=' + viewFormId;
+                const pdfUrl = appRoute('admin/admission/pdf-summary/' + viewFormId);
                 window.open(pdfUrl, '_blank');
             }
         }
@@ -2257,7 +2257,7 @@
             }
 
             // Open PDF generation page in new window
-            const pdfUrl = appRoute('admin/admission/pdf-summary') + '&form_id=' + id;
+            const pdfUrl = appRoute('admin/admission/pdf-summary/' + id);
             window.open(pdfUrl, '_blank');
         }
 

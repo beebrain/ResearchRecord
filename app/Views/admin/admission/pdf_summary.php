@@ -94,9 +94,9 @@
     </script>
     <script src="<?= base_url('assets/js/app-routes.js') ?>?v=<?= @filemtime(FCPATH . 'assets/js/app-routes.js') ?: time() ?>"></script>
     <script>
-        // Get form ID from URL
+        // form_id ฉีดจาก server (path segment) เป็นหลัก, fallback ไป query string
         const urlParams = new URLSearchParams(window.location.search);
-        const FORM_ID = urlParams.get('form_id');
+        const FORM_ID = <?= json_encode((string) ($formId ?? '')) ?> || urlParams.get('form_id');
 
         // ส่ง log การสร้าง PDF ไปเก็บที่ server (CI log) เพื่อตรวจสอบ error ย้อนหลัง
         function pdfLog(level, message, context) {

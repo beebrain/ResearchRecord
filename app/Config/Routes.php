@@ -198,7 +198,8 @@ $routes->group('admin', ['filter' => 'adminauth'], function ($routes) {
     $routes->get('admission/edit/(:num)', 'AdminController::admissionEdit/$1');
     $routes->get('admission/view/(:num)', 'AdminController::admissionView/$1');
     $routes->get('admission/print/(:num)', 'AdminController::admissionPrint/$1');
-    $routes->get('admission/pdf-summary', 'AdminController::admissionPdfSummary'); // PDF generation view
+    $routes->get('admission/pdf-summary', 'AdminController::admissionPdfSummary'); // PDF generation view (back-compat: ?form_id=)
+    $routes->get('admission/pdf-summary/(:num)', 'AdminController::admissionPdfSummary/$1'); // form_id เป็น path segment (รองรับ query-string routing)
     $routes->post('admission/generate', 'AdminController::admissionGenerate');
     $routes->post('admission/save/(:num)', 'AdminController::admissionSave/$1');
     $routes->get('admission/get/(:num)', 'AdminController::admissionGet/$1');
