@@ -1236,13 +1236,28 @@ class PublicationController extends Controller
      */
     private function getPublicationAuthors($publicationId)
     {
-        return $this->db->table('publication_authors pa')
-            ->select('pa.*, a.user_email, a.id as author_id')
+        $rows = $this->db->table('publication_authors pa')
+            ->select('pa.*, a.user_email as authors_user_email, a.id as author_id,
+                      u1.email as matched_user_email_by_pa,
+                      u2.email as matched_user_email_by_a')
             ->join('authors a', 'pa.author_id = a.id', 'left')
+            ->join('user u1', 'pa.author_email = u1.email', 'left')
+            ->join('user u2', 'a.user_email = u2.email', 'left')
             ->where('pa.publication_id', $publicationId)
             ->orderBy('pa.author_order')
             ->get()
             ->getResultArray();
+
+        foreach ($rows as &$row) {
+            $row['is_user_matched'] = !empty($row['matched_user_email_by_pa'])
+                || !empty($row['matched_user_email_by_a']);
+            if (empty($row['author_email']) && !empty($row['authors_user_email'])) {
+                $row['author_email'] = $row['authors_user_email'];
+            }
+            unset($row['matched_user_email_by_pa'], $row['matched_user_email_by_a']);
+        }
+
+        return $rows;
     }
 
     /**
