@@ -214,6 +214,7 @@ $routes->group('admin', ['filter' => 'adminauth'], function ($routes) {
     $routes->get('education', 'EducationController::index');
     $routes->get('education/users', 'EducationController::getUsers');
     $routes->get('education/get', 'EducationController::getEducation');
+    $routes->post('education/get', 'EducationController::getEducation'); // email via POST body (IIS-safe)
     $routes->get('education/get/(:any)', 'EducationController::getEducation/$1');
     $routes->post('education/saveEntry', 'EducationController::saveEntry');
     $routes->post('education/deleteEntry/(:num)', 'EducationController::deleteEntry/$1');

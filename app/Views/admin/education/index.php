@@ -409,9 +409,9 @@
         }
 
         function loadEducationEntries(userUid) {
-            // Pass the email as a route segment, not a query param: IIS drops GET params on
-            // the index.php?/route form, so ?email=... never reaches the controller.
-            $.get(appRoute('admin/education/get/' + encodeURIComponent(userUid)), function(response) {
+            // Send email via POST body: IIS rejects "@" in the URL path and drops GET params
+            // on the index.php?/route form, so neither path segment nor ?email= works here.
+            $.post(appRoute('admin/education/get'), { email: userUid }, function(response) {
                 if (response.success) {
                     const user = response.user;
                     const displayName = user.thai_name || user.name || user.email;

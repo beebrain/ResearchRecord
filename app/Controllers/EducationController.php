@@ -130,7 +130,12 @@ class EducationController extends Controller
     public function getEducation($userUid = null)
     {
         if (!$userUid) {
-            $userUid = $this->request->getGet('email') ?? $this->request->getGet('user_uid');
+            // Email is sent via POST body because IIS rejects "@" in the URL path and
+            // drops GET params on the index.php?/route form.
+            $userUid = $this->request->getPost('email')
+                ?? $this->request->getPost('user_uid')
+                ?? $this->request->getGet('email')
+                ?? $this->request->getGet('user_uid');
         }
 
         if (!$userUid) {
