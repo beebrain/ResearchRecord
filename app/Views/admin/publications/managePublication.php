@@ -1747,6 +1747,22 @@
             let isEditMode = false; // Track if we're in edit mode
             let currentEditPublicationId = null; // Store current publication ID when editing
 
+            // Remove any leftover SweetAlert loading/backdrop residue. A fast fire()/close()
+            // (e.g. the edit-loading spinner) can leave a .swal2-container behind; after a few
+            // open/close cycles these stack on top of the modal and hide it. Purge them all
+            // and reset the body styles SweetAlert mutates so the modal is always visible.
+            function purgeSwalResidue() {
+                try {
+                    if (window.Swal && typeof Swal.close === 'function' && Swal.isVisible && Swal.isVisible()) {
+                        Swal.close();
+                    }
+                } catch (e) { /* ignore */ }
+                document.querySelectorAll('.swal2-container').forEach(el => el.remove());
+                document.body.classList.remove('swal2-shown', 'swal2-height-auto', 'swal2-no-backdrop');
+                document.documentElement.classList.remove('swal2-shown', 'swal2-height-auto');
+                document.body.style.removeProperty('padding-right');
+            }
+
             // Open add modal (for new publication)
             function openAddModal() {
                 console.log('Opening add modal (Add Mode)...');
@@ -1755,6 +1771,7 @@
 
                 const addModal = document.getElementById('addModal');
                 if (addModal) {
+                    purgeSwalResidue();
                     addModal.style.display = 'flex';
                     addModal.classList.remove('hidden');
                     document.body.style.overflow = 'hidden';
@@ -1817,14 +1834,11 @@
                 isEditMode = true;
                 currentEditPublicationId = publication.id;
 
-                // Defensive: close any stuck SweetAlert loading/backdrop from a previous edit so
-                // it can't sit on top and hide the modal after several open/close cycles.
-                if (window.Swal && typeof Swal.close === 'function') {
-                    Swal.close();
-                }
-
                 const addModal = document.getElementById('addModal');
                 if (addModal) {
+                    // Clear any stuck SweetAlert backdrop so it can't hide the modal after
+                    // several open/close cycles (1st open works, 3rd doesn't, etc.).
+                    purgeSwalResidue();
                     addModal.style.display = 'flex';
                     addModal.classList.remove('hidden');
                     document.body.style.overflow = 'hidden';
