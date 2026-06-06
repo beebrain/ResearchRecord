@@ -1817,6 +1817,12 @@
                 isEditMode = true;
                 currentEditPublicationId = publication.id;
 
+                // Defensive: close any stuck SweetAlert loading/backdrop from a previous edit so
+                // it can't sit on top and hide the modal after several open/close cycles.
+                if (window.Swal && typeof Swal.close === 'function') {
+                    Swal.close();
+                }
+
                 const addModal = document.getElementById('addModal');
                 if (addModal) {
                     addModal.style.display = 'flex';
