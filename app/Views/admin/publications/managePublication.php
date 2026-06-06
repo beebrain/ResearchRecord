@@ -1140,14 +1140,9 @@
                     console.log('=== EDIT PUBLICATION START ===');
                     console.log('Publication ID:', id);
 
-                    // Show loading
-                    Swal.fire({
-                        title: 'กำลังโหลดข้อมูล...',
-                        allowOutsideClick: false,
-                        didOpen: () => {
-                            Swal.showLoading();
-                        }
-                    });
+                    // NOTE: no SweetAlert loading spinner here — its dark backdrop could fail to
+                    // close on the fast IIS path and stay covering the whole page. The modal opens
+                    // quickly anyway.
 
                     // Fetch publication data
                     const apiUrl = API.getPublication + '/' + id;
@@ -1164,8 +1159,7 @@
                         throw new Error(result.message || 'ไม่สามารถโหลดข้อมูลได้');
                     }
 
-                    // Close loading and open edit modal with author matching
-                    Swal.close();
+                    // Open edit modal with author matching
                     console.log('Opening edit modal with data and matching authors...');
                     await openAddModalForEdit(result.data);
                     console.log('=== EDIT PUBLICATION COMPLETE ===');
