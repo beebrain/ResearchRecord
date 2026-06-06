@@ -845,7 +845,7 @@ class PublicationController extends Controller
         // Rate limit: 60 requests / minute per session (debounced UI does ~10/min,
         // a script scraping would hit this fast).
         $throttler = \Config\Services::throttler();
-        if (! $throttler->check('search-user-names:' . session_id(), 60, MINUTE)) {
+        if (! $throttler->check('search-user-names_' . session_id(), 60, MINUTE)) { // "_" not ":" — CI4 cache keys reject ":"
             return $this->response->setStatusCode(429)
                 ->setJSON(['success' => false, 'message' => 'ค้นหาบ่อยเกินไป รอสักครู่']);
         }
@@ -938,7 +938,7 @@ class PublicationController extends Controller
         }
 
         $throttler = \Config\Services::throttler();
-        if (! $throttler->check('search-author-email:' . session_id(), 60, MINUTE)) {
+        if (! $throttler->check('search-author-email_' . session_id(), 60, MINUTE)) { // "_" not ":" — CI4 cache keys reject ":"
             return $this->response->setStatusCode(429)
                 ->setJSON(['success' => false, 'message' => 'ค้นหาบ่อยเกินไป รอสักครู่']);
         }
