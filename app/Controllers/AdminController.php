@@ -1539,6 +1539,12 @@ class AdminController extends Controller
         try {
             $facultyId = $this->request->getGet('faculty_id');
 
+            // TEMP DEBUG: trace faculty filter param delivery
+            log_message('debug', 'getCurricula - TEMPDBG faculty_id=' . var_export($facultyId, true)
+                . ' | QS=' . ($_SERVER['QUERY_STRING'] ?? '')
+                . ' | REQUEST_URI=' . ($_SERVER['REQUEST_URI'] ?? '')
+                . ' | GET=' . json_encode($_GET));
+
             // Get user data from session
             $userData = $this->session->get('user_data') ?? [];
             $userId = UserIdentity::sessionEmail();
