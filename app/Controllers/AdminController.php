@@ -1534,16 +1534,14 @@ class AdminController extends Controller
      * Get all curricula with faculty info
      * Filters by faculty admin permissions if applicable
      */
-    public function getCurricula()
+    public function getCurricula($facultyId = null)
     {
         try {
-            $facultyId = $this->request->getGet('faculty_id');
-
-            // TEMP DEBUG: trace faculty filter param delivery
-            log_message('debug', 'getCurricula - TEMPDBG faculty_id=' . var_export($facultyId, true)
-                . ' | QS=' . ($_SERVER['QUERY_STRING'] ?? '')
-                . ' | REQUEST_URI=' . ($_SERVER['REQUEST_URI'] ?? '')
-                . ' | GET=' . json_encode($_GET));
+            // faculty_id arrives as a route segment (works on both IIS path-rewrite and
+            // Docker query-string routing); fall back to a GET param for compatibility.
+            if ($facultyId === null) {
+                $facultyId = $this->request->getGet('faculty_id');
+            }
 
             // Get user data from session
             $userData = $this->session->get('user_data') ?? [];

@@ -175,12 +175,10 @@ function closeFacultyModal() {
 }
 
 function loadUsersForDean(facultyId = null) {
-    // Trailing "?" closes the route segment; extra GET params are then appended with "&"
-    // (matches the working query-string format, e.g. index.php?/admin/route?&faculty_id=15)
-    let url = appRoute('admin/getUsersForDeanSelection?');
-    if (facultyId) {
-        url += '&faculty_id=' + facultyId;
-    }
+    // Note: faculty_id (used only to prioritise ordering) is intentionally not sent —
+    // GET params do not survive the IIS path-rewrite on the index.php?/route form.
+    // The full active-user list is returned regardless of faculty.
+    const url = appRoute('admin/getUsersForDeanSelection');
     
     $.ajax({
         url: url,
@@ -317,12 +315,11 @@ function toggleFacultyStatus(id) {
 // ==================== Curriculum Management ====================
 
 function loadCurricula(facultyId = null) {
-    // Trailing "?" closes the route segment; extra GET params are then appended with "&"
-    // (matches the working query-string format, e.g. index.php?/admin/route?&faculty_id=15)
-    let url = appRoute('admin/getCurricula?');
-    if (facultyId) {
-        url += '&faculty_id=' + facultyId;
-    }
+    // Pass faculty_id as a route segment, not a query param: IIS (path rewrite) drops
+    // GET params on the index.php?/route form, but a path segment routes correctly on
+    // both IIS and the Docker query-string setup.
+    const path = facultyId ? ('admin/getCurricula/' + encodeURIComponent(facultyId)) : 'admin/getCurricula';
+    const url = appRoute(path);
 
     $.ajax({
         url: url,

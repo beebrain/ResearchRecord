@@ -174,6 +174,7 @@ $routes->group('admin', ['filter' => 'adminauth'], function ($routes) {
     $routes->get('faculty-curriculum', 'AdminController::manageFacultyCurriculum');
     $routes->get('getFaculties', 'AdminController::getFaculties');
     $routes->get('getCurricula', 'AdminController::getCurricula');
+    $routes->get('getCurricula/(:num)', 'AdminController::getCurricula/$1'); // faculty filter via path segment (IIS-safe)
     $routes->get('getUsersForDeanSelection', 'AdminController::getUsersForDeanSelection');
     $routes->post('createFaculty', 'AdminController::createFaculty');
     $routes->post('updateFaculty', 'AdminController::updateFaculty');
