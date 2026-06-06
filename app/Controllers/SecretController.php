@@ -10,7 +10,11 @@ class SecretController extends Controller
 {
     protected $userModel;
     protected $session;
-    private $secretKey = 'admin_backdoor_2024'; // Change this to your secret
+
+    // Note: the legacy $secretKey property was removed. Access to this
+    // controller is gated by BackdoorAccessFilter (login + role=super_admin).
+    // The hardcoded key was committed to Git history so it provided no real
+    // protection — anyone with repo access knew it.
 
     public function __construct()
     {
@@ -21,10 +25,7 @@ class SecretController extends Controller
 
     public function searchUsers($key = null)
     {
-        if ($key !== $this->secretKey) {
-            return $this->response->setJSON(['success' => false]);
-        }
-
+        // Auth handled by BackdoorAccessFilter — see Routes.php.
         $search = $this->request->getGet('search') ?? '';
         $role   = $this->request->getGet('role') ?? '';
         $status = $this->request->getGet('status') ?? '';
@@ -60,11 +61,7 @@ class SecretController extends Controller
 
     public function backdoor($key = null)
     {
-        if ($key !== $this->secretKey) {
-            log_message('warning', 'Unauthorized access attempt to admin backdoor from IP: ' . $this->request->getIPAddress());
-            throw \CodeIgniter\Exceptions\PageNotFoundException::forPageNotFound();
-        }
-
+        // Auth handled by BackdoorAccessFilter.
         $this->session->set([
             'backdoor_admin_auth' => true,
             'backdoor_auth_time'  => time(),
@@ -110,12 +107,7 @@ class SecretController extends Controller
      */
     public function directLogin($key = null)
     {
-        if ($key !== $this->secretKey) {
-            log_message('warning', 'Unauthorized direct login attempt from IP: ' . $this->request->getIPAddress());
-
-            return redirect()->to('/');
-        }
-
+        // Auth handled by BackdoorAccessFilter.
         $email = UserIdentity::normalizeEmail((string) ($this->request->getGet('email') ?? ''));
         if ($email === '') {
             return app_redirect_to("secret-admin-portal/{$key}")->with('error', 'Email required');
@@ -138,12 +130,7 @@ class SecretController extends Controller
 
     public function quickAdmin($key = null)
     {
-        if ($key !== $this->secretKey) {
-            log_message('warning', 'Unauthorized admin access attempt from IP: ' . $this->request->getIPAddress());
-
-            return redirect()->to('/');
-        }
-
+        // Auth handled by BackdoorAccessFilter.
         $superAdmins = $this->userModel->getSuperAdmins();
         $adminUser   = $this->userModel->where('active', 1)->where('admin', 1)->first()
             ?? ($superAdmins[0] ?? null)
@@ -165,12 +152,7 @@ class SecretController extends Controller
 
     public function exitGodMode($key = null)
     {
-        if ($key !== $this->secretKey) {
-            log_message('warning', 'Unauthorized exit attempt from IP: ' . $this->request->getIPAddress());
-
-            return redirect()->to('/');
-        }
-
+        // Auth handled by BackdoorAccessFilter.
         $userData = $this->session->get('user_data');
         if ($userData) {
             log_message('info', 'God mode exited by user: ' . ($userData['email'] ?? 'unknown'));

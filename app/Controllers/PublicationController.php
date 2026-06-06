@@ -842,6 +842,14 @@ class PublicationController extends Controller
                 ->setStatusCode(401);
         }
 
+        // Rate limit: 60 requests / minute per session (debounced UI does ~10/min,
+        // a script scraping would hit this fast).
+        $throttler = \Config\Services::throttler();
+        if (! $throttler->check('search-user-names:' . session_id(), 60, MINUTE)) {
+            return $this->response->setStatusCode(429)
+                ->setJSON(['success' => false, 'message' => 'ค้นหาบ่อยเกินไป รอสักครู่']);
+        }
+
         try {
             $name = $this->request->getGet('name');
             $email = $this->request->getGet('email');
@@ -927,6 +935,12 @@ class PublicationController extends Controller
         if (!$userData || !$this->request->isAJAX()) {
             return $this->response->setJSON(['success' => false, 'message' => 'Unauthorized'])
                 ->setStatusCode(401);
+        }
+
+        $throttler = \Config\Services::throttler();
+        if (! $throttler->check('search-author-email:' . session_id(), 60, MINUTE)) {
+            return $this->response->setStatusCode(429)
+                ->setJSON(['success' => false, 'message' => 'ค้นหาบ่อยเกินไป รอสักครู่']);
         }
 
         try {
