@@ -38,7 +38,7 @@ class AuthorModel extends Model
         $result = $this->db->table('authors a')
             ->select('a.id AS author_id, a.email AS author_email,
                 COALESCE(u.email, a.user_email) AS user_email,
-                u.thai_name, u.thai_lastname, u.major')
+                u.thai_name, u.thai_lastname, u.gf_name, u.gl_name, u.major')
             ->join('user u', 'a.user_email = u.email', 'left')
             ->groupStart()
             ->where('a.email', $email)
@@ -51,11 +51,15 @@ class AuthorModel extends Model
             return null;
         }
 
+        // Prefer Thai name, fall back to English so the name is never blank
+        $thaiName    = trim(($result['thai_name'] ?? '') . ' ' . ($result['thai_lastname'] ?? ''));
+        $englishName = trim(($result['gf_name'] ?? '') . ' ' . ($result['gl_name'] ?? ''));
+
         return [
             'id'         => $result['author_id'],
             'author_id'  => $result['author_id'],
             'email'      => $email,
-            'name'       => trim(($result['thai_name'] ?? '') . ' ' . ($result['thai_lastname'] ?? '')),
+            'name'       => $thaiName !== '' ? $thaiName : $englishName,
             'affiliation'=> $result['major'] ?? '',
             'user_email' => $result['user_email'] ?? '',
             'is_linked'  => ! empty($result['user_email']),

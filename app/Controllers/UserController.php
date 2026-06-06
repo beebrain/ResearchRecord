@@ -293,20 +293,27 @@ class UserController extends Controller
                 ]);
             }
 
-            // First, search by email in users table
+            // First, search by email in users table (normalize to match the email PK)
+            $email = \App\Libraries\UserIdentity::normalizeEmail((string) $email);
             $user = $this->userModel->where('email', $email)->first();
 
             if ($user) {
+                // Build display name: prefer Thai, fall back to English so it is never blank
+                $thaiFull    = trim(($user['thai_name'] ?? '') . ' ' . ($user['thai_lastname'] ?? ''));
+                $englishFull = trim(($user['gf_name'] ?? '') . ' ' . ($user['gl_name'] ?? ''));
+                $displayName = $thaiFull !== '' ? $thaiFull : $englishFull;
+
                 // Convert user data to author format
                 $authorData = [
                     'id' => null,
                     'user_id' => $user['email'],
                     'user_uid' => $user['email'],
                     'uid' => $user['email'],
+                    'matched' => true,
                     'email' => $user['email'],
                     'thai_name' => ($user['thai_name'] ?? '') . ' ' . ($user['thai_lastname'] ?? ''),
                     'english_name' => ($user['gf_name'] ?? '') . ' ' . ($user['gl_name'] ?? ''),
-                    'name' => ($user['thai_name'] ?? '') . ' ' . ($user['thai_lastname'] ?? ''),
+                    'name' => $displayName,
                     'first_name' => $user['thai_name'] ?? '',
                     'last_name' => $user['thai_lastname'] ?? '',
                     'thai_first_name' => $user['thai_name'] ?? '',
@@ -334,6 +341,7 @@ class UserController extends Controller
                     'user_id' => $author['user_id'] ?? null,
                     'user_uid' => $author['user_email'] ?? null,
                     'uid' => $author['user_email'] ?? null,
+                    'matched' => ! empty($author['is_linked']),
                     'email' => $author['email'] ?? $email,
                     'thai_name' => $author['name'] ?? '',
                     'english_name' => $author['name'] ?? '',
