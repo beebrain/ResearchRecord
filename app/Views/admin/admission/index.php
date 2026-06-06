@@ -397,13 +397,13 @@
             // Show loading
             $('#forms-table-body').html('<tr><td colspan="8" class="px-6 py-8 text-center"><div class="animate-spin inline-block w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full"></div><p class="mt-2 text-gray-500">กำลังโหลด...</p></td></tr>');
 
-            // Update URL without reload
-            const newUrl = appRoute('admin/admission') + '?year=' + year + (faculty ? '&faculty=' + faculty : '');
+            // Update URL without reload (year/faculty as path segments; IIS drops GET params)
+            const newUrl = appRoute('admin/admission/' + year + (faculty ? '/' + faculty : ''));
             window.history.pushState({}, '', newUrl);
 
             $.ajax({
-                url: appRoute('admin/admission/list?'),
-                type: 'GET',
+                url: appRoute('admin/admission/list'), // POST: IIS drops GET params
+                type: 'POST',
                 data: {
                     year: year,
                     faculty: faculty
@@ -541,7 +541,7 @@
                     success: function(result) {
                         if (result.success) {
                             Swal.fire('สำเร็จ!', `สร้างแบบฟอร์ม ${result.count} รายการ`, 'success').then(() => {
-                                window.location.href = appRoute('admin/admission') + '?year=' + year;
+                                window.location.href = appRoute('admin/admission/' + year);
                             });
                         } else {
                             Swal.fire('ผิดพลาด', result.message, 'error');

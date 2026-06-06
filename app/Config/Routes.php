@@ -160,12 +160,16 @@ $routes->group('admin', ['filter' => 'adminauth'], function ($routes) {
     // User Curriculum Management
     $routes->get('manage-user-curriculum', 'AdminController::manageuserCuriculum');
     $routes->get('getAllUsersForCurriculumManagement', 'AdminController::getAllUsersForCurriculumManagement');
+    $routes->post('getAllUsersForCurriculumManagement', 'AdminController::getAllUsersForCurriculumManagement'); // filters via POST (IIS-safe)
     $routes->get('getCurriculumsByFacultyWithMembers', 'AdminController::getCurriculumsByFacultyWithMembers');
+    $routes->post('getCurriculumsByFacultyWithMembers', 'AdminController::getCurriculumsByFacultyWithMembers'); // faculty filter via POST (IIS-safe)
 
     // User Email Management
     $routes->get('manageEmails', 'AdminController::manageEmails');
     $routes->get('getUsersWithEmails', 'AdminController::getUsersWithEmails');
+    $routes->post('getUsersWithEmails', 'AdminController::getUsersWithEmails'); // search via POST (IIS-safe)
     $routes->get('getSecondaryEmails', 'AdminController::getSecondaryEmails');
+    $routes->post('getSecondaryEmails', 'AdminController::getSecondaryEmails'); // user_uid via POST (IIS-safe)
     $routes->post('addSecondaryEmail', 'AdminController::addSecondaryEmail');
     $routes->post('updateSecondaryEmail', 'AdminController::updateSecondaryEmail');
     $routes->post('deleteSecondaryEmail', 'AdminController::deleteSecondaryEmail');
@@ -176,6 +180,7 @@ $routes->group('admin', ['filter' => 'adminauth'], function ($routes) {
     $routes->get('getCurricula', 'AdminController::getCurricula');
     $routes->get('getCurricula/(:num)', 'AdminController::getCurricula/$1'); // faculty filter via path segment (IIS-safe)
     $routes->get('getUsersForDeanSelection', 'AdminController::getUsersForDeanSelection');
+    $routes->post('getUsersForDeanSelection', 'AdminController::getUsersForDeanSelection'); // curriculum_id/faculty_id via POST (IIS-safe)
     $routes->post('createFaculty', 'AdminController::createFaculty');
     $routes->post('updateFaculty', 'AdminController::updateFaculty');
     $routes->post('deleteFaculty', 'AdminController::deleteFaculty');
@@ -198,6 +203,9 @@ $routes->group('admin', ['filter' => 'adminauth'], function ($routes) {
 
     // Student Admission Form Management
     $routes->get('admission', 'AdminController::admissionIndex');
+    $routes->get('admission/(:num)', 'AdminController::admissionIndex/$1'); // year as path segment (IIS-safe)
+    $routes->get('admission/(:num)/(:any)', 'AdminController::admissionIndex/$1/$2'); // year/faculty as path segments
+    $routes->post('admission/list', 'AdminController::admissionList'); // filters via POST (IIS-safe)
     $routes->get('admission/edit/(:num)', 'AdminController::admissionEdit/$1');
     $routes->get('admission/view/(:num)', 'AdminController::admissionView/$1');
     $routes->get('admission/print/(:num)', 'AdminController::admissionPrint/$1');
@@ -213,6 +221,7 @@ $routes->group('admin', ['filter' => 'adminauth'], function ($routes) {
     // Education History Management (Faculty Admin)
     $routes->get('education', 'EducationController::index');
     $routes->get('education/users', 'EducationController::getUsers');
+    $routes->post('education/users', 'EducationController::getUsers'); // faculty_id/search via POST (IIS-safe)
     $routes->get('education/get', 'EducationController::getEducation');
     $routes->post('education/get', 'EducationController::getEducation'); // email via POST body (IIS-safe)
     $routes->get('education/get/(:any)', 'EducationController::getEducation/$1');
@@ -220,6 +229,7 @@ $routes->group('admin', ['filter' => 'adminauth'], function ($routes) {
     $routes->post('education/deleteEntry/(:num)', 'EducationController::deleteEntry/$1');
     $routes->get('education/pdf-report', 'EducationController::pdfReport');
     $routes->get('education/report-data', 'EducationController::getReportData');
+    $routes->post('education/report-data', 'EducationController::getReportData'); // faculty_id via POST (IIS-safe)
 });
 
 // Dashboard API Routes (requires auth - accessible by all logged-in users)

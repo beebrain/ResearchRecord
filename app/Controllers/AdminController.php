@@ -1119,7 +1119,7 @@ class AdminController extends Controller
         }
 
         try {
-            $search = $this->request->getGet('search');
+            $search = $this->request->getPostGet('search');
 
             if ($search) {
                 $users = $this->userModel->searchUsersWithCurriculum($search);
@@ -1409,7 +1409,7 @@ class AdminController extends Controller
         }
 
         try {
-            $userEmail = UserIdentity::normalizeEmail((string) ($this->request->getGet('user_uid') ?? ''));
+            $userEmail = UserIdentity::normalizeEmail((string) ($this->request->getPostGet('user_uid') ?? ''));
 
             if ($userEmail === '') {
                 return $this->response->setJSON([
@@ -2942,8 +2942,8 @@ class AdminController extends Controller
         }
 
         try {
-            $search = $this->request->getGet('search');
-            $facultyId = $this->request->getGet('faculty_id');
+            $search = $this->request->getPostGet('search');
+            $facultyId = $this->request->getPostGet('faculty_id');
 
             // Get all active teachers with their curriculum info from teacher_curriculum_view
             $builder = $this->db->table('user');
@@ -3028,7 +3028,7 @@ class AdminController extends Controller
         }
 
         try {
-            $facultyId = $this->request->getGet('faculty_id');
+            $facultyId = $this->request->getPostGet('faculty_id');
 
             // Check user role and permissions
             $userData = $this->session->get('user_data') ?? [];
@@ -3183,7 +3183,7 @@ class AdminController extends Controller
     /**
      * Show list of student admission forms
      */
-    public function admissionIndex()
+    public function admissionIndex($year = null, $faculty = null)
     {
         $admissionModel = new \App\Models\StudentAdmissionFormModel();
         $facultyModel = new \App\Models\FacultyModel();
@@ -3191,14 +3191,15 @@ class AdminController extends Controller
         // Get available years first
         $years = $admissionModel->getAvailableYears();
 
-        // Get selected year from query param or default to latest available year
-        $selectedYear = $this->request->getGet('year');
+        // Year/faculty arrive as route segments (IIS drops GET params on index.php?/route);
+        // fall back to POST/GET for compatibility.
+        $selectedYear = $year ?? $this->request->getPostGet('year');
         if (empty($selectedYear)) {
             // Use the latest year (first in array since it's ordered DESC)
             $selectedYear = !empty($years) ? $years[0] : (date('Y') + 543);
         }
 
-        $selectedFaculty = $this->request->getGet('faculty') ?? '';
+        $selectedFaculty = $faculty ?? $this->request->getPostGet('faculty') ?? '';
 
         // If no years available, use selected year
         if (empty($years)) {
@@ -3302,13 +3303,13 @@ class AdminController extends Controller
         $years = $admissionModel->getAvailableYears();
 
         // Get year from query param or default to latest available year
-        $year = $this->request->getGet('year');
+        $year = $this->request->getPostGet('year');
         if (empty($year)) {
             // Use the latest year (first in array since it's ordered DESC)
             $year = !empty($years) ? $years[0] : (date('Y') + 543);
         }
 
-        $faculty = $this->request->getGet('faculty') ?? '';
+        $faculty = $this->request->getPostGet('faculty') ?? '';
 
         // Get forms based on user role
         $userData = $this->session->get('user_data');
@@ -3703,8 +3704,8 @@ class AdminController extends Controller
     public function getUsersForDeanSelection()
     {
         try {
-            $facultyId = $this->request->getGet('faculty_id');
-            $curriculumId = $this->request->getGet('curriculum_id');
+            $facultyId = $this->request->getPostGet('faculty_id');
+            $curriculumId = $this->request->getPostGet('curriculum_id');
 
             // If curriculum_id is provided, get only members of that curriculum
             if ($curriculumId) {

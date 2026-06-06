@@ -207,15 +207,17 @@
 
         async function loadUsers(searchTerm = '') {
             try {
-                const url = searchTerm ?
-                    `${appRoute('admin/getUsersWithEmails')}?search=${encodeURIComponent(searchTerm)}` :
-                    appRoute('admin/getUsersWithEmails');
+                // POST: IIS drops GET params on the index.php?/route form
+                const body = new URLSearchParams();
+                if (searchTerm) body.set('search', searchTerm);
 
-                const response = await fetch(url, {
-                    method: 'GET',
+                const response = await fetch(appRoute('admin/getUsersWithEmails'), {
+                    method: 'POST',
                     headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: body.toString()
                 });
 
                 const result = await response.json();
@@ -317,11 +319,14 @@
 
         async function loadSecondaryEmails(userUid) {
             try {
-                const response = await fetch(`${appRoute('admin/getSecondaryEmails')}?user_uid=${userUid}`, {
-                    method: 'GET',
+                // POST: IIS drops GET params on the index.php?/route form
+                const response = await fetch(appRoute('admin/getSecondaryEmails'), {
+                    method: 'POST',
                     headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: new URLSearchParams({ user_uid: userUid }).toString()
                 });
 
                 const result = await response.json();

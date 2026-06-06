@@ -279,10 +279,11 @@
                 processing: true,
                 serverSide: false,
                 ajax: {
-                    url: appRoute('admin/education/users?'),
+                    url: appRoute('admin/education/users'),
+                    type: 'POST', // POST: IIS drops GET params on index.php?/route
                     cache: false,
                     data: function(d) {
-                        // Send filter params via data instead of URL to avoid double-? with CI4 query-string routing
+                        // Send filter params via POST body (IIS drops GET params)
                         d.faculty_id = $('#facultyFilter').val() || '';
                         d.search = $('#searchInput').val() || '';
                     },
@@ -622,7 +623,7 @@
             });
 
             try {
-                const response = await $.get(appRoute('admin/education/report-data?'), { faculty_id: facultyId });
+                const response = await $.post(appRoute('admin/education/report-data'), { faculty_id: facultyId });
 
                 if (!response.success || !response.data || response.data.length === 0) {
                     Swal.fire({

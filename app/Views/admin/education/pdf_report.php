@@ -174,7 +174,7 @@
             $('#loadingSection').removeClass('hidden');
             $('#btnGeneratePDF').prop('disabled', true);
 
-            $.get(appRoute('admin/education/report-data?'), { faculty_id: facultyId })
+            $.post(appRoute('admin/education/report-data'), { faculty_id: facultyId })
                 .done(function(response) {
                     $('#loadingSection').addClass('hidden');
 

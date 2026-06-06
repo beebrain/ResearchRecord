@@ -321,7 +321,7 @@ function populateFacultyFilter() {
  * Load all users with curriculum info
  */
 function loadUsers(search = '', facultyId = 'all') {
-    const url = appRoute('admin/getAllUsersForCurriculumManagement?');
+    const url = appRoute('admin/getAllUsersForCurriculumManagement'); // POST: IIS drops GET params
     const params = {};
 
     if (search) {
@@ -333,7 +333,7 @@ function loadUsers(search = '', facultyId = 'all') {
 
     $.ajax({
         url: url,
-        type: 'GET',
+        type: 'POST',
         dataType: 'json',
         data: params,
         beforeSend: function (xhr) {
@@ -368,7 +368,7 @@ function loadUsers(search = '', facultyId = 'all') {
  * Load curriculums by faculty with members
  */
 function loadCurriculums(facultyId = 'all') {
-    const url = appRoute('admin/getCurriculumsByFacultyWithMembers?');
+    const url = appRoute('admin/getCurriculumsByFacultyWithMembers'); // POST: IIS drops GET params
     const params = {};
 
     if (facultyId) {
@@ -379,7 +379,7 @@ function loadCurriculums(facultyId = 'all') {
 
     $.ajax({
         url: url,
-        type: 'GET',
+        type: 'POST',
         dataType: 'json',
         data: params,
         beforeSend: function (xhr) {
@@ -1188,8 +1188,8 @@ function loadUsersForChair(curriculumId, currentChairId = null) {
     }
     
     $.ajax({
-        url: appRoute('admin/getUsersForDeanSelection?'),
-        method: 'GET',
+        url: appRoute('admin/getUsersForDeanSelection'), // POST: IIS drops GET params
+        method: 'POST',
         dataType: 'json',
         data: {
             curriculum_id: curriculumId

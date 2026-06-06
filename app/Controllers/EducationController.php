@@ -70,8 +70,8 @@ class EducationController extends Controller
         $userRole = $userData['role'] ?? 'user';
         $managedFaculties = json_decode($userData['managed_faculties'] ?? '[]', true);
 
-        $facultyFilter = $this->request->getGet('faculty_id');
-        $search = $this->request->getGet('search');
+        $facultyFilter = $this->request->getPostGet('faculty_id');
+        $search = $this->request->getPostGet('search');
 
         // Build query
         $builder = $this->userModel->db->table('user');
@@ -305,7 +305,7 @@ class EducationController extends Controller
         $userRole = $userData['role'] ?? 'user';
         $managedFaculties = json_decode($userData['managed_faculties'] ?? '[]', true);
 
-        $facultyId = $this->request->getGet('faculty_id');
+        $facultyId = $this->request->getPostGet('faculty_id');
 
         // Build query to get users with education
         $builder = $this->userModel->db->table('user u');
