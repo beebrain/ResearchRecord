@@ -2268,6 +2268,24 @@
                     if (window.AuthorNameSearch) {
                         const $newInput = $(authorDiv).find('input[name*="[name]"]');
                         window.AuthorNameSearch.setupSingleNameInput($newInput);
+
+                        // If this author is matched to a system user, render the chip so the
+                        // "ผู้ใช้ในระบบ" state persists on reload (same as live selection), and keep
+                        // the user link on the name input so the save serializer submits it.
+                        if (isMatched && typeof window.AuthorNameSearch.renderChip === 'function') {
+                            const $row = $(authorDiv);
+                            if (userUid) {
+                                $newInput.data('user-uid', userUid);
+                                $row.find('input[name*="[email]"]').data('user-uid', userUid);
+                            }
+                            $row.data('matched-user', {
+                                uid: userUid,
+                                name: authorName,
+                                email: authorEmail,
+                                affiliation: authorAffiliation
+                            });
+                            window.AuthorNameSearch.renderChip($row);
+                        }
                     }
                 }, 100);
             }
@@ -3033,16 +3051,21 @@
                             corresponding: correspondingInput && correspondingInput.checked ? '1' : '0'
                         };
 
-                        // Include user_id if available (from autocomplete selection)
+                        // Include user link if available. The matched user-uid may live on the
+                        // name input, the email input (email-autocomplete), or the hidden
+                        // authors[..][user_uid] field — check all so the link is never lost.
                         const $nameInput = $(nameInput);
-                        const userId = $nameInput.data('user-id');
-                        const userUid = $nameInput.data('user-uid');
+                        const $emailInput = $(emailInput);
+                        const $uidHidden = $(container.querySelector('input[name*="[user_uid]"]'));
+                        const userId = $nameInput.data('user-id') || $emailInput.data('user-id');
+                        const userUid = $nameInput.data('user-uid') || $emailInput.data('user-uid') || ($uidHidden.length ? $uidHidden.val() : '');
 
                         if (userId) {
                             authorData.author_id = userId;
                         }
                         if (userUid) {
                             authorData.uid = userUid;
+                            authorData.user_uid = userUid;
                         }
 
                         authors.push(authorData);
