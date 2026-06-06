@@ -7,7 +7,7 @@
     <title><?= $title ?? 'เพิ่มผลงานวิจัย' ?></title>
     <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.min.css') ?>">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <meta name="csrf-token" content="<?= csrf_hash() ?>">
+    <?= view('partials/csrf_head') ?>
 
     <script>
         // CI4-generated endpoints — site_url() picks the right URL form
