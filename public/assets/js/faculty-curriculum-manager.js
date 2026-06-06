@@ -177,7 +177,8 @@ function closeFacultyModal() {
 function loadUsersForDean(facultyId = null) {
     let url = appRoute('admin/getUsersForDeanSelection');
     if (facultyId) {
-        url += '?faculty_id=' + facultyId;
+        // appRoute already starts the query string with "?", so extra params use "&"
+        url += '&faculty_id=' + facultyId;
     }
     
     $.ajax({
@@ -317,7 +318,8 @@ function toggleFacultyStatus(id) {
 function loadCurricula(facultyId = null) {
     let url = appRoute('admin/getCurricula');
     if (facultyId) {
-        url += '?faculty_id=' + facultyId;
+        // appRoute already starts the query string with "?", so extra params use "&"
+        url += '&faculty_id=' + facultyId;
     }
 
     $.ajax({
