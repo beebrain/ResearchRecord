@@ -175,9 +175,10 @@ function closeFacultyModal() {
 }
 
 function loadUsersForDean(facultyId = null) {
-    let url = appRoute('admin/getUsersForDeanSelection');
+    // Trailing "?" closes the route segment; extra GET params are then appended with "&"
+    // (matches the working query-string format, e.g. index.php?/admin/route?&faculty_id=15)
+    let url = appRoute('admin/getUsersForDeanSelection?');
     if (facultyId) {
-        // appRoute already starts the query string with "?", so extra params use "&"
         url += '&faculty_id=' + facultyId;
     }
     
@@ -316,9 +317,10 @@ function toggleFacultyStatus(id) {
 // ==================== Curriculum Management ====================
 
 function loadCurricula(facultyId = null) {
-    let url = appRoute('admin/getCurricula');
+    // Trailing "?" closes the route segment; extra GET params are then appended with "&"
+    // (matches the working query-string format, e.g. index.php?/admin/route?&faculty_id=15)
+    let url = appRoute('admin/getCurricula?');
     if (facultyId) {
-        // appRoute already starts the query string with "?", so extra params use "&"
         url += '&faculty_id=' + facultyId;
     }
 
