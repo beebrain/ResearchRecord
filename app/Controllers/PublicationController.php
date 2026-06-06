@@ -864,16 +864,7 @@ class PublicationController extends Controller
             $builder = $this->userModel->builder();
 
             $users = $builder
-                ->select('
-                email,
-                gf_name,
-                gl_name,
-                thai_name,
-                thai_lastname,
-                major,
-                title,
-                titleThai
-            ')
+                ->select('email, gf_name, gl_name, thai_name, thai_lastname')
                 ->where('active', 1)
                 ->groupStart()
                 ->like('gf_name', $searchTerm)
@@ -889,25 +880,20 @@ class PublicationController extends Controller
                 ->get()
                 ->getResultArray();
 
-            // Format results for frontend
+            // Format results for frontend — return only what the chip needs.
+            // Previous response leaked english_name/thai_name/title separately;
+            // a single display_name + email + affiliation is enough.
             $formattedUsers = array_map(function ($user) {
-                // Determine best display name
-                $englishName = trim($user['gf_name'] . ' ' . $user['gl_name']);
-                $thaiName = trim($user['thai_name'] . ' ' . $user['thai_lastname']);
-
-                $displayName = !empty($thaiName) ? $thaiName : $englishName;
+                $thaiName    = trim(($user['thai_name'] ?? '') . ' ' . ($user['thai_lastname'] ?? ''));
+                $englishName = trim(($user['gf_name'] ?? '') . ' ' . ($user['gl_name'] ?? ''));
+                $displayName = $thaiName !== '' ? $thaiName : $englishName;
 
                 return [
-                    'id' => $user['email'],
-                    'uid' => $user['email'],
-                    'name' => $displayName,
+                    'uid'          => $user['email'],
+                    'name'         => $displayName,
                     'display_name' => $displayName,
-                    'english_name' => $englishName,
-                    'thai_name' => $thaiName,
-                    'email' => $user['email'],
-                    'affiliation' => 'มหาวิทยาลัยราชภัฏอุตรดิตถ์',
-                    'title' => $user['title'] ?? ''
-                    // titleThai removed - not needed in frontend
+                    'email'        => $user['email'],
+                    'affiliation'  => 'มหาวิทยาลัยราชภัฏอุตรดิตถ์',
                 ];
             }, $users);
 
@@ -967,7 +953,7 @@ class PublicationController extends Controller
             if (!$author) {
                 // Search in user table by email (partial match)
                 $user = $this->userModel->builder()
-                    ->select('email, thai_name, thai_lastname, gf_name, gl_name, titleThai, major')
+                    ->select('email, thai_name, thai_lastname, gf_name, gl_name, major')
                     ->where('active', 1)
                     ->like('email', $email)
                     ->limit(1)
@@ -993,39 +979,20 @@ class PublicationController extends Controller
                     ? $author['affiliation']
                     : 'มหาวิทยาลัยราชภัฏอุตรดิตถ์';
 
-                // Build response using data already retrieved
-                $response = [
+                // Return only what the form needs. Previous response also
+                // leaked user_info.full_name + major + other_emails of any
+                // matched user — strictly more than the chip uses.
+                return $this->response->setJSON([
                     'success' => true,
-                    'found' => true,
-                    'author' => [
-                        'id' => $author['id'],
-                        'name' => $author['name'],
-                        'email' => $author['email'],
+                    'found'   => true,
+                    'author'  => [
+                        'id'          => $author['id'],
+                        'name'        => $author['name'],
+                        'email'       => $author['email'],
                         'affiliation' => $affiliation,
-                        'user_uid' => $author['user_email'] ?? ''
-                    ]
-                ];
-
-                // Add user info if linked (data already available from JOIN)
-                if ($author['is_linked']) {
-                    $response['user_info'] = [
-                        'full_name' => $author['name'],
-                        'major' => $author['affiliation'] ?? '',
-                        'is_linked' => true
-                    ];
-
-                    // Optional: Get other emails for this user (if needed)
-                    if (method_exists($this, 'getAuthorEmailsByUser')) {
-                        $userEmails = $this->getAuthorEmailsByUser($author['user_email'] ?? '');
-                        if (count($userEmails) > 1) {
-                            $response['other_emails'] = array_filter($userEmails, function ($e) use ($email) {
-                                return $e !== $email;
-                            });
-                        }
-                    }
-                }
-
-                return $this->response->setJSON($response);
+                        'user_uid'    => $author['user_email'] ?? '',
+                    ],
+                ]);
             }
 
             // No match found
