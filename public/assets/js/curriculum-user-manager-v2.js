@@ -617,7 +617,7 @@ function renderCurriculumCard(curriculum) {
                         title="เลือกประธานหลักสูตร"
                         data-curriculum-id="${curriculum.id}"
                         data-curriculum-name="${escapeHtml(curriculum.name)}"
-                        data-chair-id="${chairInfo ? chairInfo.uid : ''}">
+                        data-chair-id="${chairInfo ? chairInfo.email : ''}">
                         เลือกประธานหลักสูตร
                     </button>
                     <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-1 rounded">
@@ -1202,9 +1202,9 @@ function loadUsersForChair(curriculumId, currentChairId = null) {
                 if (response.data && response.data.length > 0) {
                     response.data.forEach(function(user) {
                         const option = $('<option></option>')
-                            .attr('value', user.uid)
+                            .attr('value', user.email)
                             .text(user.name + (user.email ? ' (' + user.email + ')' : ''));
-                        if (currentChairId && user.uid == currentChairId) {
+                        if (currentChairId && user.email == currentChairId) {
                             option.prop('selected', true);
                         }
                         chairSelect.append(option);
@@ -1261,7 +1261,7 @@ window.saveCurriculumChair = function() {
         contentType: 'application/json',
         data: JSON.stringify({
             curriculum_id: curriculumId,
-            chair_id: chairId
+            chair_email: chairId
         }),
         dataType: 'json',
         success: function(response) {

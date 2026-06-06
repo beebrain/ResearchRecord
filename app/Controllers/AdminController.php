@@ -1491,7 +1491,6 @@ class AdminController extends Controller
                     $faculties = $this->db->table('faculties')
                         ->select('faculties.*, 
                             COUNT(curriculum.id) as curriculum_count,
-                            dean.email as dean_uid,
                             dean.titleThai as dean_title,
                             dean.title as dean_title_en,
                             dean.thai_name as dean_name,
@@ -1645,11 +1644,12 @@ class AdminController extends Controller
                 ]);
             }
 
+            $deanEmail = $data['dean_email'] ?? $data['dean_id'] ?? null; // dean_id kept for backward compatibility
             $facultyData = [
                 'code' => $data['code'],
                 'name' => $data['name'],
                 'status' => isset($data['status']) && $data['status'] ? 1 : 0,
-                'dean_id' => !empty($data['dean_id']) ? $data['dean_id'] : null
+                'dean_email' => !empty($deanEmail) ? UserIdentity::normalizeEmail((string) $deanEmail) : null
             ];
 
             if ($this->facultyModel->insert($facultyData)) {
@@ -1709,11 +1709,12 @@ class AdminController extends Controller
                 }
             }
 
+            $deanEmail = $data['dean_email'] ?? $data['dean_id'] ?? null; // dean_id kept for backward compatibility
             $facultyData = [
                 'code' => $data['code'],
                 'name' => $data['name'],
                 'status' => isset($data['status']) && $data['status'] ? 1 : 0,
-                'dean_id' => !empty($data['dean_id']) ? $data['dean_id'] : null
+                'dean_email' => !empty($deanEmail) ? UserIdentity::normalizeEmail((string) $deanEmail) : null
             ];
 
             log_message('debug', 'Faculty data to update: ' . json_encode($facultyData));
@@ -3054,9 +3055,9 @@ class AdminController extends Controller
                 'c.degree_level',
                 'c.faculty_id',
                 'c.chair_email',
+                // chair.* columns are joined below; chair_email already carries the account identifier
                 'f.name as faculty_name',
                 'f.code as faculty_code',
-                'chair.email as chair_uid',
                 'chair.titleThai as chair_title',
                 'chair.title as chair_title_en',
                 'chair.thai_name as chair_name',
@@ -3119,7 +3120,7 @@ class AdminController extends Controller
 
                 // Format chair information
                 $chairInfo = null;
-                if (!empty($curriculum['chair_uid'])) {
+                if (!empty($curriculum['chair_email'])) {
                     $title = '';
                     if (!empty($curriculum['chair_title'])) {
                         $title = $curriculum['chair_title'];
@@ -3136,7 +3137,7 @@ class AdminController extends Controller
 
                     if ($chairName) {
                         $chairInfo = [
-                            'uid' => $curriculum['chair_uid'],
+                            'email' => $curriculum['chair_email'],
                             'name' => $chairName,
                             'title' => $title ?: null
                         ];
@@ -3658,7 +3659,7 @@ class AdminController extends Controller
      */
     private function formatDeanInfo($faculty)
     {
-        if (empty($faculty['dean_uid'])) {
+        if (empty($faculty['dean_email'])) {
             return null;
         }
 
@@ -3681,7 +3682,7 @@ class AdminController extends Controller
         }
 
         return [
-            'uid' => $faculty['dean_uid'],
+            'email' => $faculty['dean_email'],
             'name' => $name ?: '-',
             'title' => $title ?: null,
             'thai_name' => $faculty['dean_name'] ?? null,
@@ -3704,7 +3705,7 @@ class AdminController extends Controller
             // If curriculum_id is provided, get only members of that curriculum
             if ($curriculumId) {
                 $builder = $this->db->table('teacher_curriculum tc')
-                    ->select('u.email, u.email as uid, u.titleThai, u.title, u.thai_name, u.thai_lastname, u.gf_name, u.gl_name, u.faculty_id')
+                    ->select('u.email, u.titleThai, u.title, u.thai_name, u.thai_lastname, u.gf_name, u.gl_name, u.faculty_id')
                     ->join('user u', 'u.email = tc.teacher_email', 'inner')
                     ->where('tc.curriculum_id', $curriculumId)
                     ->where('tc.status', 1)
@@ -3714,7 +3715,7 @@ class AdminController extends Controller
             } else {
                 // Get all active users (preferably teachers)
                 $builder = $this->db->table('user')
-                    ->select('email as uid, titleThai, title, thai_name, thai_lastname, gf_name, gl_name, email, faculty_id')
+                    ->select('titleThai, title, thai_name, thai_lastname, gf_name, gl_name, email, faculty_id')
                     ->where('active', 1)
                     ->orderBy('thai_name', 'ASC')
                     ->orderBy('gf_name', 'ASC');
@@ -3752,7 +3753,6 @@ class AdminController extends Controller
                 }
 
                 $formattedUsers[] = [
-                    'uid' => $user['email'],
                     'name' => $name,
                     'title' => $title,
                     'email' => $user['email'],
@@ -3785,7 +3785,8 @@ class AdminController extends Controller
         try {
             $data = $this->request->getJSON(true);
             $curriculumId = $data['curriculum_id'] ?? null;
-            $chairId = $data['chair_id'] ?? null; // null to remove chair
+            $chairEmail = $data['chair_email'] ?? $data['chair_id'] ?? null; // chair_id kept for backward compatibility; null to remove chair
+            $chairEmail = !empty($chairEmail) ? UserIdentity::normalizeEmail((string) $chairEmail) : null;
 
             if (!$curriculumId) {
                 return $this->response->setJSON([
@@ -3826,9 +3827,9 @@ class AdminController extends Controller
                 ]);
             }
 
-            // Validate chair_id if provided
-            if ($chairId) {
-                $chair = $this->userModel->find($chairId);
+            // Validate chair email if provided
+            if ($chairEmail) {
+                $chair = $this->userModel->find($chairEmail);
                 if (!$chair || $chair['active'] != 1) {
                     return $this->response->setJSON([
                         'success' => false,
@@ -3838,11 +3839,11 @@ class AdminController extends Controller
             }
 
             // Update curriculum
-            $updateData = ['chair_id' => $chairId ?: null];
+            $updateData = ['chair_email' => $chairEmail ?: null];
             if ($this->curriculumModel->update($curriculumId, $updateData)) {
                 return $this->response->setJSON([
                     'success' => true,
-                    'message' => $chairId ? 'ตั้งประธานหลักสูตรสำเร็จ' : 'ลบประธานหลักสูตรสำเร็จ'
+                    'message' => $chairEmail ? 'ตั้งประธานหลักสูตรสำเร็จ' : 'ลบประธานหลักสูตรสำเร็จ'
                 ]);
             } else {
                 return $this->response->setJSON([

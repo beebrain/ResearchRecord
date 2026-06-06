@@ -124,7 +124,7 @@ function initFacultyForm() {
             code: $('#facultyCode').val(),
             name: $('#facultyName').val(),
             status: $('#facultyStatus').is(':checked'),
-            dean_id: $('#facultyDean').val() || null
+            dean_email: $('#facultyDean').val() || null
         };
 
         if (id) {
@@ -150,9 +150,9 @@ function openFacultyModal(id = null) {
             $('#facultyName').val(faculty.name);
             // Handle both old numeric (1/0) and new string ('active'/'inactive') status values
             $('#facultyStatus').prop('checked', faculty.status === 'active' || faculty.status == 1);
-            // Set dean if exists
-            if (faculty.dean_info && faculty.dean_info.uid) {
-                $('#facultyDean').val(faculty.dean_info.uid);
+            // Set dean if exists (matched by email)
+            if (faculty.dean_info && faculty.dean_info.email) {
+                $('#facultyDean').val(faculty.dean_info.email);
             } else {
                 $('#facultyDean').val('');
             }
@@ -191,7 +191,7 @@ function loadUsersForDean(facultyId = null) {
                 
                 response.data.forEach(function(user) {
                     const option = $('<option></option>')
-                        .attr('value', user.uid)
+                        .attr('value', user.email)
                         .text(user.name + (user.email ? ' (' + user.email + ')' : ''));
                     deanSelect.append(option);
                 });

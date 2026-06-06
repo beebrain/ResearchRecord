@@ -44,7 +44,6 @@ class FacultyModel extends Model
     public function getWithCurriculumCount()
     {
         return $this->select('faculties.*, COUNT(curriculum.id) as curriculum_count,
-                dean.email as dean_uid,
                 dean.titleThai as dean_title,
                 dean.title as dean_title_en,
                 dean.thai_name as dean_name,

@@ -280,12 +280,6 @@ class CurriculumModel extends Model
             if (is_array($chair)) {
                 $row['chair'] = $chair;
             }
-        } elseif (! empty($row['chair_id'])) {
-            $userModel = new UserModel();
-            $chair = $userModel->find((int) $row['chair_id']);
-            if (is_array($chair)) {
-                $row['chair'] = $chair;
-            }
         }
 
         return $row;

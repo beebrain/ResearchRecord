@@ -182,9 +182,9 @@ class UserController extends Controller
                 $curriculumModel = new \App\Models\CurriculumModel();
                 $curriculum = $curriculumModel->find($curriculumId);
                 
-                if ($curriculum && isset($curriculum['chair_id']) && $curriculum['chair_id'] == $userId) {
+                if ($curriculum && !empty($curriculum['chair_email']) && $curriculum['chair_email'] == $userId) {
                     // Remove chair if the removed user is the chair
-                    $curriculumModel->update($curriculumId, ['chair_id' => null]);
+                    $curriculumModel->update($curriculumId, ['chair_email' => null]);
                     log_message('info', 'Removed chair (user ' . $userId . ') from curriculum ' . $curriculumId);
                 }
                 

@@ -149,7 +149,7 @@
                 </div>
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-2">คณบดี</label>
-                    <select id="facultyDean" name="dean_id"
+                    <select id="facultyDean" name="dean_email"
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
                         <option value="">-- ไม่ระบุ --</option>
                     </select>
