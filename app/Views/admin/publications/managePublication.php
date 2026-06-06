@@ -1897,7 +1897,10 @@
                         for (let i = 0; i < publication.authors.length; i++) {
                             const author = publication.authors[i];
                             const authorName = author.name || author.author_name || '';
-                            const authorEmail = author.email || '';
+                            // getPublication returns the email as author_email — email mapping is
+                            // the primary match, so fall back to author_email (was a blank string).
+                            const authorEmail = author.email || author.author_email || '';
+                            const authorAffiliation = author.affiliation || author.author_affiliation || '';
 
                             console.log(`\n--- Author ${i + 1}/${publication.authors.length} ---`);
                             console.log('Original data:', {
@@ -1912,7 +1915,7 @@
                                 addAddAuthor({
                                     author_name: authorName,
                                     author_email: authorEmail,
-                                    author_affiliation: author.affiliation || '',
+                                    author_affiliation: authorAffiliation,
                                     corresponding: author.corresponding === '1' || author.corresponding === 1,
                                     user_uid: author.user_id,
                                     matched: true
@@ -1926,8 +1929,8 @@
                                 name: authorName,
                                 author_email: authorEmail,
                                 email: authorEmail,
-                                author_affiliation: author.affiliation || '',
-                                affiliation: author.affiliation || '',
+                                author_affiliation: authorAffiliation,
+                                affiliation: authorAffiliation,
                                 corresponding: author.corresponding === '1' || author.corresponding === 1
                             };
 
@@ -2044,7 +2047,7 @@
                                 addAddAuthor({
                                     author_name: matchedName,
                                     author_email: matchedUser.email || authorEmail,
-                                    author_affiliation: matchedUser.affiliation || author.affiliation || 'มหาวิทยาลัยราชภัฏอุตรดิตถ์',
+                                    author_affiliation: matchedUser.affiliation || authorAffiliation || 'มหาวิทยาลัยราชภัฏอุตรดิตถ์',
                                     corresponding: author.corresponding === '1' || author.corresponding === 1,
                                     user_uid: matchedUser.uid || matchedUser.id || '',
                                     matched: true
@@ -2055,7 +2058,7 @@
                                 addAddAuthor({
                                     author_name: authorName,
                                     author_email: authorEmail,
-                                    author_affiliation: author.affiliation || '',
+                                    author_affiliation: authorAffiliation,
                                     corresponding: author.corresponding === '1' || author.corresponding === 1,
                                     user_uid: '',
                                     matched: false
