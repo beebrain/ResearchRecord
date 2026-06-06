@@ -311,6 +311,9 @@
                                     <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         มาตรฐาน กพอ.
                                     </th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        ผู้บันทึก
+                                    </th>
                                     <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Actions
                                     </th>
@@ -319,7 +322,7 @@
                             <tbody id="publications-table" class="bg-white divide-y divide-gray-200">
                                 <!-- Loading state -->
                                 <tr id="loading-row">
-                                    <td colspan="6" class="px-6 py-20 text-center">
+                                    <td colspan="7" class="px-6 py-20 text-center">
                                         <div class="flex flex-col items-center justify-center gap-4">
                                             <div class="relative">
                                                 <div class="w-12 h-12 border-4 border-blue-200 rounded-full"></div>
@@ -914,7 +917,7 @@
                     console.log('No publications to display - showing empty state');
                     tbody.innerHTML = `
                     <tr>
-                        <td colspan="6" class="px-6 py-20 text-center">
+                        <td colspan="7" class="px-6 py-20 text-center">
                             <div class="flex flex-col items-center justify-center">
                                 <div class="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                                     <span class="text-4xl">📭</span>
@@ -946,6 +949,9 @@
 
                         const authors = pub.authors_names_thai || pub.authors_names_en || '-';
                         const source = pub.source || '-';
+                        const recorderName = (pub.created_by_name && pub.created_by_name.trim()) ? pub.created_by_name.trim() : '';
+                        const recorderEmail = pub.created_by_email || '';
+                        const recorder = recorderName || recorderEmail || '-';
 
                         return `
                     <tr class="hover:bg-gray-50 transition-colors">
@@ -987,7 +993,13 @@
                                 <option value="null" ${pub.approve === null || pub.approve === undefined || pub.approve === '' ? 'selected' : ''}>ยังไม่ได้ตรวจสอบ</option>
                             </select>
                         </td>
-                        
+
+                        <!-- ผู้บันทึก (recorder / created by) -->
+                        <td class="px-6 py-4">
+                            <div class="text-sm text-gray-700">${escapeHtml(recorder)}</div>
+                            ${recorderName && recorderEmail ? `<div class="text-xs text-gray-400">${escapeHtml(recorderEmail)}</div>` : ''}
+                        </td>
+
                         <!-- Action Buttons -->
                         <td class="px-6 py-4">
                             <div class="flex justify-center items-center gap-2">
