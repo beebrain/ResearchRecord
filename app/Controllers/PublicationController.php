@@ -168,6 +168,9 @@ class PublicationController extends Controller
                 // Process authors
                 $authors = $this->request->getPost('authors');
 
+                // TEMP DEBUG: trace author payload to diagnose lost user mapping on save
+                log_message('debug', 'savePublication - TEMPDBG raw authors=' . (is_string($authors) ? $authors : json_encode($authors)));
+
                 if (!empty($authors)) {
                     // Handle JSON string format
                     if (is_string($authors)) {
