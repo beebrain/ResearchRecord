@@ -757,6 +757,22 @@
                 return typeMap[type] || type;
             }
 
+            // Sort publications by latest saved time (updated_at, then created_at), newest first
+            function sortByLatestSaved(list) {
+                const savedTime = (pub) => {
+                    const raw = pub.updated_at || pub.created_at || '';
+                    // MySQL datetime "YYYY-MM-DD HH:MM:SS" -> ISO so Date.parse is reliable
+                    const t = Date.parse(String(raw).replace(' ', 'T'));
+                    return isNaN(t) ? 0 : t;
+                };
+                list.sort((a, b) => {
+                    const diff = savedTime(b) - savedTime(a);
+                    if (diff !== 0) return diff;
+                    return (parseInt(b.id) || 0) - (parseInt(a.id) || 0);
+                });
+                return list;
+            }
+
             // Load publications data
             async function loadPublications() {
                 try {
@@ -778,6 +794,8 @@
 
                     if (result.success) {
                         allPublications = result.data;
+                        // เรียงตามการบันทึกล่าสุด (updated_at/created_at มากสุดก่อน)
+                        sortByLatestSaved(allPublications);
                         filteredPublications = [...allPublications];
                         console.log('Total publications loaded:', allPublications.length);
                         console.log('All publications:', allPublications);
