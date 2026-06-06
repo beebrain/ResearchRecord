@@ -209,10 +209,11 @@ function editUserRole(userEmail) {
         return;
     }
 
-    currentUserId = user.uid;
+    currentUserId = user.uid || user.email || '';
 
-    // Populate form
-    $('#userId').val(user.uid);
+    // Populate form. Fall back to email (uid was dropped); the `|| ''` is important because
+    // jQuery .val(undefined) acts as a getter and would leave the previous user's id behind.
+    $('#userId').val(user.uid || user.email || '');
     const userName = (user.thai_name || '') + ' ' + (user.thai_lastname || '') + ' (' + user.email + ')';
     $('#userName').val(userName);
     $('#userEmail').val(user.email || '');
@@ -354,6 +355,7 @@ function setupEventListeners() {
         e.preventDefault();
 
         const userId = $('#userId').val();
+        const userEmail = $('#userEmail').val(); // email is the identity now (uid was dropped)
         const userType = $('#userType').val();
         const facultyId = $('#userFaculty').val();
         const role = $('#userRole').val();
@@ -379,6 +381,7 @@ function setupEventListeners() {
         // Submit role update
         const requestData = {
             user_id: userId,
+            user_email: userEmail, // controller resolves the user by email when user_id is empty
             user_type: userType,
             faculty_id: facultyId || null,
             role: role,
