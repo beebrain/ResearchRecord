@@ -1059,7 +1059,7 @@ class AdminDashboardController extends Controller
             log_message('debug', 'getDashboardPublications - Returning ' . count($publications) . ' publications where user is author by email: ' . $targetEmail);
             return $this->response->setJSON([
                 'success' => true,
-                'data' => $publications
+                'data' => $this->publicationModel->attachAuthorsList($publications)
             ]);
         }
 
@@ -1100,9 +1100,11 @@ class AdminDashboardController extends Controller
                 log_message('debug', 'getDashboardPublications - Loading user publications by email for user: ' . $userEmail);
                 $publications = $this->publicationModel->getPublicationsByEmail($user['email'] ?? '', $limit);
             } elseif ($isSuperAdmin) {
-                // Super admin sees all publications
-                log_message('debug', 'getDashboardPublications - Loading all publications (Super Admin)');
-                $publications = $this->publicationModel->getAllPublicationsWithAuthors($limit);
+                // Super admin sees all publications.
+                // Use the lightweight base-table query (not the heavy publication_view)
+                // since author chips are attached separately via attachAuthorsList().
+                log_message('debug', 'getDashboardPublications - Loading all publications (Super Admin, light)');
+                $publications = $this->publicationModel->getAllPublicationsLight((int) $limit);
             } elseif ($isFacultyAdmin) {
                 // Faculty admin sees only publications from their managed faculties
                 $managedFaculties = RoleHelper::getManagedFaculties($user);
@@ -1128,7 +1130,7 @@ class AdminDashboardController extends Controller
 
             return $this->response->setJSON([
                 'success' => true,
-                'data' => $publications
+                'data' => $this->publicationModel->attachAuthorsList($publications)
             ]);
         } catch (\Exception $e) {
             return $this->response->setJSON([

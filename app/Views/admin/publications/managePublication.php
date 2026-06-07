@@ -48,6 +48,24 @@
             font-family: 'Sarabun', sans-serif;
         }
 
+        /* -----------------------------------------------------------------
+           Remove SweetAlert's dark full-screen backdrop on this page.
+           On the fast server path a loading dialog (Swal.showLoading) can fail
+           to close and leaves a black .swal2-container stacked over the modal,
+           making the page look "black / blank". By making the backdrop fully
+           transparent and non-interactive, a stuck container can never black
+           out or block the page; the white dialog card itself still shows.
+           ----------------------------------------------------------------- */
+        .swal2-container {
+            background: transparent !important;
+            pointer-events: none !important;
+        }
+
+        .swal2-container .swal2-popup {
+            pointer-events: auto !important;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+        }
+
         .loading-spinner {
             border: 3px solid #f3f3f3;
             border-top: 3px solid #3b82f6;
@@ -300,9 +318,6 @@
                                         Title
                                     </th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Authors
-                                    </th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Type
                                     </th>
                                     <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -322,7 +337,7 @@
                             <tbody id="publications-table" class="bg-white divide-y divide-gray-200">
                                 <!-- Loading state -->
                                 <tr id="loading-row">
-                                    <td colspan="7" class="px-6 py-20 text-center">
+                                    <td colspan="6" class="px-6 py-20 text-center">
                                         <div class="flex flex-col items-center justify-center gap-4">
                                             <div class="relative">
                                                 <div class="w-12 h-12 border-4 border-blue-200 rounded-full"></div>
@@ -780,58 +795,30 @@
             async function loadPublications() {
                 try {
                     const apiUrl = API.publications + '?limit=1000';
-                    console.log('=== LOAD PUBLICATIONS START ===');
-                    console.log('API URL:', apiUrl);
-                    console.log('BASE_URL:', BASE_URL);
 
                     const response = await fetch(apiUrl);
-                    console.log('Response status:', response.status);
-                    console.log('Response ok:', response.ok);
-                    console.log('Response headers:', response.headers);
-
                     const result = await response.json();
-                    console.log('API Result:', result);
-                    console.log('Result success:', result.success);
-                    console.log('Result data length:', result.data ? result.data.length : 'no data');
-                    console.log('First publication:', result.data && result.data.length > 0 ? result.data[0] : 'none');
 
                     if (result.success) {
                         allPublications = result.data;
                         // เรียงตามการบันทึกล่าสุด (updated_at/created_at มากสุดก่อน)
                         sortByLatestSaved(allPublications);
                         filteredPublications = [...allPublications];
-                        console.log('Total publications loaded:', allPublications.length);
-                        console.log('All publications:', allPublications);
-
-                        // Debug: Check if approve field exists in first publication
-                        if (allPublications.length > 0) {
-                            const firstPub = allPublications[0];
-                            console.log('First publication fields:', Object.keys(firstPub));
-                            console.log('First publication approve value:', firstPub.approve, 'type:', typeof firstPub.approve);
-                        }
 
                         updateStats();
                         renderTable();
-                        console.log('=== LOAD PUBLICATIONS COMPLETE ===');
                     } else {
                         console.error('API returned success=false:', result.message);
                         showError('ไม่สามารถโหลดข้อมูลได้: ' + result.message);
                     }
                 } catch (error) {
-                    console.error('=== LOAD PUBLICATIONS ERROR ===');
-                    console.error('Error type:', error.name);
-                    console.error('Error message:', error.message);
-                    console.error('Error stack:', error.stack);
-                    console.error('Full error object:', error);
+                    console.error('Load publications error:', error);
                     showError('เกิดข้อผิดพลาดในการโหลดข้อมูล');
                 }
             }
 
             // Update statistics
             function updateStats() {
-                console.log('=== UPDATE STATS START ===');
-                console.log('allPublications length:', allPublications.length);
-
                 const totalCount = allPublications.length;
                 const journalCount = allPublications.filter(p => p.publication_type === 'journal').length;
                 const conferenceCount = allPublications.filter(p => p.publication_type === 'proceedings').length;
@@ -840,17 +827,10 @@
                     !['journal', 'proceedings'].includes(p.publication_type)
                 ).length;
 
-                console.log('Total count:', totalCount);
-                console.log('Journal count:', journalCount);
-                console.log('Conference count:', conferenceCount);
-                console.log('Other count:', otherCount);
-
                 document.getElementById('total-count').textContent = totalCount;
                 document.getElementById('journal-count').textContent = journalCount;
                 document.getElementById('conference-count').textContent = conferenceCount;
                 document.getElementById('other-count').textContent = otherCount;
-
-                console.log('=== UPDATE STATS COMPLETE ===');
             }
 
             // Filter publications
@@ -858,21 +838,6 @@
                 const searchTerm = document.getElementById('search-input').value.toLowerCase();
                 const typeFilter = document.getElementById('type-filter').value;
                 const statusFilter = document.getElementById('status-filter')?.value || '';
-
-                console.log('=== FILTER PUBLICATIONS ===');
-                console.log('Search term:', searchTerm);
-                console.log('Type filter:', typeFilter);
-                console.log('Status filter:', statusFilter);
-
-                // Debug: Check approve values in first 5 publications
-                if (statusFilter === 'approved' && allPublications.length > 0) {
-                    console.log('Sample approve values from first 5 publications:');
-                    allPublications.slice(0, 5).forEach((pub, idx) => {
-                        const approveVal = pub.approve;
-                        const matches = approveVal == 1 || approveVal === '1' || approveVal === 1;
-                        console.log(`  Pub ${idx + 1} (ID: ${pub.id}): approve=${approveVal}, type=${typeof approveVal}, matches=${matches}`);
-                    });
-                }
 
                 filteredPublications = allPublications.filter(pub => {
                     // Search filter
@@ -898,26 +863,17 @@
                     return matchesSearch && matchesType && matchesStatus;
                 });
 
-                console.log('Filtered count:', filteredPublications.length);
-                console.log('=== FILTER COMPLETE ===');
-
                 renderTable();
             }
 
             // Render publications table
             function renderTable() {
-                console.log('=== RENDER TABLE START ===');
-                console.log('filteredPublications length:', filteredPublications.length);
-                console.log('First 3 filtered publications:', filteredPublications.slice(0, 3));
-
                 const tbody = document.getElementById('publications-table');
-                console.log('Table body element:', tbody);
 
                 if (filteredPublications.length === 0) {
-                    console.log('No publications to display - showing empty state');
                     tbody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="px-6 py-20 text-center">
+                        <td colspan="6" class="px-6 py-20 text-center">
                             <div class="flex flex-col items-center justify-center">
                                 <div class="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                                     <span class="text-4xl">📭</span>
@@ -938,16 +894,8 @@
                 }
 
                 try {
-                    console.log('Rendering', filteredPublications.length, 'publications...');
                     tbody.innerHTML = filteredPublications.map((pub, index) => {
-                        console.log(`Rendering publication ${index + 1}:`, {
-                            id: pub.id,
-                            title: pub.title,
-                            type: pub.publication_type,
-                            year: pub.publication_year
-                        });
-
-                        const authors = pub.authors_names_thai || pub.authors_names_en || '-';
+                        const authorsChips = renderAuthorChips(pub);
                         const source = pub.source || '-';
                         const recorderName = (pub.created_by_name && pub.created_by_name.trim()) ? pub.created_by_name.trim() : '';
                         const recorderEmail = pub.created_by_email || '';
@@ -955,17 +903,13 @@
 
                         return `
                     <tr class="hover:bg-gray-50 transition-colors">
-                        <!-- Title (2 lines: title + source) -->
-                        <td class="px-6 py-4">
+                        <!-- Title + source + author chips -->
+                        <td class="px-6 py-4 max-w-md">
                             <div class="font-semibold text-gray-900 text-sm leading-snug mb-1">${escapeHtml(pub.title)}</div>
-                            <div class="text-xs text-gray-500">${escapeHtml(source)}</div>
+                            <div class="text-xs text-gray-500 mb-2">${escapeHtml(source)}</div>
+                            ${authorsChips}
                         </td>
-                        
-                        <!-- Authors -->
-                        <td class="px-6 py-4">
-                            <div class="text-sm text-gray-700">${escapeHtml(authors)}</div>
-                        </td>
-                        
+
                         <!-- Type Badge -->
                         <td class="px-6 py-4">
                             <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full ${getTypeColorClass(pub.publication_type)}">
@@ -1017,12 +961,8 @@
                     </tr>
                 `;
                     }).join('');
-                    console.log('Table rendering complete');
-                    console.log('=== RENDER TABLE COMPLETE ===');
                 } catch (error) {
-                    console.error('=== RENDER TABLE ERROR ===');
-                    console.error('Error during rendering:', error);
-                    console.error('Error stack:', error.stack);
+                    console.error('Render table error:', error);
                 }
             }
 
@@ -1124,6 +1064,39 @@
                     return `<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-gradient-to-r from-rose-400 to-red-500 text-white shadow-sm">✗ ไม่ผ่านเกณฑ์</span>`;
                 }
                 return `<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-sm">⏳ ยังไม่ได้ตรวจสอบ</span>`;
+            }
+
+            // Render author chips under the title.
+            // - Authors matched to a registered user (in the database) => colored chip
+            // - Authors not in the database / not matched => black & white chip
+            function renderAuthorChips(pub) {
+                let authors = Array.isArray(pub.authors_list) ? pub.authors_list : [];
+
+                // Fallback for older payloads without authors_list: build plain (unmatched) chips
+                if (authors.length === 0) {
+                    const raw = pub.authors_names_thai || pub.authors_names_en || '';
+                    authors = raw
+                        .split(',')
+                        .map(name => ({ name: name.trim(), matched: false }))
+                        .filter(a => a.name !== '');
+                }
+
+                if (authors.length === 0) {
+                    return '<span class="text-xs text-gray-400">ไม่มีข้อมูลผู้แต่ง</span>';
+                }
+
+                const chips = authors.map(a => {
+                    const name = escapeHtml(a.name || '-');
+                    const cls = a.matched
+                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                        : 'bg-gray-100 text-gray-500 border border-gray-300';
+                    const dot = a.matched ? 'bg-blue-500' : 'bg-gray-400';
+                    return `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${cls}">
+                        <span class="w-1.5 h-1.5 rounded-full ${dot}"></span>${name}
+                    </span>`;
+                }).join('');
+
+                return `<div class="flex flex-wrap gap-1.5">${chips}</div>`;
             }
 
             // Escape HTML to prevent XSS

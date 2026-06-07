@@ -513,4 +513,129 @@ class PublicationModel extends Model
 
         return $builder->get()->getResultArray();
     }
+
+    /**
+     * Attach a structured per-author list to each publication row so the UI can
+     * render author chips. Each author carries a `matched` flag indicating whether
+     * the author resolves to a registered user in the database.
+     *
+     * An author is considered "matched" when it links to a user either by
+     *   - author_email matching a user email (same rule publication_view uses), or
+     *   - author_id -> authors.user_email matching a user (legacy linkage).
+     *
+     * Adds an `authors_list` key (list of {name, matched, order}) to every row, and
+     * back-fills `authors_names_thai` / `authors_names_en` when missing so the
+     * client-side search keeps working without depending on the heavy view.
+     *
+     * @param list<array<string,mixed>> $publications
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function attachAuthorsList(array $publications): array
+    {
+        if ($publications === []) {
+            return $publications;
+        }
+
+        $ids = array_values(array_filter(array_unique(array_map(
+            static fn ($p) => (int) ($p['id'] ?? 0),
+            $publications
+        )), static fn ($id) => $id > 0));
+        if ($ids === []) {
+            return $publications;
+        }
+
+        // Two linkage paths to a real user:
+        //   ue: author_email -> user.email (canonical, matches publication_view)
+        //   ua: author_id -> authors.user_email -> user.email (legacy linkage)
+        $rows = $this->db->table('publication_authors pa')
+            ->select("
+                pa.publication_id,
+                pa.author_order,
+                pa.author_name,
+                COALESCE(ue.email, ua.email) AS user_email,
+                COALESCE(ue.thai_name, ua.thai_name) AS thai_name,
+                COALESCE(ue.thai_lastname, ua.thai_lastname) AS thai_lastname,
+                COALESCE(ue.gf_name, ua.gf_name) AS gf_name,
+                COALESCE(ue.gl_name, ua.gl_name) AS gl_name
+            ", false)
+            ->join('user ue', "ue.email = LOWER(TRIM(pa.author_email)) AND pa.author_email IS NOT NULL AND TRIM(pa.author_email) <> ''", 'left', false)
+            ->join('authors a', 'pa.author_id = a.id', 'left')
+            ->join('user ua', 'ua.email = a.user_email', 'left')
+            ->whereIn('pa.publication_id', $ids)
+            ->orderBy('pa.publication_id', 'ASC')
+            ->orderBy('pa.author_order', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        $byPublication = [];
+        $thaiNames     = [];
+        $enNames       = [];
+        foreach ($rows as $row) {
+            $pubId   = (int) $row['publication_id'];
+            $matched = ! empty($row['user_email']);
+
+            if ($matched) {
+                $thai    = trim(($row['thai_name'] ?? '') . ' ' . ($row['thai_lastname'] ?? ''));
+                $english = trim(($row['gf_name'] ?? '') . ' ' . ($row['gl_name'] ?? ''));
+                $thaiName = $thai !== '' ? $thai : ($english !== '' ? $english : (string) $row['author_name']);
+                $enName   = $english !== '' ? $english : $thaiName;
+            } else {
+                $thaiName = (string) $row['author_name'];
+                $enName   = (string) $row['author_name'];
+            }
+
+            $byPublication[$pubId][] = [
+                'name'    => $thaiName,
+                'matched' => $matched,
+                'order'   => (int) $row['author_order'],
+            ];
+            $thaiNames[$pubId][] = $thaiName;
+            $enNames[$pubId][]   = $enName;
+        }
+
+        foreach ($publications as &$publication) {
+            $pubId                       = (int) ($publication['id'] ?? 0);
+            $publication['authors_list'] = $byPublication[$pubId] ?? [];
+
+            // Back-fill the joined name strings only when the row doesn't already
+            // carry them (light super-admin path), so we never clobber the values
+            // produced by the other query paths.
+            if (empty($publication['authors_names_thai']) && isset($thaiNames[$pubId])) {
+                $publication['authors_names_thai'] = implode(', ', $thaiNames[$pubId]);
+            }
+            if (empty($publication['authors_names_en']) && isset($enNames[$pubId])) {
+                $publication['authors_names_en'] = implode(', ', $enNames[$pubId]);
+            }
+        }
+        unset($publication);
+
+        return $publications;
+    }
+
+    /**
+     * Lightweight publication list for management screens: base table + creator
+     * join only, deliberately skipping publication_view's heavy correlated
+     * GROUP_CONCAT subqueries (author curriculum/faculty aggregation) which the
+     * manage page does not use. Author chips are added separately via
+     * attachAuthorsList().
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function getAllPublicationsLight(int $limit = 1000): array
+    {
+        return $this->db->table('publications p')
+            ->select("
+                p.*,
+                CONCAT(COALESCE(u.gf_name, ''), ' ', COALESCE(u.gl_name, '')) AS created_by_name,
+                u.faculty_id AS created_by_faculty_id
+            ", false)
+            ->join('user u', 'p.created_by_email = u.email', 'left')
+            ->orderBy('p.publication_year', 'DESC')
+            ->orderBy('p.publication_month', 'DESC')
+            ->orderBy('p.created_at', 'DESC')
+            ->limit($limit)
+            ->get()
+            ->getResultArray();
+    }
 }
