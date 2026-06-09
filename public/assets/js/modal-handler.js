@@ -13,7 +13,20 @@ document.addEventListener('DOMContentLoaded', function() {
         '[class*="modal"]'    // Any class containing "modal"
     ];
 
-    const modals = document.querySelectorAll(modalSelectors.join(','));
+    const allModals = document.querySelectorAll(modalSelectors.join(','));
+    const modals = Array.from(allModals).filter(function(el) {
+        // Exclude known inner modal components
+        const isInner = el.classList.contains('modal-content') || 
+                        el.classList.contains('modal-dialog') || 
+                        el.classList.contains('modal-body') || 
+                        el.classList.contains('modal-header') || 
+                        el.classList.contains('modal-footer') ||
+                        el.classList.contains('view-modal-card');
+        if (isInner) return false;
+        
+        // Exclude if it has an ancestor that is also a modal container
+        return !el.parentElement || !el.parentElement.closest('[id$="Modal"], [id$="modal"], .modal');
+    });
 
     modals.forEach(function(modal) {
         // Skip if already has handler
