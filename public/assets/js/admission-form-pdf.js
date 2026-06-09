@@ -93,7 +93,33 @@ function generateAdmissionFormPDF(formData, useThaiFont = false) {
         };
         return typeMap[type] || type || '-';
     }
-    
+
+    // Helper: insert break opportunities (zero-width spaces) into Thai text so
+    // pdfmake can wrap it inside a fixed-width table cell. Thai has no spaces, so
+    // without this an entire title is treated as one unbreakable "word" and forces
+    // the column (and the whole table) wider than the page.
+    function wrapThaiText(text) {
+        if (text === null || text === undefined) return '';
+        const str = String(text);
+        if (!str) return '';
+        const ZWSP = '​';
+        // Prefer proper Thai word segmentation when available (modern browsers).
+        try {
+            if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+                const seg = new Intl.Segmenter('th', { granularity: 'word' });
+                let out = '';
+                for (const part of seg.segment(str)) {
+                    out += part.segment + ZWSP;
+                }
+                return out;
+            }
+        } catch (e) {
+            // fall through to character-level fallback
+        }
+        // Fallback: allow a break after every Thai character.
+        return str.replace(/([฀-๿])/g, '$1' + ZWSP);
+    }
+
     // Build content array
     const content = [];
     
@@ -518,17 +544,20 @@ function generateAdmissionFormPDF(formData, useThaiFont = false) {
         // ถ้ามีข้อมูลจริง แสดงข้อมูล ถ้าไม่มีแสดงแถวว่าง
         publicationTableBody.push([
             { text: thaiNum, alignment: 'center', fontSize: 12 },
-            { text: authorName, fontSize: 12 },
-            { text: pubTypeThai, fontSize: 12 },
-            { text: pub.title || '-', fontSize: 12 },
+            { text: wrapThaiText(authorName), fontSize: 12 },
+            { text: wrapThaiText(pubTypeThai), fontSize: 12 },
+            { text: wrapThaiText(pub.title || '-'), fontSize: 12 },
             { text: pub.publication_year ? (parseInt(pub.publication_year) + 543).toString() : '-', alignment: 'center', fontSize: 12 }
         ]);
     }
-    
+
     content.push({
         table: {
             headerRows: 1,
-            widths: [50, 120, 100, '*', 80],
+            // Landscape A4 usable width = 841.89 - 50 - 50 ≈ 742pt.
+            // Fixed columns + '*' (title) must stay within this so no column
+            // is pushed off the page.
+            widths: [40, 130, 80, '*', 70],
             body: publicationTableBody
         },
         layout: {
