@@ -1224,42 +1224,42 @@ function generateAdmissionFormPDF(formData, useThaiFont = false) {
             throw new Error('ไม่สามารถสร้าง PDF instance ได้');
         }
         
-        // Render แล้วส่งไฟล์ด้วยการ "ดาวน์โหลด" ผ่าน anchor — เชื่อถือได้ทุกเบราว์เซอร์
-        // (ไม่พึ่ง nested window.open ที่มักโดน popup blocker บน production)
-        pdfDocGenerator.getBlob((blob) => {
-            try {
-                if (!blob) {
-                    throw new Error('ไม่สามารถสร้าง PDF blob ได้');
-                }
-
-                const blobUrl = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = blobUrl;
-                a.download = fileName;
-                a.rel = 'noopener';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
+        // ดาวน์โหลดด้วย pdfMake.download() โดยตรง — ใช้ FileSaver ที่ฝังมากับ pdfmake
+        // จึงตั้งชื่อไฟล์ได้ถูกต้องทุกเบราว์เซอร์ (วิธีสร้าง <a download> เองเคยทำให้
+        // บางเบราว์เซอร์/in-app webview ตั้งชื่อไฟล์เป็น UUID ของ blob แทนชื่อจริง)
+        // download() ไม่เปิด window ใหม่ จึงไม่โดน popup blocker
+        try {
+            pdfDocGenerator.download(fileName, () => {
                 console.log('PDF download triggered:', fileName);
-
-                // เก็บ blob URL ไว้ให้ผู้ใช้กดเปิด/ดาวน์โหลดซ้ำได้ และคืนหน่วยความจำภายหลัง
-                window.__lastPdfBlobUrl = blobUrl;
-                setTimeout(() => URL.revokeObjectURL(blobUrl), 120000);
-
+                window.__lastPdfFileName = fileName;
                 // แจ้งหน้า generation ว่าไฟล์พร้อมแล้ว (เพื่อปิดหน้าต่างได้อย่างปลอดภัย)
                 if (typeof window.__onPdfReady === 'function') {
-                    window.__onPdfReady(blobUrl, fileName);
+                    window.__onPdfReady(null, fileName);
                 }
-            } catch (deliverError) {
-                console.error('PDF delivery error:', deliverError);
+            });
+        } catch (deliverError) {
+            console.error('PDF delivery error:', deliverError);
+            // Fallback: สร้าง blob + anchor เอง
+            pdfDocGenerator.getBlob((blob) => {
                 try {
-                    pdfDocGenerator.download(fileName);
-                    if (typeof window.__onPdfReady === 'function') window.__onPdfReady(null, fileName);
-                } catch (_) {
-                    if (typeof window.__onPdfError === 'function') window.__onPdfError(deliverError);
+                    if (!blob) throw new Error('ไม่สามารถสร้าง PDF blob ได้');
+                    const blobUrl = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = fileName;
+                    a.rel = 'noopener';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.__lastPdfBlobUrl = blobUrl;
+                    setTimeout(() => URL.revokeObjectURL(blobUrl), 120000);
+                    if (typeof window.__onPdfReady === 'function') window.__onPdfReady(blobUrl, fileName);
+                } catch (fallbackError) {
+                    console.error('PDF fallback error:', fallbackError);
+                    if (typeof window.__onPdfError === 'function') window.__onPdfError(fallbackError);
                 }
-            }
-        });
+            });
+        }
         
     } catch (error) {
         console.error('PDF generation error:', error);
