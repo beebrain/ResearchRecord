@@ -1224,42 +1224,97 @@ function generateAdmissionFormPDF(formData, useThaiFont = false) {
             throw new Error('ไม่สามารถสร้าง PDF instance ได้');
         }
         
-        // ดาวน์โหลดด้วย pdfMake.download() โดยตรง — ใช้ FileSaver ที่ฝังมากับ pdfmake
-        // จึงตั้งชื่อไฟล์ได้ถูกต้องทุกเบราว์เซอร์ (วิธีสร้าง <a download> เองเคยทำให้
-        // บางเบราว์เซอร์/in-app webview ตั้งชื่อไฟล์เป็น UUID ของ blob แทนชื่อจริง)
-        // download() ไม่เปิด window ใหม่ จึงไม่โดน popup blocker
-        try {
-            pdfDocGenerator.download(fileName, () => {
-                console.log('PDF download triggered:', fileName);
-                window.__lastPdfFileName = fileName;
-                // แจ้งหน้า generation ว่าไฟล์พร้อมแล้ว (เพื่อปิดหน้าต่างได้อย่างปลอดภัย)
-                if (typeof window.__onPdfReady === 'function') {
-                    window.__onPdfReady(null, fileName);
-                }
-            });
-        } catch (deliverError) {
-            console.error('PDF delivery error:', deliverError);
-            // Fallback: สร้าง blob + anchor เอง
-            pdfDocGenerator.getBlob((blob) => {
-                try {
-                    if (!blob) throw new Error('ไม่สามารถสร้าง PDF blob ได้');
-                    const blobUrl = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = blobUrl;
-                    a.download = fileName;
-                    a.rel = 'noopener';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    window.__lastPdfBlobUrl = blobUrl;
-                    setTimeout(() => URL.revokeObjectURL(blobUrl), 120000);
-                    if (typeof window.__onPdfReady === 'function') window.__onPdfReady(blobUrl, fileName);
-                } catch (fallbackError) {
-                    console.error('PDF fallback error:', fallbackError);
-                    if (typeof window.__onPdfError === 'function') window.__onPdfError(fallbackError);
-                }
-            });
+        // ส่ง PDF ที่เรนเดอร์เสร็จไปให้ server stream กลับมาเป็นไฟล์ พร้อมส่วนหัว
+        // Content-Disposition เพื่อให้ "ตั้งชื่อไฟล์ได้ถูกต้องทุกเบราว์เซอร์"
+        // (บางเบราว์เซอร์/in-app webview ไม่สนใจ <a download> บน blob: URL จึงตั้งชื่อ
+        //  ไฟล์เป็น UUID ของ blob แทนชื่อจริง — การให้ server กำหนดชื่อจึงชัวร์กว่า)
+        const downloadUrl = (typeof window.appRoute === 'function')
+            ? window.appRoute('admin/admission/pdf-download')
+            : ((typeof BASE_URL !== 'undefined' ? BASE_URL : '') + '/index.php/admin/admission/pdf-download');
+
+        // Fallback: ดาวน์โหลดฝั่ง client ด้วย <a download> (เผื่อ server-download ใช้ไม่ได้)
+        function fallbackClientDownload(blob) {
+            try {
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = fileName;
+                a.rel = 'noopener';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.__lastPdfBlobUrl = blobUrl;
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 120000);
+                if (typeof window.__onPdfReady === 'function') window.__onPdfReady(blobUrl, fileName);
+            } catch (e) {
+                console.error('PDF fallback error:', e);
+                if (typeof window.__onPdfError === 'function') window.__onPdfError(e);
+            }
         }
+
+        pdfDocGenerator.getBlob((blob) => {
+            try {
+                if (!blob) throw new Error('ไม่สามารถสร้าง PDF blob ได้');
+
+                const reader = new FileReader();
+                reader.onload = function () {
+                    try {
+                        const base64 = String(reader.result).split(',')[1] || '';
+                        if (!base64) throw new Error('แปลง PDF เป็น base64 ไม่สำเร็จ');
+
+                        // submit ผ่าน hidden form → hidden iframe เพื่อให้ browser ดาวน์โหลด
+                        // ไฟล์จาก response ของ server (ไม่พึ่ง a.download)
+                        let iframe = document.getElementById('__pdf_dl_frame');
+                        if (!iframe) {
+                            iframe = document.createElement('iframe');
+                            iframe.id = '__pdf_dl_frame';
+                            iframe.name = '__pdf_dl_frame';
+                            iframe.style.display = 'none';
+                            document.body.appendChild(iframe);
+                        }
+
+                        const form = document.createElement('form');
+                        form.method = 'POST';
+                        form.action = downloadUrl;
+                        form.target = '__pdf_dl_frame';
+                        form.style.display = 'none';
+
+                        const dataInput = document.createElement('textarea');
+                        dataInput.name = 'data';
+                        dataInput.value = base64;
+                        form.appendChild(dataInput);
+
+                        const nameInput = document.createElement('input');
+                        nameInput.type = 'hidden';
+                        nameInput.name = 'filename';
+                        nameInput.value = fileName;
+                        form.appendChild(nameInput);
+
+                        document.body.appendChild(form);
+                        form.submit();
+                        document.body.removeChild(form);
+
+                        console.log('PDF submitted to server for download:', fileName);
+                        window.__lastPdfFileName = fileName;
+
+                        // เก็บ blob URL ไว้ให้กด "เปิดดู PDF" ได้
+                        const blobUrl = URL.createObjectURL(blob);
+                        window.__lastPdfBlobUrl = blobUrl;
+                        setTimeout(() => URL.revokeObjectURL(blobUrl), 120000);
+
+                        if (typeof window.__onPdfReady === 'function') window.__onPdfReady(blobUrl, fileName);
+                    } catch (postErr) {
+                        console.error('PDF server-download error, falling back to client download:', postErr);
+                        fallbackClientDownload(blob);
+                    }
+                };
+                reader.onerror = function () { fallbackClientDownload(blob); };
+                reader.readAsDataURL(blob);
+            } catch (deliverError) {
+                console.error('PDF delivery error:', deliverError);
+                if (typeof window.__onPdfError === 'function') window.__onPdfError(deliverError);
+            }
+        });
         
     } catch (error) {
         console.error('PDF generation error:', error);

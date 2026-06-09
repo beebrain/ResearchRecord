@@ -217,6 +217,7 @@ $routes->group('admin', ['filter' => 'adminauth'], function ($routes) {
     $routes->get('admission/list', 'AdminController::admissionList');
     $routes->post('admission/update-position', 'AdminController::admissionUpdatePosition');
     $routes->post('admission/log-client', 'AdminController::admissionLogClient'); // รับ log จากฝั่ง client (PDF) มาเขียนลง CI log
+    $routes->post('admission/pdf-download', 'AdminController::admissionPdfDownload'); // stream client-generated PDF กลับมาเป็นไฟล์ (ตั้งชื่อไฟล์ถูกต้องทุกเบราว์เซอร์)
 
     // Education History Management (Faculty Admin)
     $routes->get('education', 'EducationController::index');

@@ -230,7 +230,8 @@
                                 </div>`;
                         }
                         // ปิดอัตโนมัติหลังจากแน่ใจว่าไฟล์ถูกส่งแล้ว
-                        setTimeout(() => { try { window.close(); } catch (e) {} }, 4000);
+                        // (เผื่อเวลาให้ server-download round-trip เสร็จก่อนปิดหน้าต่าง)
+                        setTimeout(() => { try { window.close(); } catch (e) {} }, 8000);
                     };
                     window.__onPdfError = function (err) {
                         throw new Error((err && err.message) || 'สร้าง PDF ไม่สำเร็จ');

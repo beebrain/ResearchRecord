@@ -3588,6 +3588,51 @@ class AdminController extends Controller
     }
 
     /**
+     * Stream a client-generated PDF back as a download with a proper filename.
+     *
+     * pdfMake builds the PDF in the browser, but some browsers / in-app webviews
+     * ignore the <a download> attribute on blob: URLs and save the file under the
+     * blob's UUID. Posting the PDF here and returning it with a
+     * Content-Disposition header guarantees the filename on every browser.
+     *
+     * Route: POST /admin/admission/pdf-download
+     * Body : data (base64 PDF, optionally as a data: URL), filename
+     */
+    public function admissionPdfDownload()
+    {
+        $data     = (string) $this->request->getPost('data');
+        $filename = (string) $this->request->getPost('filename');
+
+        // Strip a possible "data:application/pdf;base64," prefix
+        if (($pos = strpos($data, 'base64,')) !== false) {
+            $data = substr($data, $pos + 7);
+        }
+        $data = str_replace(' ', '+', trim($data));
+
+        $binary = base64_decode($data, true);
+        if ($binary === false || $binary === '' || strncmp($binary, '%PDF', 4) !== 0) {
+            log_message('warning', 'ADMISSION_PDF_DOWNLOAD invalid payload user=' . (UserIdentity::sessionEmail() ?: 'unknown'));
+            return $this->response->setStatusCode(400)->setBody('ข้อมูล PDF ไม่ถูกต้อง');
+        }
+
+        // Sanitise filename, force a .pdf extension
+        $filename = preg_replace('/[\\\\\/:*?"<>|\r\n]+/', '_', $filename);
+        $filename = trim($filename);
+        if ($filename === '') {
+            $filename = 'admission_form_' . date('Ymd_His') . '.pdf';
+        } elseif (! preg_match('/\.pdf$/i', $filename)) {
+            $filename .= '.pdf';
+        }
+
+        return $this->response
+            ->setHeader('Content-Type', 'application/pdf')
+            ->setHeader('Content-Disposition', 'attachment; filename="' . $filename . '"')
+            ->setHeader('Content-Length', (string) strlen($binary))
+            ->setHeader('Cache-Control', 'no-store')
+            ->setBody($binary);
+    }
+
+    /**
      * View admission form (read-only)
      */
     public function admissionView($id = null)
