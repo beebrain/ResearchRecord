@@ -62,6 +62,11 @@ document.addEventListener('DOMContentLoaded', function() {
         // Find close buttons
         const closeButtons = modal.querySelectorAll('[onclick*="close"], [class*="close"], button[type="button"]');
         closeButtons.forEach(function(btn) {
+            // Skip if the button already has a custom onclick handler
+            if (btn.getAttribute('onclick')) {
+                return;
+            }
+
             // Only add if text suggests it's a close button
             const btnText = btn.textContent.toLowerCase();
             if (btnText.includes('ปิด') || btnText.includes('close') || btnText.includes('ยกเลิก') || btnText.includes('cancel')) {
