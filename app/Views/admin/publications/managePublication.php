@@ -364,10 +364,10 @@
         <!-- NOTE: editModal has been removed. Now using addModal for both Add and Edit modes. -->
 
         <!-- Add Publication Modal (Layer 1: lowest) -->
-        <div id="addModal" class="hidden fixed inset-0 z-[40] flex items-start justify-center bg-gray-900 bg-opacity-70 overflow-y-auto pt-16 pb-10 px-4">
-            <div class="modal-content relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl">
-                <!-- Modal Header (Dynamic: Add/Edit) - Sticky -->
-                <div class="sticky top-0 z-10 flex justify-between items-center px-8 py-5 border-b border-gray-200 bg-white rounded-t-2xl">
+        <div id="addModal" class="hidden fixed inset-0 z-[40] flex items-center justify-center bg-gray-900 bg-opacity-70 p-4 sm:p-6">
+            <div class="modal-content relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+                <!-- Modal Header (Dynamic: Add/Edit) -->
+                <div class="flex justify-between items-center px-8 py-5 border-b border-gray-200 bg-white rounded-t-2xl flex-shrink-0">
                     <h2 id="addModalTitle" class="text-2xl font-bold text-gray-900">เพิ่มผลงานวิจัย</h2>
                     <button onclick="closeAddModal()"
                         class="w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 transition-colors"
@@ -379,7 +379,7 @@
                 </div>
 
                 <!-- Add/Edit Form -->
-                <form id="addForm" class="px-8 py-6 space-y-6 overflow-y-auto" style="max-height: calc(100vh - 200px);">
+                <form id="addForm" class="px-8 py-6 space-y-6 overflow-y-auto flex-1">
                     <?= csrf_field() ?>
                     <!-- Hidden field for Edit mode -->
                     <input type="hidden" id="add_publication_id" name="publication_id" value="">
@@ -724,7 +724,7 @@
 
                 </form>
                 <!-- Modal Footer (Dynamic: Add/Edit) -->
-                <div class="flex gap-4 justify-end px-8 py-6 border-t border-gray-100 rounded-b-2xl">
+                <div class="flex gap-4 justify-end px-8 py-6 border-t border-gray-100 rounded-b-2xl flex-shrink-0 bg-white">
                     <button type="button" onclick="closeAddModal()"
                         class="px-6 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors">
                         ยกเลิก

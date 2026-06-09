@@ -149,16 +149,16 @@
         </main>
 
         <!-- Edit Publication Modal -->
-        <div id="editModal" class="hidden fixed inset-0 z-50 flex items-start justify-center bg-gray-900 bg-opacity-70 overflow-y-auto py-10 px-4">
-            <div class="modal-content relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl">
+        <div id="editModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-70 p-4 sm:p-6">
+            <div class="modal-content relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
                 <!-- Modal Header -->
-                <div class="flex justify-between items-center px-8 py-6 border-b border-gray-100">
+                <div class="flex justify-between items-center px-8 py-6 border-b border-gray-100 flex-shrink-0">
                     <h2 class="text-2xl font-bold text-gray-900">แก้ไขผลงานวิจัย</h2>
                     <button onclick="closeEditModal()" class="text-gray-600 hover:text-gray-900 text-3xl font-bold">&times;</button>
                 </div>
 
                 <!-- Edit Form -->
-                <form id="editForm" class="px-8 py-6 space-y-6 max-h-[80vh] overflow-y-auto">
+                <form id="editForm" class="px-8 py-6 space-y-6 overflow-y-auto flex-1">
                     <input type="hidden" id="edit_publication_id" name="publication_id">
 
                     <!-- Publication Type -->
@@ -353,7 +353,7 @@
 
                 </form>
                 <!-- Modal Footer -->
-                <div class="flex gap-4 justify-end px-8 py-6 border-t border-gray-100 rounded-b-2xl">
+                <div class="flex gap-4 justify-end px-8 py-6 border-t border-gray-100 rounded-b-2xl flex-shrink-0 bg-white">
                     <button type="button" onclick="closeEditModal()"
                         class="px-6 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors">
                         ยกเลิก

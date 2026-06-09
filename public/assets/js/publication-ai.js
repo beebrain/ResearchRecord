@@ -9,6 +9,14 @@ if (typeof window.BASE_URL === 'undefined') {
     window.BASE_URL = '';
 }
 
+// Helper to construct dynamic API URLs supporting query-string routing
+function getApiUrl(path) {
+    const base = window.BASE_URL || '';
+    const hasQueryRouting = window.location.href.includes('index.php?');
+    const separator = hasQueryRouting ? '/index.php?' : '/index.php';
+    return base + separator + (path.startsWith('/') ? path : '/' + path);
+}
+
 let aiExtractedData = null;
 
 // DOM Elements
@@ -313,7 +321,7 @@ async function callAIExtraction() {
         } else if (uploadedFileData) {
             // Use uploaded file data (construct local URL)
             requestData = {
-                url: uploadedFileData.download_url || window.BASE_URL + '/index.php/utility/downloadFile/' + uploadedFileData.stored_name
+                url: uploadedFileData.download_url || getApiUrl('utility/downloadFile/' + uploadedFileData.stored_name)
             };
         } else {
             throw new Error('กรุณาอัปโหลดไฟล์หรือใส่ URL ก่อน');
@@ -1030,7 +1038,7 @@ async function matchAndFillAuthor(authorData, index) {
 
 async function searchAuthorByEmail(email) {
     try {
-        const response = await fetch(window.BASE_URL + '/index.php/user/searchByEmail', {
+        const response = await fetch(getApiUrl('user/searchByEmail'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1059,7 +1067,7 @@ async function searchAuthorByThaiName(nameInfo) {
             return null;
         }
 
-        const response = await fetch(window.BASE_URL + '/index.php/user/searchByName', {
+        const response = await fetch(getApiUrl('user/searchByName'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1092,7 +1100,7 @@ async function searchAuthorByEnglishName(nameInfo) {
             return null;
         }
 
-        const response = await fetch(window.BASE_URL + '/index.php/user/searchByName', {
+        const response = await fetch(getApiUrl('user/searchByName'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

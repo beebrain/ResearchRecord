@@ -272,6 +272,10 @@ $routes->group('curriculum',  function ($routes) {
     $routes->get('getWithPublicationStats', 'CurriculumController::getWithPublicationStats');
 });
 
+// User/Author search for AI assistant (accessible by all authenticated users)
+$routes->post('user/searchByEmail', 'UserController::searchByEmail', ['filter' => 'auth']);
+$routes->post('user/searchByName', 'UserController::searchByName', ['filter' => 'auth']);
+
 // User routes for curriculum management (requires admin auth for security)
 $routes->group('user', ['filter' => 'adminauth'], function ($routes) {
     $routes->get('/', 'UserController::index');
