@@ -94,30 +94,91 @@ function generateAdmissionFormPDF(formData, useThaiFont = false) {
         return typeMap[type] || type || '-';
     }
 
-    // Helper: insert break opportunities (zero-width spaces) into Thai text so
-    // pdfmake can wrap it inside a fixed-width table cell. Thai has no spaces, so
-    // without this an entire title is treated as one unbreakable "word" and forces
-    // the column (and the whole table) wider than the page.
-    function wrapThaiText(text) {
+    // Helper: convert an academic position/role to Thai.
+    // The DB role is stored in English (e.g. "instructor" from teacher_curriculum),
+    // which must not be printed raw in the Thai form.
+    function getPositionThai(pos) {
+        if (!pos) return 'อาจารย์';
+        const s = String(pos).trim().toLowerCase();
+        const map = {
+            'instructor': 'อาจารย์',
+            'lecturer': 'อาจารย์',
+            'teacher': 'อาจารย์',
+            'assistant professor': 'ผู้ช่วยศาสตราจารย์',
+            'asst. professor': 'ผู้ช่วยศาสตราจารย์',
+            'asst professor': 'ผู้ช่วยศาสตราจารย์',
+            'associate professor': 'รองศาสตราจารย์',
+            'assoc. professor': 'รองศาสตราจารย์',
+            'assoc professor': 'รองศาสตราจารย์',
+            'professor': 'ศาสตราจารย์',
+            'prof.': 'ศาสตราจารย์',
+            'prof': 'ศาสตราจารย์'
+        };
+        // ถ้า map ได้ใช้ค่าไทย, ถ้าเป็นภาษาไทยอยู่แล้วใช้ค่าเดิม
+        return map[s] || pos;
+    }
+
+    // Helper: wrap Thai text to fit a fixed-width table cell.
+    // Thai has no spaces, so a long title is one unbreakable "word" that forces the
+    // column (and the whole table) wider than the page. We pre-break it into real
+    // lines joined with "\n" — which pdfmake renders natively, so there is no need
+    // to insert a zero-width-space character (the THSarabunNew font has no glyph for
+    // U+200B and would render it as a tofu box "□").
+    //
+    // Line width is estimated from measured THSarabunNew advances @12pt:
+    //   combining marks (tone/upper/lower vowels) = 0pt, space ≈ 2.6pt, other ≈ 4.7pt.
+    // maxWidth = available text width of the cell in points.
+    function wrapThaiText(text, maxWidth) {
         if (text === null || text === undefined) return '';
         const str = String(text);
         if (!str) return '';
-        const ZWSP = '​';
-        // Prefer proper Thai word segmentation when available (modern browsers).
+        const MAX_WIDTH = maxWidth || 400;
+        const W_OTHER = 4.7;
+        const W_SPACE = 2.6;
+
+        const isZeroWidth = (c) =>
+            c === 0x0E31 || (c >= 0x0E34 && c <= 0x0E3A) || (c >= 0x0E47 && c <= 0x0E4E);
+        const charW = (ch) => {
+            const c = ch.codePointAt(0);
+            if (isZeroWidth(c)) return 0;
+            if (ch === ' ') return W_SPACE;
+            return W_OTHER;
+        };
+        const strW = (s) => { let w = 0; for (const ch of s) w += charW(ch); return w; };
+
+        // แตกเป็น "คำ" ภาษาไทยเพื่อเลือกจุดตัดบรรทัดที่เหมาะสม (ถ้าเบราว์เซอร์รองรับ)
+        let words;
         try {
             if (typeof Intl !== 'undefined' && Intl.Segmenter) {
-                const seg = new Intl.Segmenter('th', { granularity: 'word' });
-                let out = '';
-                for (const part of seg.segment(str)) {
-                    out += part.segment + ZWSP;
-                }
-                return out;
+                words = Array.from(new Intl.Segmenter('th', { granularity: 'word' }).segment(str), s => s.segment);
+            } else {
+                words = str.match(/\s+|\S+/g) || [str];
             }
         } catch (e) {
-            // fall through to character-level fallback
+            words = str.match(/\s+|\S+/g) || [str];
         }
-        // Fallback: allow a break after every Thai character.
-        return str.replace(/([฀-๿])/g, '$1' + ZWSP);
+
+        const lines = [];
+        let cur = '', curW = 0;
+        const flush = () => { lines.push(cur.replace(/^ +/, '')); cur = ''; curW = 0; };
+
+        for (const word of words) {
+            const ww = strW(word);
+            if (curW > 0 && curW + ww > MAX_WIDTH) flush();
+            if (ww > MAX_WIDTH) {
+                // คำเดียวยาวเกินบรรทัด → ตัดทีละอักขระ
+                for (const ch of word) {
+                    const cw = charW(ch);
+                    if (curW + cw > MAX_WIDTH && curW > 0) flush();
+                    cur += ch; curW += cw;
+                }
+            } else {
+                cur += word; curW += ww;
+            }
+        }
+        if (cur !== '') flush();
+
+        return lines.join('\n');
     }
 
     // Build content array
@@ -280,8 +341,8 @@ function generateAdmissionFormPDF(formData, useThaiFont = false) {
     // แสดงตามจำนวนอาจารย์จริง (ไม่มีแถวว่าง)
     for (let i = 0; i < teacherCount; i++) {
         const teacher = teachers[i] || {};
-        // Get position from titleThai, fallback to 'อาจารย์'
-        const position = teacher.titleThai || teacher.position || 'อาจารย์';
+        // Get position from titleThai, fallback to Thai-mapped role (e.g. instructor -> อาจารย์)
+        const position = teacher.titleThai || getPositionThai(teacher.position);
         // Get name without title - prioritize thai_name + thai_lastname
         const nameOnly = (teacher.thai_name && teacher.thai_lastname) ? 
             (teacher.thai_name + ' ' + teacher.thai_lastname) : 
@@ -544,9 +605,10 @@ function generateAdmissionFormPDF(formData, useThaiFont = false) {
         // ถ้ามีข้อมูลจริง แสดงข้อมูล ถ้าไม่มีแสดงแถวว่าง
         publicationTableBody.push([
             { text: thaiNum, alignment: 'center', fontSize: 12 },
-            { text: wrapThaiText(authorName), fontSize: 12 },
-            { text: wrapThaiText(pubTypeThai), fontSize: 12 },
-            { text: wrapThaiText(pub.title || '-'), fontSize: 12 },
+            { text: authorName, fontSize: 12 },
+            { text: pubTypeThai, fontSize: 12 },
+            // ชื่อผลงานไม่มีช่องว่างให้ pdfmake ตัดบรรทัด จึงต้อง wrap เองตามความกว้างคอลัมน์ (~406pt)
+            { text: wrapThaiText(pub.title || '-', 400), fontSize: 12 },
             { text: pub.publication_year ? (parseInt(pub.publication_year) + 543).toString() : '-', alignment: 'center', fontSize: 12 }
         ]);
     }
