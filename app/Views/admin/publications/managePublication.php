@@ -208,6 +208,14 @@
 
 <body class="min-h-full">
     <div class="min-h-full bg-gray-50">
+        <!-- Robust Non-blocking Loading Overlay -->
+        <div id="loadingOverlay" class="hidden fixed inset-0 z-[99999] flex items-center justify-center bg-gray-900 bg-opacity-50 backdrop-blur-sm pointer-events-auto">
+            <div class="flex flex-col items-center p-6 bg-white rounded-2xl shadow-xl">
+                <div class="loading-spinner mb-4"></div>
+                <p class="font-semibold text-gray-700">กำลังประมวลผลข้อมูลผู้แต่ง...</p>
+            </div>
+        </div>
+
         <?php
         // Set page title and subtitle for header partial
         $pageTitle = 'จัดการผลงานวิจัย';
@@ -1109,13 +1117,19 @@
 
             // Edit publication
             async function editPublication(id) {
+                if (isEditLoading) {
+                    console.log('Edit publication already in progress, ignoring click.');
+                    return;
+                }
+                isEditLoading = true;
+
+                // Show robust CSS-based loading overlay
+                const loader = document.getElementById('loadingOverlay');
+                if (loader) loader.classList.remove('hidden');
+
                 try {
                     console.log('=== EDIT PUBLICATION START ===');
                     console.log('Publication ID:', id);
-
-                    // NOTE: no SweetAlert loading spinner here — its dark backdrop could fail to
-                    // close on the fast IIS path and stay covering the whole page. The modal opens
-                    // quickly anyway.
 
                     // Fetch publication data
                     const apiUrl = API.getPublication + '/' + id;
@@ -1141,12 +1155,19 @@
                     console.error('Error type:', error.name);
                     console.error('Error message:', error.message);
                     console.error('Error stack:', error.stack);
+                    
+                    // Close the modal just in case it was opened before the error occurred
+                    closeAddModal();
+
                     Swal.fire({
                         title: 'เกิดข้อผิดพลาด!',
                         text: error.message || 'ไม่สามารถโหลดข้อมูลผลงานได้',
                         icon: 'error',
                         confirmButtonText: 'ตกลง'
                     });
+                } finally {
+                    isEditLoading = false;
+                    if (loader) loader.classList.add('hidden');
                 }
             }
 
@@ -1725,6 +1746,8 @@
             let addUploadedFileData = null;
             let isEditMode = false; // Track if we're in edit mode
             let currentEditPublicationId = null; // Store current publication ID when editing
+            let isEditLoading = false; // Guard to prevent concurrent edit triggers
+            let currentEditLoadId = 0; // Token to cancel stale async matching loops
 
             // Remove any leftover SweetAlert loading/backdrop residue. A fast fire()/close()
             // (e.g. the edit-loading spinner) can leave a .swal2-container behind; after a few
@@ -1813,266 +1836,303 @@
                 isEditMode = true;
                 currentEditPublicationId = publication.id;
 
+                // Increment and capture load ID
+                currentEditLoadId++;
+                const loadId = currentEditLoadId;
+
                 const addModal = document.getElementById('addModal');
                 if (addModal) {
-                    // Clear any stuck SweetAlert backdrop so it can't hide the modal after
-                    // several open/close cycles (1st open works, 3rd doesn't, etc.).
-                    purgeSwalResidue();
-                    addModal.style.display = 'flex';
-                    addModal.classList.remove('hidden');
-                    document.body.style.overflow = 'hidden';
+                    // Show robust CSS-based loading overlay
+                    const loader = document.getElementById('loadingOverlay');
+                    if (loader) loader.classList.remove('hidden');
 
-                    // Update modal title and button for Edit mode
-                    document.getElementById('addModalTitle').textContent = 'แก้ไขผลงานวิจัย';
-                    document.getElementById('addFormSubmitBtn').textContent = 'บันทึกการแก้ไข';
-                    document.getElementById('add_publication_id').value = publication.id;
+                    try {
+                        // Clear any stuck SweetAlert backdrop so it can't hide the modal after
+                        // several open/close cycles (1st open works, 3rd doesn't, etc.).
+                        purgeSwalResidue();
+                        addModal.style.display = 'flex';
+                        addModal.classList.remove('hidden');
+                        document.body.style.overflow = 'hidden';
 
-                    // Reset upload UI
-                    document.getElementById('add_uploadProgress').classList.add('hidden');
-                    document.getElementById('add_uploadedFile').classList.add('hidden');
-                    document.getElementById('add_fileInput').value = '';
-                    document.getElementById('add_ai-url-input').value = '';
-                    addUploadedFileData = null;
+                        // Update modal title and button for Edit mode
+                        document.getElementById('addModalTitle').textContent = 'แก้ไขผลงานวิจัย';
+                        document.getElementById('addFormSubmitBtn').textContent = 'บันทึกการแก้ไข';
+                        document.getElementById('add_publication_id').value = publication.id;
 
-                    // Fill form with publication data
-                    document.getElementById('add_publication_type').value = publication.publication_type || '';
-                    document.getElementById('add_title').value = publication.title || '';
-                    document.getElementById('add_abstract').value = publication.abstract || '';
-                    document.getElementById('add_source').value = publication.source || '';
+                        // Reset upload UI
+                        document.getElementById('add_uploadProgress').classList.add('hidden');
+                        document.getElementById('add_uploadedFile').classList.add('hidden');
+                        document.getElementById('add_fileInput').value = '';
+                        document.getElementById('add_ai-url-input').value = '';
+                        addUploadedFileData = null;
 
-                    // Convert CE year to BE year for display
-                    const ceYear = publication.publication_year;
-                    document.getElementById('add_publication_year').value = ceYear ? parseInt(ceYear) + 543 : '';
-                    document.getElementById('add_publication_month').value = publication.publication_month || '';
+                        // Fill form with publication data
+                        document.getElementById('add_publication_type').value = publication.publication_type || '';
+                        document.getElementById('add_title').value = publication.title || '';
+                        document.getElementById('add_abstract').value = publication.abstract || '';
+                        document.getElementById('add_source').value = publication.source || '';
 
-                    document.getElementById('add_volume').value = publication.volume || '';
-                    document.getElementById('add_issue').value = publication.issue || '';
-                    document.getElementById('add_pages').value = publication.pages || '';
-                    document.getElementById('add_doi').value = publication.doi || '';
-                    document.getElementById('add_isbn').value = publication.isbn || '';
-                    document.getElementById('add_publisher').value = publication.publisher || '';
-                    document.getElementById('add_conference_name').value = publication.conference_name || '';
-                    document.getElementById('add_conference_location').value = publication.conference_location || '';
-                    document.getElementById('add_conference_date').value = publication.conference_date || '';
-                    document.getElementById('add_book_title').value = publication.book_title || '';
-                    document.getElementById('add_chapter').value = publication.chapter || '';
-                    document.getElementById('add_editor').value = publication.editor || '';
-                    document.getElementById('add_keywords').value = publication.keywords || '';
-                    document.getElementById('add_ref_url').value = publication.ref_url || '';
-                    document.getElementById('add_url').value = publication.url || '';
+                        // Convert CE year to BE year for display
+                        const ceYear = publication.publication_year;
+                        document.getElementById('add_publication_year').value = ceYear ? parseInt(ceYear) + 543 : '';
+                        document.getElementById('add_publication_month').value = publication.publication_month || '';
 
-                    // Show "เปิดไฟล์ที่อัปโหลด" when ref_url/url/file_link points to an uploaded file
-                    const fileRef = publication.ref_url || publication.file_link || publication.url;
-                    const fileUrl = getFileDownloadUrl(fileRef, publication.url || publication.ref_url);
-                    const existingLinkBlock = document.getElementById('add_existing_file_link');
-                    const existingLinkAnchor = document.getElementById('add_existing_file_link_anchor');
-                    if (existingLinkBlock && existingLinkAnchor) {
-                        if (fileUrl) {
-                            existingLinkAnchor.href = fileUrl;
-                            existingLinkBlock.classList.remove('hidden');
+                        document.getElementById('add_volume').value = publication.volume || '';
+                        document.getElementById('add_issue').value = publication.issue || '';
+                        document.getElementById('add_pages').value = publication.pages || '';
+                        document.getElementById('add_doi').value = publication.doi || '';
+                        document.getElementById('add_isbn').value = publication.isbn || '';
+                        document.getElementById('add_publisher').value = publication.publisher || '';
+                        document.getElementById('add_conference_name').value = publication.conference_name || '';
+                        document.getElementById('add_conference_location').value = publication.conference_location || '';
+                        document.getElementById('add_conference_date').value = publication.conference_date || '';
+                        document.getElementById('add_book_title').value = publication.book_title || '';
+                        document.getElementById('add_chapter').value = publication.chapter || '';
+                        document.getElementById('add_editor').value = publication.editor || '';
+                        document.getElementById('add_keywords').value = publication.keywords || '';
+                        document.getElementById('add_ref_url').value = publication.ref_url || '';
+                        document.getElementById('add_url').value = publication.url || '';
+
+                        // Show "เปิดไฟล์ที่อัปโหลด" when ref_url/url/file_link points to an uploaded file
+                        const fileRef = publication.ref_url || publication.file_link || publication.url;
+                        const fileUrl = getFileDownloadUrl(fileRef, publication.url || publication.ref_url);
+                        const existingLinkBlock = document.getElementById('add_existing_file_link');
+                        const existingLinkAnchor = document.getElementById('add_existing_file_link_anchor');
+                        if (existingLinkBlock && existingLinkAnchor) {
+                            if (fileUrl) {
+                                existingLinkAnchor.href = fileUrl;
+                                existingLinkBlock.classList.remove('hidden');
+                            } else {
+                                existingLinkBlock.classList.add('hidden');
+                            }
+                        }
+
+                        document.getElementById('add_notes').value = publication.notes || '';
+
+                        // Select publication type card
+                        document.querySelectorAll('#addModal .publication-type-card').forEach(card => {
+                            card.classList.remove('selected');
+                            if (card.dataset.type === publication.publication_type) {
+                                card.classList.add('selected');
+                            }
+                        });
+
+                        // Clear and add authors with 3-Step Matching (Email → Thai Name → English Name)
+                        document.getElementById('add_authors_container').innerHTML = '';
+                        addAuthorsCount = 0;
+
+                        if (publication.authors && publication.authors.length > 0) {
+                            console.log(`=== EDIT MODE: Processing ${publication.authors.length} authors with 3-Step Matching ===`);
+
+                            // Process each author with comprehensive matching
+                            for (let i = 0; i < publication.authors.length; i++) {
+                                // Check if this load operation was cancelled or superseded
+                                if (loadId !== currentEditLoadId || !isEditMode) {
+                                    console.log('Edit load cancelled/superseded, aborting author matching.');
+                                    return;
+                                }
+
+                                const author = publication.authors[i];
+                                const authorName = author.name || author.author_name || '';
+                                // getPublication returns the email as author_email — email mapping is
+                                // the primary match, so fall back to author_email (was a blank string).
+                                const authorEmail = author.email || author.author_email || '';
+                                const authorAffiliation = author.affiliation || author.author_affiliation || '';
+
+                                console.log(`\n--- Author ${i + 1}/${publication.authors.length} ---`);
+                                console.log('Original data:', {
+                                    name: authorName,
+                                    email: authorEmail,
+                                    user_id: author.user_id
+                                });
+
+                                // If author already has user_id/uid/is_user_matched, keep the existing match directly
+                                const matchedUid = author.user_id || author.uid || (author.is_user_matched ? author.author_email : null);
+                                if (matchedUid) {
+                                    console.log(`✓ Author ${i + 1} already matched with user_id: ${matchedUid}`);
+                                    addAddAuthor({
+                                        author_name: authorName,
+                                        author_email: authorEmail,
+                                        author_affiliation: authorAffiliation,
+                                        corresponding: author.corresponding === '1' || author.corresponding === 1,
+                                        user_uid: matchedUid,
+                                        matched: true
+                                    });
+                                    continue;
+                                }
+
+                                // Enrich author data (split name fields for better matching)
+                                const enrichedAuthor = {
+                                    author_name: authorName,
+                                    name: authorName,
+                                    author_email: authorEmail,
+                                    email: authorEmail,
+                                    author_affiliation: authorAffiliation,
+                                    affiliation: authorAffiliation,
+                                    corresponding: author.corresponding === '1' || author.corresponding === 1
+                                };
+
+                                // Apply ensureAuthorSplitFields if available
+                                const processedAuthor = typeof window.ensureAuthorSplitFields === 'function' ?
+                                    window.ensureAuthorSplitFields(enrichedAuthor) :
+                                    enrichedAuthor;
+
+                                console.log('Enriched author data:', processedAuthor);
+
+                                let matchedUser = null;
+
+                                // ============================================================
+                                // STEP 1: Try to match by EMAIL first
+                                // ============================================================
+                                if (authorEmail && typeof window.searchAuthorByEmail === 'function') {
+                                    console.log(`[Step 1] Searching by email: "${authorEmail}"...`);
+                                    try {
+                                        matchedUser = await window.searchAuthorByEmail(authorEmail);
+                                        if (loadId !== currentEditLoadId || !isEditMode) {
+                                            console.log('Edit load cancelled/superseded, aborting.');
+                                            return;
+                                        }
+                                        if (matchedUser) {
+                                            console.log(`✓ Author ${i + 1} MATCHED by email!`, matchedUser);
+                                        } else {
+                                            console.log(`✗ No match found by email`);
+                                        }
+                                    } catch (err) {
+                                        console.warn(`✗ Email search failed:`, err);
+                                    }
+                                } else {
+                                    console.log(`[Step 1] Skipped - No email or searchAuthorByEmail not available`);
+                                }
+
+                                // ============================================================
+                                // STEP 2: Try to match by THAI NAME (if not matched by email)
+                                // ============================================================
+                                if (!matchedUser && authorName && typeof window.searchAuthorByThaiName === 'function') {
+                                    console.log(`[Step 2] Searching by Thai name: "${authorName}"...`);
+                                    try {
+                                        // Split Thai name into first and last parts
+                                        let thaiFirst = processedAuthor.thai_first_name;
+                                        let thaiLast = processedAuthor.thai_last_name;
+
+                                        // If not already split, split now
+                                        if (!thaiFirst && typeof window.splitNameParts === 'function') {
+                                            const parts = window.splitNameParts(authorName);
+                                            thaiFirst = parts.firstName;
+                                            thaiLast = parts.lastName;
+                                            console.log(`  Split Thai name: first="${thaiFirst}", last="${thaiLast}"`);
+                                        }
+
+                                        matchedUser = await window.searchAuthorByThaiName({
+                                            fullName: authorName,
+                                            firstName: thaiFirst,
+                                            lastName: thaiLast
+                                        });
+                                        if (loadId !== currentEditLoadId || !isEditMode) {
+                                            console.log('Edit load cancelled/superseded, aborting.');
+                                            return;
+                                        }
+                                        if (matchedUser) {
+                                            console.log(`✓ Author ${i + 1} MATCHED by Thai name!`, matchedUser);
+                                        } else {
+                                            console.log(`✗ No match found by Thai name`);
+                                        }
+                                    } catch (err) {
+                                        console.warn(`✗ Thai name search failed:`, err);
+                                    }
+                                } else if (!matchedUser) {
+                                    console.log(`[Step 2] Skipped - No name or searchAuthorByThaiName not available`);
+                                }
+
+                                // ============================================================
+                                // STEP 3: Try to match by ENGLISH NAME (if still not matched)
+                                // ============================================================
+                                if (!matchedUser && authorName && typeof window.searchAuthorByEnglishName === 'function') {
+                                    console.log(`[Step 3] Searching by English name: "${authorName}"...`);
+                                    try {
+                                        // Split English name into first and last parts
+                                        let engFirst = processedAuthor.gf_name;
+                                        let engLast = processedAuthor.gl_name;
+
+                                        // If not already split, split now
+                                        if (!engFirst && typeof window.splitNameParts === 'function') {
+                                            const parts = window.splitNameParts(authorName);
+                                            engFirst = parts.firstName;
+                                            engLast = parts.lastName;
+                                            console.log(`  Split English name: first="${engFirst}", last="${engLast}"`);
+                                        }
+
+                                        matchedUser = await window.searchAuthorByEnglishName({
+                                            fullName: authorName,
+                                            firstName: engFirst,
+                                            lastName: engLast
+                                        });
+                                        if (loadId !== currentEditLoadId || !isEditMode) {
+                                            console.log('Edit load cancelled/superseded, aborting.');
+                                            return;
+                                        }
+                                        if (matchedUser) {
+                                            console.log(`✓ Author ${i + 1} MATCHED by English name!`, matchedUser);
+                                        } else {
+                                            console.log(`✗ No match found by English name`);
+                                        }
+                                    } catch (err) {
+                                        console.warn(`✗ English name search failed:`, err);
+                                    }
+                                } else if (!matchedUser) {
+                                    console.log(`[Step 3] Skipped - No name or searchAuthorByEnglishName not available`);
+                                }
+
+                                // ============================================================
+                                // FINAL: Add author with matched or original data
+                                // ============================================================
+                                if (matchedUser) {
+                                    // Successfully matched - use matched user data
+                                    const matchedName = matchedUser.thai_name ||
+                                        (matchedUser.gf_name && matchedUser.gl_name ? `${matchedUser.gf_name} ${matchedUser.gl_name}` : '') ||
+                                        authorName;
+
+                                    console.log(`✓✓ Author ${i + 1} FINAL: Using matched data`);
+                                    addAddAuthor({
+                                        author_name: matchedName,
+                                        author_email: matchedUser.email || authorEmail,
+                                        author_affiliation: matchedUser.affiliation || authorAffiliation || 'มหาวิทยาลัยราชภัฏอุตรดิตถ์',
+                                        corresponding: author.corresponding === '1' || author.corresponding === 1,
+                                        user_uid: matchedUser.uid || matchedUser.id || '',
+                                        matched: true
+                                    });
+                                } else {
+                                    // Not found in database - use original data
+                                    console.log(`✗✗ Author ${i + 1} FINAL: No match found, using original data`);
+                                    addAddAuthor({
+                                        author_name: authorName,
+                                        author_email: authorEmail,
+                                        author_affiliation: authorAffiliation,
+                                        corresponding: author.corresponding === '1' || author.corresponding === 1,
+                                        user_uid: '',
+                                        matched: false
+                                    });
+                                }
+                            }
+
+                            console.log(`\n=== EDIT MODE: Finished processing ${publication.authors.length} authors ===\n`);
                         } else {
-                            existingLinkBlock.classList.add('hidden');
+                            console.log('No authors in publication, adding empty author field');
+                            addAddAuthor(); // Add one empty author field
+                        }
+
+                        // Update conditional fields based on publication type
+                        updateAddConditionalFields();
+                    } catch (err) {
+                        console.error('Error in openAddModalForEdit:', err);
+                        // Close modal immediately to avoid leaving a broken backdrop visible
+                        closeAddModal();
+                        throw err;
+                    } finally {
+                        // Only hide loading overlay if this load hasn't been superseded
+                        if (loadId === currentEditLoadId) {
+                            if (loader) loader.classList.add('hidden');
                         }
                     }
-
-                    document.getElementById('add_notes').value = publication.notes || '';
-
-                    // Select publication type card
-                    document.querySelectorAll('#addModal .publication-type-card').forEach(card => {
-                        card.classList.remove('selected');
-                        if (card.dataset.type === publication.publication_type) {
-                            card.classList.add('selected');
-                        }
-                    });
-
-                    // Clear and add authors with 3-Step Matching (Email → Thai Name → English Name)
-                    document.getElementById('add_authors_container').innerHTML = '';
-                    addAuthorsCount = 0;
-
-                    if (publication.authors && publication.authors.length > 0) {
-                        console.log(`=== EDIT MODE: Processing ${publication.authors.length} authors with 3-Step Matching ===`);
-
-                        // Process each author with comprehensive matching
-                        for (let i = 0; i < publication.authors.length; i++) {
-                            const author = publication.authors[i];
-                            const authorName = author.name || author.author_name || '';
-                            // getPublication returns the email as author_email — email mapping is
-                            // the primary match, so fall back to author_email (was a blank string).
-                            const authorEmail = author.email || author.author_email || '';
-                            const authorAffiliation = author.affiliation || author.author_affiliation || '';
-
-                            console.log(`\n--- Author ${i + 1}/${publication.authors.length} ---`);
-                            console.log('Original data:', {
-                                name: authorName,
-                                email: authorEmail,
-                                user_id: author.user_id
-                            });
-
-                            // If author already has user_id, keep the existing match
-                            if (author.user_id) {
-                                console.log(`✓ Author ${i + 1} already matched with user_id: ${author.user_id}`);
-                                addAddAuthor({
-                                    author_name: authorName,
-                                    author_email: authorEmail,
-                                    author_affiliation: authorAffiliation,
-                                    corresponding: author.corresponding === '1' || author.corresponding === 1,
-                                    user_uid: author.user_id,
-                                    matched: true
-                                });
-                                continue;
-                            }
-
-                            // Enrich author data (split name fields for better matching)
-                            const enrichedAuthor = {
-                                author_name: authorName,
-                                name: authorName,
-                                author_email: authorEmail,
-                                email: authorEmail,
-                                author_affiliation: authorAffiliation,
-                                affiliation: authorAffiliation,
-                                corresponding: author.corresponding === '1' || author.corresponding === 1
-                            };
-
-                            // Apply ensureAuthorSplitFields if available
-                            const processedAuthor = typeof window.ensureAuthorSplitFields === 'function' ?
-                                window.ensureAuthorSplitFields(enrichedAuthor) :
-                                enrichedAuthor;
-
-                            console.log('Enriched author data:', processedAuthor);
-
-                            let matchedUser = null;
-
-                            // ============================================================
-                            // STEP 1: Try to match by EMAIL first
-                            // ============================================================
-                            if (authorEmail && typeof window.searchAuthorByEmail === 'function') {
-                                console.log(`[Step 1] Searching by email: "${authorEmail}"...`);
-                                try {
-                                    matchedUser = await window.searchAuthorByEmail(authorEmail);
-                                    if (matchedUser) {
-                                        console.log(`✓ Author ${i + 1} MATCHED by email!`, matchedUser);
-                                    } else {
-                                        console.log(`✗ No match found by email`);
-                                    }
-                                } catch (err) {
-                                    console.warn(`✗ Email search failed:`, err);
-                                }
-                            } else {
-                                console.log(`[Step 1] Skipped - No email or searchAuthorByEmail not available`);
-                            }
-
-                            // ============================================================
-                            // STEP 2: Try to match by THAI NAME (if not matched by email)
-                            // ============================================================
-                            if (!matchedUser && authorName && typeof window.searchAuthorByThaiName === 'function') {
-                                console.log(`[Step 2] Searching by Thai name: "${authorName}"...`);
-                                try {
-                                    // Split Thai name into first and last parts
-                                    let thaiFirst = processedAuthor.thai_first_name;
-                                    let thaiLast = processedAuthor.thai_last_name;
-
-                                    // If not already split, split now
-                                    if (!thaiFirst && typeof window.splitNameParts === 'function') {
-                                        const parts = window.splitNameParts(authorName);
-                                        thaiFirst = parts.firstName;
-                                        thaiLast = parts.lastName;
-                                        console.log(`  Split Thai name: first="${thaiFirst}", last="${thaiLast}"`);
-                                    }
-
-                                    matchedUser = await window.searchAuthorByThaiName({
-                                        fullName: authorName,
-                                        firstName: thaiFirst,
-                                        lastName: thaiLast
-                                    });
-
-                                    if (matchedUser) {
-                                        console.log(`✓ Author ${i + 1} MATCHED by Thai name!`, matchedUser);
-                                    } else {
-                                        console.log(`✗ No match found by Thai name`);
-                                    }
-                                } catch (err) {
-                                    console.warn(`✗ Thai name search failed:`, err);
-                                }
-                            } else if (!matchedUser) {
-                                console.log(`[Step 2] Skipped - No name or searchAuthorByThaiName not available`);
-                            }
-
-                            // ============================================================
-                            // STEP 3: Try to match by ENGLISH NAME (if still not matched)
-                            // ============================================================
-                            if (!matchedUser && authorName && typeof window.searchAuthorByEnglishName === 'function') {
-                                console.log(`[Step 3] Searching by English name: "${authorName}"...`);
-                                try {
-                                    // Split English name into first and last parts
-                                    let engFirst = processedAuthor.gf_name;
-                                    let engLast = processedAuthor.gl_name;
-
-                                    // If not already split, split now
-                                    if (!engFirst && typeof window.splitNameParts === 'function') {
-                                        const parts = window.splitNameParts(authorName);
-                                        engFirst = parts.firstName;
-                                        engLast = parts.lastName;
-                                        console.log(`  Split English name: first="${engFirst}", last="${engLast}"`);
-                                    }
-
-                                    matchedUser = await window.searchAuthorByEnglishName({
-                                        fullName: authorName,
-                                        firstName: engFirst,
-                                        lastName: engLast
-                                    });
-
-                                    if (matchedUser) {
-                                        console.log(`✓ Author ${i + 1} MATCHED by English name!`, matchedUser);
-                                    } else {
-                                        console.log(`✗ No match found by English name`);
-                                    }
-                                } catch (err) {
-                                    console.warn(`✗ English name search failed:`, err);
-                                }
-                            } else if (!matchedUser) {
-                                console.log(`[Step 3] Skipped - No name or searchAuthorByEnglishName not available`);
-                            }
-
-                            // ============================================================
-                            // FINAL: Add author with matched or original data
-                            // ============================================================
-                            if (matchedUser) {
-                                // Successfully matched - use matched user data
-                                const matchedName = matchedUser.thai_name ||
-                                    (matchedUser.gf_name && matchedUser.gl_name ? `${matchedUser.gf_name} ${matchedUser.gl_name}` : '') ||
-                                    authorName;
-
-                                console.log(`✓✓ Author ${i + 1} FINAL: Using matched data`);
-                                addAddAuthor({
-                                    author_name: matchedName,
-                                    author_email: matchedUser.email || authorEmail,
-                                    author_affiliation: matchedUser.affiliation || authorAffiliation || 'มหาวิทยาลัยราชภัฏอุตรดิตถ์',
-                                    corresponding: author.corresponding === '1' || author.corresponding === 1,
-                                    user_uid: matchedUser.uid || matchedUser.id || '',
-                                    matched: true
-                                });
-                            } else {
-                                // Not found in database - use original data
-                                console.log(`✗✗ Author ${i + 1} FINAL: No match found, using original data`);
-                                addAddAuthor({
-                                    author_name: authorName,
-                                    author_email: authorEmail,
-                                    author_affiliation: authorAffiliation,
-                                    corresponding: author.corresponding === '1' || author.corresponding === 1,
-                                    user_uid: '',
-                                    matched: false
-                                });
-                            }
-                        }
-
-                        console.log(`\n=== EDIT MODE: Finished processing ${publication.authors.length} authors ===\n`);
-                    } else {
-                        console.log('No authors in publication, adding empty author field');
-                        addAddAuthor(); // Add one empty author field
-                    }
-
-                    // Update conditional fields based on publication type
-                    updateAddConditionalFields();
                 }
             }
 
@@ -2090,6 +2150,12 @@
                 // Reset edit mode
                 isEditMode = false;
                 currentEditPublicationId = null;
+                // Increment currentEditLoadId to cancel any active async load loops
+                currentEditLoadId++;
+
+                // Hide loader overlay just in case
+                const loader = document.getElementById('loadingOverlay');
+                if (loader) loader.classList.add('hidden');
 
                 // Reset upload UI and hide "เปิดไฟล์ที่อัปโหลด"
                 document.getElementById('add_uploadProgress').classList.add('hidden');

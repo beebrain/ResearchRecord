@@ -381,20 +381,27 @@ class AdminController extends Controller
 
             // Process authors to get proper names
             foreach ($authors as &$author) {
+                // Flag whether this author is linked to a system user — used by
+                // the edit form to render a "matched" chip instead of plain inputs.
+                $author['is_user_matched'] = !empty($author['user_thai_name'])
+                    || !empty($author['author_user_thai_name']);
+
+                // Find the matched user's email/UID
+                $author['user_id'] = null;
+                if (!empty($author['user_thai_name'])) {
+                    $author['user_id'] = $author['author_email'];
+                } elseif (!empty($author['author_user_thai_name'])) {
+                    $author['user_id'] = $author['author_email_from_authors'] ?? $author['author_email'];
+                }
+
                 // Priority: uid from user table > author_id from authors+user > name from publication_authors
                 if (!empty($author['author_email']) && !empty($author['user_thai_name'])) {
-                    // Use user table Thai name (direct link via author_email)
+                    // Use user table Thai name (direct link via author_email) - WITHOUT titleThai
                     $fullName = trim($author['user_thai_name'] . ' ' . ($author['user_thai_lastname'] ?? ''));
-                    if (!empty($author['user_title_thai'])) {
-                        $fullName = $author['user_title_thai'] . $fullName;
-                    }
                     $author['author_name'] = $fullName;
                 } elseif (!empty($author['author_id']) && !empty($author['author_user_thai_name'])) {
-                    // Use authors table linked to user (via authors.user_uid)
+                    // Use authors table linked to user (via authors.user_uid) - WITHOUT titleThai
                     $fullName = trim($author['author_user_thai_name'] . ' ' . ($author['author_user_thai_lastname'] ?? ''));
-                    if (!empty($author['author_user_title_thai'])) {
-                        $fullName = $author['author_user_title_thai'] . $fullName;
-                    }
                     $author['author_name'] = $fullName;
                     if (!empty($author['author_email_from_authors'])) {
                         $author['author_email'] = $author['author_email_from_authors'];
@@ -405,6 +412,26 @@ class AdminController extends Controller
                         $author['author_name'] = $author['author_name'] ?? '';
                     }
                 }
+
+                // Ensure email and affiliation are set
+                if (empty($author['author_email'])) {
+                    $author['author_email'] = $author['author_email'] ?? '';
+                }
+                if (empty($author['author_affiliation'])) {
+                    $author['author_affiliation'] = $author['author_affiliation'] ?? '';
+                }
+                if (!isset($author['corresponding'])) {
+                    $author['corresponding'] = $author['corresponding'] ?? 0;
+                }
+
+                // Remove titleThai and related fields from response (not needed in frontend)
+                unset($author['user_title_thai']);
+                unset($author['author_user_title_thai']);
+                unset($author['user_thai_name']);
+                unset($author['user_thai_lastname']);
+                unset($author['author_user_thai_name']);
+                unset($author['author_user_thai_lastname']);
+                unset($author['author_email_from_authors']);
             }
 
             $publication['authors'] = $authors;

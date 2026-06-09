@@ -737,9 +737,26 @@
 
             let editAuthorsCount = 0;
 
+            // Remove any leftover SweetAlert loading/backdrop residue. A fast fire()/close()
+            // (e.g. the edit-loading spinner) can leave a .swal2-container behind; after a few
+            // open/close cycles these stack on top of the modal and hide it. Purge them all
+            // and reset the body styles SweetAlert mutates so the modal is always visible.
+            function purgeSwalResidue() {
+                try {
+                    if (window.Swal && typeof Swal.close === 'function' && Swal.isVisible && Swal.isVisible()) {
+                        Swal.close();
+                    }
+                } catch (e) { /* ignore */ }
+                document.querySelectorAll('.swal2-container').forEach(el => el.remove());
+                document.body.classList.remove('swal2-shown', 'swal2-height-auto', 'swal2-no-backdrop');
+                document.documentElement.classList.remove('swal2-shown', 'swal2-height-auto');
+                document.body.style.removeProperty('padding-right');
+            }
+
             // Open edit modal
             function openEditModal(publication) {
                 try {
+                    purgeSwalResidue();
                     // Set publication ID
                     document.getElementById('edit_publication_id').value = publication.id;
 
@@ -806,6 +823,7 @@
                 }
                 document.body.style.overflow = '';
                 document.getElementById('editForm').reset();
+                purgeSwalResidue();
             }
 
             // Update conditional fields based on publication type
@@ -888,6 +906,29 @@
                     if (window.AuthorNameSearch) {
                         const $newInput = $(authorDiv).find('input[name*="[name]"]');
                         window.AuthorNameSearch.setupSingleNameInput($newInput);
+
+                        // If this author is matched to a system user, render the chip so the
+                        // "ผู้ใช้ในระบบ" state persists on load (same as live selection)
+                        if (authorData && (authorData.is_user_matched || authorData.user_id || authorData.uid)) {
+                            const $row = $(authorDiv);
+                            const nameVal = authorData.author_name || authorData.name || '';
+                            const emailVal = authorData.author_email || authorData.email || '';
+                            const affilVal = authorData.author_affiliation || authorData.affiliation || '';
+                            const userUid = authorData.user_id || authorData.uid || '';
+                            if (userUid) {
+                                $newInput.data('user-uid', userUid);
+                                $row.find('input[name*="[email]"]').data('user-uid', userUid);
+                            }
+                            $row.data('matched-user', {
+                                uid: userUid,
+                                name: nameVal,
+                                email: emailVal,
+                                affiliation: affilVal
+                            });
+                            if (typeof window.AuthorNameSearch.renderChip === 'function') {
+                                window.AuthorNameSearch.renderChip($row);
+                            }
+                        }
                     }
                 }, 100);
             }

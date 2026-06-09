@@ -709,12 +709,29 @@
 
             let editAuthorsCount = 0;
 
+            // Remove any leftover SweetAlert loading/backdrop residue. A fast fire()/close()
+            // (e.g. the edit-loading spinner) can leave a .swal2-container behind; after a few
+            // open/close cycles these stack on top of the modal and hide it. Purge them all
+            // and reset the body styles SweetAlert mutates so the modal is always visible.
+            function purgeSwalResidue() {
+                try {
+                    if (window.Swal && typeof Swal.close === 'function' && Swal.isVisible && Swal.isVisible()) {
+                        Swal.close();
+                    }
+                } catch (e) { /* ignore */ }
+                document.querySelectorAll('.swal2-container').forEach(el => el.remove());
+                document.body.classList.remove('swal2-shown', 'swal2-height-auto', 'swal2-no-backdrop');
+                document.documentElement.classList.remove('swal2-shown', 'swal2-height-auto');
+                document.body.style.removeProperty('padding-right');
+            }
+
             // Open edit modal
             function openEditModal(publication) {
                 console.log('=== openEditModal START ===');
                 console.log('Publication:', publication);
 
                 try {
+                    purgeSwalResidue();
                     // Set publication ID
                     document.getElementById('edit_publication_id').value = publication.id;
 
@@ -789,6 +806,7 @@
                 if (form) {
                     form.reset();
                 }
+                purgeSwalResidue();
             }
 
             // Close modal on Escape key
