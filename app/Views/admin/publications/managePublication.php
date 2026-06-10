@@ -186,6 +186,58 @@
             overflow: hidden;
         }
 
+        /* ================================================================
+           Modal overflow prevention – ensures the add/edit modal always
+           stays within the viewport and the form body scrolls internally
+           when content is taller than the available space.
+           
+           The key fix: `.modal-content` uses `flex flex-col min-h-0` so
+           the `flex-1` child (`#addForm`) can shrink below its intrinsic
+           content height. Without `min-h-0` on the flex parent, the form
+           would push the footer off-screen.
+           ================================================================ */
+        #addModal .modal-content {
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            min-height: 0; /* critical: allow flex children to shrink */
+        }
+
+        #addModal .modal-content #addForm {
+            min-height: 0; /* allow this element to shrink */
+            overflow-y: auto;
+            flex: 1 1 auto;
+        }
+
+        /* On very short screens, reduce spacing further */
+        @media (max-height: 700px) {
+            #addModal .modal-content > div.flex-shrink-0 {
+                padding-top: 0.5rem !important;
+                padding-bottom: 0.5rem !important;
+            }
+            #addModal .modal-content #addForm {
+                padding-top: 0.5rem !important;
+                padding-bottom: 0.5rem !important;
+            }
+            #addModal .modal-content #addForm .space-y-4 > * {
+                margin-bottom: 0.5rem !important;
+            }
+            #addModal .modal-content #addForm .form-section {
+                margin-bottom: 0.75rem !important;
+            }
+            #addModal .modal-content #addForm .publication-type-card .type-card-inner {
+                min-height: 60px !important;
+                padding: 0.5rem !important;
+            }
+            /* Hide tips/help text on very short screens */
+            #addModal .modal-content #addForm p.text-xs.text-blue-600,
+            #addModal .modal-content #addForm p.text-xs.text-gray-500,
+            #addModal .modal-content #addForm p.text-sm.text-gray-500,
+            #addModal .modal-content #addForm .section-description {
+                display: none !important;
+            }
+        }
+
         /* Scrollbar styling */
         #publications-table::-webkit-scrollbar {
             width: 6px;
@@ -364,10 +416,10 @@
         <!-- NOTE: editModal has been removed. Now using addModal for both Add and Edit modes. -->
 
         <!-- Add Publication Modal (Layer 1: lowest) -->
-        <div id="addModal" class="hidden fixed inset-0 z-[40] flex items-center justify-center bg-gray-900 bg-opacity-70 p-4 sm:p-6">
-            <div class="modal-content relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div id="addModal" class="hidden fixed inset-0 z-[40] flex items-center justify-center bg-gray-900 bg-opacity-70 p-4 sm:p-6" style="overscroll-behavior: contain;">
+            <div class="modal-content relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden min-h-0">
                 <!-- Modal Header (Dynamic: Add/Edit) -->
-                <div class="flex justify-between items-center px-8 py-5 border-b border-gray-200 bg-white rounded-t-2xl flex-shrink-0">
+                <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200 bg-white rounded-t-2xl flex-shrink-0">
                     <h2 id="addModalTitle" class="text-2xl font-bold text-gray-900">เพิ่มผลงานวิจัย</h2>
                     <button onclick="closeAddModal()"
                         class="w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 transition-colors"
@@ -379,7 +431,7 @@
                 </div>
 
                 <!-- Add/Edit Form -->
-                <form id="addForm" class="px-8 py-6 space-y-6 overflow-y-auto flex-1">
+                <form id="addForm" class="px-6 py-4 space-y-4 overflow-y-auto flex-1 min-h-0">
                     <?= csrf_field() ?>
                     <!-- Hidden field for Edit mode -->
                     <input type="hidden" id="add_publication_id" name="publication_id" value="">
@@ -724,7 +776,7 @@
 
                 </form>
                 <!-- Modal Footer (Dynamic: Add/Edit) -->
-                <div class="flex gap-4 justify-end px-8 py-6 border-t border-gray-100 rounded-b-2xl flex-shrink-0 bg-white">
+                <div class="flex gap-3 justify-end px-6 py-4 border-t border-gray-100 rounded-b-2xl flex-shrink-0 bg-white">
                     <button type="button" onclick="closeAddModal()"
                         class="px-6 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors">
                         ยกเลิก

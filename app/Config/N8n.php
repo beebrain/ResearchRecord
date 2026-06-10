@@ -10,7 +10,7 @@ use CodeIgniter\Config\BaseConfig;
  * Shares the same n8n instance as newScience (the newer deployment). Override
  * in .env if the host or webhook paths change:
  *   N8N_BASE_URL = "https://n8n.kidcbc.work"
- *   N8N_EXTRACT_ARTICLE_PATH = "webhook/extract-article"
+ *   N8N_EXTRACT_ARTICLE_PATH = "webhook/extract-article-v2"
  *   N8N_SYNC_ORCID_PATH = "webhook/sync-orcid"
  */
 class N8n extends BaseConfig
@@ -19,7 +19,7 @@ class N8n extends BaseConfig
     public string $baseUrl = 'https://n8n.kidcbc.work';
 
     /** Webhook path for AI article extraction (POST { "url": "..." }). */
-    public string $extractArticlePath = 'webhook/extract-article';
+    public string $extractArticlePath = 'webhook/extract-article-v2';
 
     /** Webhook path for ORCID sync (GET ?orcid_id=...). */
     public string $syncOrcidPath = 'webhook/sync-orcid';

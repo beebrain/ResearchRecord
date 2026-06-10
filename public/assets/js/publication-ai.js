@@ -33,11 +33,11 @@ const applyAIDataBtn = document.getElementById('applyAIData');
 const aiWaitingModal = document.getElementById('aiWaitingModal');
 const aiAutoFillMessage = document.getElementById('aiAutoFillMessage');
 
-// n8n extract-article webhook — injected from server config (Config\N8n) via
+// n8n extract-article-v2 webhook — injected from server config (Config\N8n) via
 // window.N8N_EXTRACT_ARTICLE_URL; falls back to the shared newScience n8n host.
 const AI_API_URL = (typeof window !== 'undefined' && window.N8N_EXTRACT_ARTICLE_URL)
     ? window.N8N_EXTRACT_ARTICLE_URL
-    : 'https://n8n.kidcbc.work/webhook/extract-article';
+    : 'https://n8n.kidcbc.work/webhook/extract-article-v2';
 
 // Export AI_API_URL for reuse in other files
 window.AI_API_URL = AI_API_URL;

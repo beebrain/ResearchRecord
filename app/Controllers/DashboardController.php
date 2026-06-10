@@ -1376,7 +1376,7 @@ class DashboardController extends Controller
 
     /**
      * Fetch publication details by DOI using ngrok AI API
-     * Uses same endpoint as publication-ai.js: /webhook/extract-article
+     * Uses same endpoint as publication-ai.js: /webhook/extract-article-v2
      * Returns detailed publication info including all authors
      */
     private function fetchPublicationByDoi($doi)
