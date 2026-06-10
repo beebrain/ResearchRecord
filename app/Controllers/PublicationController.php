@@ -1061,7 +1061,10 @@ class PublicationController extends Controller
                 $existingAuthor = $this->authorModel->getAuthorlinkUser($authorData['email']);
                 if ($existingAuthor) {
                     $processedAuthor['author_id'] = $existingAuthor['id'];
-                    $processedAuthor['uid'] = $existingAuthor['user_id'];
+                    // 'uid' is not consumed by addAuthorsToPublication(); link is by
+                    // author_id/email. After the email-PK migration the authors record
+                    // exposes user_email (not user_id), so keep this in sync if present.
+                    $processedAuthor['uid'] = $existingAuthor['user_email'] ?? null;
                 }
             }
 
