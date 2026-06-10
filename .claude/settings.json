@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --check public/assets/js/admission-form-pdf.js)",
+      "Bash(WIN_KC_PASS='admin@SCI@URU' ./scripts/git-pull-win-kc-rr.sh)",
+      "Bash(npx --yes playwright --version)",
+      "Bash(node -e \"try{require\\('puppeteer'\\);console.log\\('puppeteer-yes'\\)}catch\\(e\\){console.log\\('no-puppeteer'\\)}\")",
+      "Bash(npx --yes playwright install chromium)",
+      "Bash(npm init *)",
+      "Bash(npm i *)",
+      "Bash(node -e \"const p=require\\('/tmp/node_modules/playwright-core'\\);console.log\\('ok', typeof p.chromium\\)\")",
+      "Bash(node pdf_dl_test.mjs native)",
+      "Bash(node pdf_dl_test.mjs anchor)",
+      "Bash(php -l app/Controllers/AdminController.php)",
+      "Bash(php -l app/Config/Routes.php)",
+      "Bash(curl -s -o /dev/null -D - -w 'HTTP %{http_code}\\\\n' -X POST http://localhost/ResearchRecord/public/index.php/admin/admission/log-client -H 'Content-Type: application/json' --data '{\"level\":\"info\",\"message\":\"t\"}')",
+      "Bash(curl -s -o /dev/null -D - -w \"HTTP %{http_code}\\\\n\" \"http://localhost/ResearchRecord/public/index.php/admin/admission/pdf-summary/1\")",
+      "Bash(grep -n 'group\\('\\\\''admin'\\\\''\\\\|group\\(\"admin\"\\\\|$routes->group\\\\|filter' app/Config/Routes.php)",
+      "Bash(WIN_KC_PASS=admin@SCI@URU sshpass -e ssh -F /dev/null -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/Users/boobee/.ssh/known_hosts -o PubkeyAuthentication=no -o PreferredAuthentications=password -o 'ProxyCommand=tailscale nc %h 22' -o ConnectTimeout=30 Administrator@100.74.66.65 'cd /d C:\\\\inetpub\\\\ResearchRecord && git rev-parse --short HEAD && findstr /C:\"pdf-download\" app\\\\Config\\\\Routes.php')",
+      "Bash(node -e ' *)"
+    ]
+  }
+}

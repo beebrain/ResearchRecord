@@ -3405,6 +3405,29 @@
 
             <!-- Modal Footer (ปิดได้เฉพาะกากบาทข้างบน) -->
             <div class="flex-shrink-0 flex gap-3 justify-end px-6 py-4 border-t border-gray-100 bg-gray-50">
+                <button type="button" onclick="editFromView()" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2">
+                    <span>✏️</span> แก้ไขผลงาน
+                </button>
+                <button type="button" onclick="closeViewModal()" class="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors">
+                    ปิด
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Waiting Modal (Layer 2) -->
+    <div id="addAiWaitingModal" class="hidden fixed inset-0 z-[9000] flex items-center justify-center bg-gray-900 bg-opacity-70 p-4 sm:p-6" style="overscroll-behavior: contain; pointer-events: auto;">
+        <div class="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center text-center">
+            <div class="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center mb-4 shadow-lg animate-pulse-slow">
+                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+            </div>
+            <h3 class="text-xl font-bold text-gray-900 mb-2">กำลังประมวลผลด้วย AI</h3>
+            <p id="addAiWaitingMessage" class="text-gray-600 text-sm">AI กำลังอ่านและวิเคราะห์เอกสารของคุณ<br>แล้วกรอกข้อมูลลงในฟอร์มให้อัตโนมัติ</p>
+            <div class="mt-6 flex items-center gap-2 text-sm text-gray-500">
+                <div class="loading-spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
+                <span>กรุณารอสักครู่...</span>
             </div>
         </div>
     </div>

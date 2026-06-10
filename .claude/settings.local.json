@@ -22,7 +22,15 @@
       "Bash(php update_teacher_faculty.php:*)",
       "Bash(\"C:\\xampp\\mysql\\bin\\mysql.exe\" -u root researchrecord --default-character-set=utf8mb4 -e \"SELECT \n    COUNT(*) as total_with_faculty,\n    COUNT(DISTINCT faculty_id) as unique_faculties\nFROM user \nWHERE active = 1 \nAND user_type = ''TEACHER'' \nAND faculty_id IS NOT NULL;\")",
       "Bash(dir /s /b \"c:\\xampp\\htdocs\\researchRecord\\app\\Views\\*curriculum*\")",
-      "Bash(dir \"c:\\\\xampp\\\\htdocs\\\\researchRecord\" /b)"
+      "Bash(dir \"c:\\\\xampp\\\\htdocs\\\\researchRecord\" /b)",
+      "Bash(php -l app/Models/AuthorModel.php)",
+      "Bash(php -l app/Controllers/PublicationController.php)",
+      "Bash(git add *)",
+      "Bash(git push *)",
+      "Bash(git reset *)",
+      "Bash(bash scripts/deploy-curriculum-api.sh)",
+      "Bash(bash scripts/deploy-rr-with-backup.sh --file app/Libraries/RrOpenApiSpec.php --file app/Libraries/UserIdentity.php --file app/Models/CurriculumModel.php --file app/Models/PublicationModel.php --file app/Models/UserModel.php --file app/Views/api_docs/swagger.php)",
+      "Bash(git revert *)"
     ],
     "deny": [],
     "ask": []
