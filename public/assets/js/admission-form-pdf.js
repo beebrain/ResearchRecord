@@ -574,66 +574,137 @@ function generateAdmissionFormPDF(formData, useThaiFont = false) {
         margin: [0, 0, 0, 5]
     });
     
-    // Use publications already declared above (line 263)
-    // const publications = form.publications || []; // Already declared
-    const publicationTableBody = [];
-    
-    // Header row
-    publicationTableBody.push([
-        { text: 'ลำดับที่', alignment: 'center', fontSize: 12, bold: true },
-        { text: 'ชื่อ-สกุล', alignment: 'center', fontSize: 12, bold: true },
-        { text: 'ประเภทผลงาน', alignment: 'center', fontSize: 12, bold: true },
-        { text: 'ชื่อผลงาน', alignment: 'center', fontSize: 12, bold: true },
-        { text: 'ปีที่เผยแพร่', alignment: 'center', fontSize: 12, bold: true }
-    ]);
-    
-    // Data rows - แสดงตามจำนวนผลงานจริง (อย่างน้อย 5 แถว)
-    const minRows = 5;
-    const actualCount = publications.length;
-    const rowCount = Math.max(minRows, actualCount);
-    
-    for (let i = 0; i < rowCount; i++) {
-        const pub = publications[i] || {};
-        const thaiNum = i < 10 ? toThaiNumeral(i + 1) : (i + 1).toString();
-        
-        // Get author name from publication_view (author_name_th or author_name)
-        const authorName = pub.author_name_th || pub.author_name || '-';
-        
-        // Get publication type in Thai
-        const pubTypeThai = getPublicationTypeThai(pub.publication_type);
-        
-        // ถ้ามีข้อมูลจริง แสดงข้อมูล ถ้าไม่มีแสดงแถวว่าง
-        publicationTableBody.push([
-            { text: thaiNum, alignment: 'center', fontSize: 12 },
-            { text: authorName, fontSize: 12 },
-            { text: pubTypeThai, fontSize: 12 },
-            // ชื่อผลงานไม่มีช่องว่างให้ pdfmake ตัดบรรทัด จึงต้อง wrap เองตามความกว้างคอลัมน์ (~406pt)
-            { text: wrapThaiText(pub.title || '-', 400), fontSize: 12 },
-            { text: pub.publication_year ? (parseInt(pub.publication_year) + 543).toString() : '-', alignment: 'center', fontSize: 12 }
-        ]);
-    }
+    // Section 5 presents one block per responsible teacher: a qualifications
+    // header (position / all education degrees / relationship) followed by that
+    // teacher's academic works rendered as APA-style citations.
+    // - Education comes from the CV module (teacher.education, attached server-side).
+    // - Works are grouped from form.publications by user_id (= teacher email),
+    //   which getTeacherPublications() already tags per teacher.
 
-    content.push({
-        table: {
-            headerRows: 1,
-            // Landscape A4 usable width = 841.89 - 50 - 50 ≈ 742pt.
-            // Fixed columns + '*' (title) must stay within this so no column
-            // is pushed off the page.
-            widths: [40, 130, 80, '*', 70],
-            body: publicationTableBody
-        },
-        layout: {
-            hLineWidth: function(i, node) { return 1; },
-            vLineWidth: function(i, node) { return 1; },
-            hLineColor: function(i, node) { return '#000000'; },
-            vLineColor: function(i, node) { return '#000000'; },
-            paddingLeft: function(i, node) { return 5; },
-            paddingRight: function(i, node) { return 5; },
-            paddingTop: function(i, node) { return 3; },
-            paddingBottom: function(i, node) { return 3; }
-        },
-        margin: [0, 0, 0, 15]
+    // Build an APA-style citation array (source italicised) from a publication row.
+    const buildApaCitation = (pub) => {
+        const authors = (pub.authors_names_th || pub.authors_names_en
+            || pub.author_name_th || pub.author_name || '').trim();
+        const yearCe = parseInt(pub.publication_year || 0);
+        const yearBe = yearCe ? (yearCe + 543).toString() : '-';
+        const title = (pub.title || '').trim();
+        const source = (pub.source || '').trim();
+        const volume = (pub.volume != null ? String(pub.volume) : '').trim();
+        const pages = (pub.pages != null ? String(pub.pages) : '').trim();
+
+        const parts = [];
+        if (authors) parts.push({ text: authors + ' ' });
+        parts.push({ text: '(' + yearBe + '). ' });
+        if (title) parts.push({ text: title + '. ' });
+        if (source) parts.push({ text: source, italics: true });
+        let tail = '';
+        if (volume) tail += (source ? ', ' : '') + volume;
+        if (pages) tail += ((volume || source) ? ', ' : '') + 'หน้า ' + pages;
+        tail += '.';
+        parts.push({ text: tail });
+        return parts;
+    };
+
+    // Group teacher publications by teacher email (user_id), newest first.
+    const pubsByTeacher = {};
+    publications.forEach(pub => {
+        const uid = (pub.user_id || pub.author_uid || '').toString().toLowerCase().trim();
+        if (!uid) return;
+        (pubsByTeacher[uid] = pubsByTeacher[uid] || []).push(pub);
     });
+    Object.keys(pubsByTeacher).forEach(uid => {
+        pubsByTeacher[uid].sort((a, b) =>
+            (parseInt(b.publication_year || 0)) - (parseInt(a.publication_year || 0)));
+    });
+
+    const responsibleTeachers = form.teachers || [];
+
+    responsibleTeachers.forEach((teacher, idx) => {
+        const email = (teacher.user_email || teacher.user_id || '').toString().toLowerCase().trim();
+        const position = teacher.titleThai || getPositionThai(teacher.position) || '-';
+        const nameOnly = (teacher.thai_name && teacher.thai_lastname)
+            ? (teacher.thai_name + ' ' + teacher.thai_lastname)
+            : (teacher.full_name
+                ? teacher.full_name.replace(/^(อาจารย์|ดร\.|ผศ\.|ผศ\.ดร\.|รศ\.|รศ\.ดร\.|ศ\.|ศ\.ดร\.)\s*/g, '')
+                : '-');
+
+        // Education cell — list every degree (highest/most recent first).
+        const eduList = teacher.education || [];
+        const eduCell = eduList.length
+            ? {
+                stack: eduList.map(e => {
+                    let line = (e.title || '').trim();
+                    if (e.organization) line += (line ? ' ' : '') + e.organization;
+                    if (e.grad_year_be) line += ' (' + e.grad_year_be + ')';
+                    return { text: line, fontSize: 11, margin: [0, 0, 0, 2] };
+                })
+            }
+            : { text: '-', fontSize: 11 };
+
+        // Works block — APA citations under the standard heading.
+        const teacherPubs = pubsByTeacher[email] || [];
+        const worksStack = [{
+            text: 'ผลงานวิชาการ (อย่างน้อย 1 รายการในรอบ 5 ปี (ปีการศึกษา ' +
+                ((currentYear - 4) + '–' + currentYear) + '))',
+            bold: true,
+            fontSize: 11,
+            margin: [0, 0, 0, 4]
+        }];
+        if (teacherPubs.length) {
+            teacherPubs.forEach(pub => {
+                worksStack.push({ text: buildApaCitation(pub), fontSize: 11, margin: [0, 0, 0, 4] });
+            });
+        } else {
+            worksStack.push({ text: '-', fontSize: 11 });
+        }
+
+        const headerFill = '#e8e8e8';
+        const teacherTable = [
+            [
+                { text: 'ลำดับ', alignment: 'center', fontSize: 11, bold: true, fillColor: headerFill },
+                { text: 'ชื่อ–นามสกุล', alignment: 'center', fontSize: 11, bold: true, fillColor: headerFill },
+                { text: 'ตำแหน่ง\nทางวิชาการ', alignment: 'center', fontSize: 11, bold: true, fillColor: headerFill },
+                { text: 'คุณวุฒิการศึกษา\n(ทุกระดับการศึกษา)', alignment: 'center', fontSize: 11, bold: true, fillColor: headerFill },
+                { text: 'ความสัมพันธ์\n(วุฒิตรง หรือ สัมพันธ์)', alignment: 'center', fontSize: 11, bold: true, fillColor: headerFill }
+            ],
+            [
+                { text: (idx + 1).toString(), alignment: 'center', fontSize: 11 },
+                { text: nameOnly, fontSize: 11 },
+                { text: position, fontSize: 11 },
+                eduCell,
+                { text: teacher.degree_relation || '-', alignment: 'center', fontSize: 11 }
+            ],
+            [
+                { colSpan: 5, stack: worksStack }, {}, {}, {}, {}
+            ]
+        ];
+
+        content.push({
+            table: {
+                headerRows: 1,
+                // Landscape A4 usable width ≈ 742pt.
+                widths: [30, 120, 90, '*', 90],
+                body: teacherTable
+            },
+            layout: {
+                hLineWidth: function() { return 1; },
+                vLineWidth: function() { return 1; },
+                hLineColor: function() { return '#000000'; },
+                vLineColor: function() { return '#000000'; },
+                paddingLeft: function() { return 5; },
+                paddingRight: function() { return 5; },
+                paddingTop: function() { return 3; },
+                paddingBottom: function() { return 3; }
+            },
+            // keep each teacher block from splitting awkwardly across pages
+            unbreakable: false,
+            margin: [0, 0, 0, 12]
+        });
+    });
+
+    if (responsibleTeachers.length === 0) {
+        content.push({ text: '-', fontSize: 12, margin: [0, 0, 0, 12] });
+    }
     
     // Section 6: Student Group Information (return to portrait orientation)
     content.push({

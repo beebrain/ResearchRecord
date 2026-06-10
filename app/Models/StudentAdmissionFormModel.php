@@ -315,6 +315,7 @@ class StudentAdmissionFormModel extends Model
             ->getResultArray();
 
         if (!empty($savedTeachers)) {
+            $this->attachTeacherEducation($savedTeachers);
             return $savedTeachers;
         }
 
@@ -350,7 +351,74 @@ class StudentAdmissionFormModel extends Model
             $teacher['admission_year'] = null;
         }
 
+        $this->attachTeacherEducation($defaultTeachers);
         return $defaultTeachers;
+    }
+
+    /**
+     * Attach education history (คุณวุฒิการศึกษาทุกระดับ) to each teacher row.
+     *
+     * Pulls from the CV module (cv_sections type=education + cv_entries) which the
+     * EducationController/profile pages already populate. Each teacher gains an
+     * `education` array ordered highest/most-recent degree first, with a
+     * pre-computed Buddhist-era graduation year so the PDF generator can render
+     * the qualification column without further lookups.
+     */
+    private function attachTeacherEducation(array &$teachers): void
+    {
+        if (empty($teachers)) {
+            return;
+        }
+
+        $db = \Config\Database::connect();
+
+        foreach ($teachers as &$teacher) {
+            $email = strtolower(trim($teacher['user_email'] ?? $teacher['user_id'] ?? ''));
+            $teacher['education'] = [];
+            if ($email === '') {
+                continue;
+            }
+
+            $section = $db->table('cv_sections')
+                ->select('id')
+                ->where('owner_email_norm', $email)
+                ->where('type', 'education')
+                ->get()
+                ->getRowArray();
+
+            if (empty($section)) {
+                continue;
+            }
+
+            $entries = $db->table('cv_entries')
+                ->select('title, organization, location, start_date, end_date, is_current')
+                ->where('section_id', $section['id'])
+                ->orderBy('is_current', 'DESC')
+                ->orderBy('end_date', 'DESC')
+                ->orderBy('start_date', 'DESC')
+                ->get()
+                ->getResultArray();
+
+            foreach ($entries as $entry) {
+                $gradYearBe = null;
+                if (!empty($entry['is_current'])) {
+                    $gradYearBe = 'ปัจจุบัน';
+                } elseif (!empty($entry['end_date'])) {
+                    $year = (int) substr($entry['end_date'], 0, 4);
+                    if ($year > 0) {
+                        $gradYearBe = (string) ($year + 543);
+                    }
+                }
+
+                $teacher['education'][] = [
+                    'title'        => $entry['title'] ?? '',
+                    'organization' => $entry['organization'] ?? '',
+                    'location'     => $entry['location'] ?? '',
+                    'grad_year_be' => $gradYearBe,
+                ];
+            }
+        }
+        unset($teacher);
     }
 
     /**
@@ -668,7 +736,10 @@ class StudentAdmissionFormModel extends Model
                         'publication_type' => $pub['publication_type'],
                         'source' => $pub['source'],
                         'publication_year' => $pub['publication_year'],
+                        'publication_month' => $pub['publication_month'] ?? null,
                         'volume' => $pub['volume'] ?? null,
+                        'pages' => $pub['pages'] ?? null,
+                        'doi' => $pub['doi'] ?? null,
                         'notes' => $pub['notes'] ?? null,
                         'abstract' => $pub['abstract'] ?? null,
                         'authors_names_th' => $pub['authors_names_thai'] ?? $pub['authors_names_th'] ?? '',
