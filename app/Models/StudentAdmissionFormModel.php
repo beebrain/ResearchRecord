@@ -417,6 +417,24 @@ class StudentAdmissionFormModel extends Model
                     'grad_year_be' => $gradYearBe,
                 ];
             }
+
+            // Graduation dates are frequently blank, so the SQL date sort cannot
+            // guarantee highest-degree-first. Re-sort by degree level inferred
+            // from the title (เอก > โท > ตรี), newest year as a tiebreaker.
+            usort($teacher['education'], static function ($a, $b) {
+                $rank = static function (string $title): int {
+                    if (preg_match('/เอก|ปร\.ด|ค\.ด|ดุษฎี|Ph\.?\s*D|D\.Eng/iu', $title)) return 3;
+                    if (preg_match('/โท|มหาบัณฑิต|M\.(Sc|A|Eng|Ed|S)|ค\.ม|วท\.ม|ศศ\.ม/iu', $title)) return 2;
+                    if (preg_match('/ตรี|บัณฑิต|B\.(Sc|A|Eng|Ed)|วท\.บ|ค\.บ|วศ\.บ/iu', $title)) return 1;
+                    return 0;
+                };
+                $ra = $rank($a['title']);
+                $rb = $rank($b['title']);
+                if ($ra !== $rb) {
+                    return $rb <=> $ra; // higher degree first
+                }
+                return (int) ($b['grad_year_be'] ?? 0) <=> (int) ($a['grad_year_be'] ?? 0);
+            });
         }
         unset($teacher);
     }
