@@ -371,7 +371,9 @@ function generateAdmissionFormPDF(formData, useThaiFont = false) {
     content.push({
         table: {
             headerRows: 2,
-            widths: [25, 65, 110, 35, 35, 35, 35, 35], // ที่, ตำแหน่ง, ชื่อ-นามสกุล, 5 ปี
+            // '*' on the name column makes the table span the full portrait
+            // page width (usable ≈ 495pt); year columns fixed and centred.
+            widths: [30, 80, '*', 50, 50, 50, 50, 50], // ที่, ตำแหน่ง, ชื่อ-นามสกุล, 5 ปี
             body: teacherTableBody
         },
         layout: {
