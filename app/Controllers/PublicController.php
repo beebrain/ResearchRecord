@@ -61,7 +61,7 @@ final class PublicController extends Controller
             $publications = $db->table('publications p')
                 ->select('
                     p.id, p.title, p.publication_type, p.source, p.publication_year, p.publication_month, p.doi, p.approve, p.created_at,
-                    p.created_by_email,
+                    p.created_by_email, p.volume, p.issue, p.pages, p.publisher,
                     CONCAT(COALESCE(creator.thai_name, creator.gf_name, \'\'), \' \', COALESCE(creator.thai_lastname, creator.gl_name, \'\')) as created_by_name,
                     GROUP_CONCAT(pa.author_name ORDER BY pa.author_order SEPARATOR \', \') as authors,
                     GROUP_CONCAT(pa.author_email ORDER BY pa.author_order SEPARATOR \', \') as author_emails
@@ -155,7 +155,7 @@ final class PublicController extends Controller
             $publications = $db->table('publications p')
                 ->select('
                     p.id, p.title, p.publication_type, p.source, p.publication_year, p.publication_month, p.doi, p.created_at,
-                    p.created_by_email,
+                    p.created_by_email, p.volume, p.issue, p.pages, p.publisher,
                     CONCAT(COALESCE(creator.thai_name, creator.gf_name, \'\'), \' \', COALESCE(creator.thai_lastname, creator.gl_name, \'\')) as created_by_name,
                     GROUP_CONCAT(pa.author_name ORDER BY pa.author_order SEPARATOR \', \') as authors,
                     GROUP_CONCAT(pa.author_email ORDER BY pa.author_order SEPARATOR \', \') as author_emails

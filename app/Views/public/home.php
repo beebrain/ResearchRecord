@@ -406,8 +406,23 @@
                             var creator = (p.created_by_name || '').trim() || (p.created_by_email || '');
                             var source = p.source || '';
                             var authorEmails = (p.author_emails || '').trim();
+                            var volume = p.volume || '';
+                            var issue = p.issue || '';
+                            var pages = p.pages || '';
+                            var publisher = p.publisher || '';
                             return (
-                                '<article class="pub-item rounded-xl border border-slate-200 px-4 py-3 hover:bg-slate-50 transition-colors" data-author-emails="' + esc(authorEmails) + '">' +
+                                '<article class="pub-item rounded-xl border border-slate-200 px-4 py-3 hover:bg-slate-50 transition-colors" ' +
+                                    'data-author-emails="' + esc(authorEmails) + '" ' +
+                                    'data-title="' + esc(p.title || '') + '" ' +
+                                    'data-authors="' + esc(authors) + '" ' +
+                                    'data-year="' + esc(year) + '" ' +
+                                    'data-source="' + esc(source) + '" ' +
+                                    'data-volume="' + esc(volume) + '" ' +
+                                    'data-issue="' + esc(issue) + '" ' +
+                                    'data-pages="' + esc(pages) + '" ' +
+                                    'data-publisher="' + esc(publisher) + '" ' +
+                                    'data-type="' + esc(type) + '" ' +
+                                    'data-doi="' + esc(doi) + '">' +
                                     '<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">' +
                                         '<div class="min-w-0">' +
                                             '<div class="font-medium text-slate-900">' + esc(p.title || '') + '</div>' +
@@ -419,7 +434,13 @@
                                                 chip(source) +
                                             '</div>' +
                                         '</div>' +
-                                        (doi ? '<div class="shrink-0"><a class="text-sm text-indigo-700 hover:text-indigo-900 underline" href="' + esc('https://doi.org/' + doi) + '" target="_blank" rel="noopener">DOI</a></div>' : '') +
+                                        '<div class="shrink-0 flex items-center gap-2">' +
+                                            '<button type="button" class="btn-copy-apa7 inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 hover:text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" title="คัดลอกในรูปแบบ APA 7">' +
+                                                '<svg class="w-3.5 h-3.5 icon-copy" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>' +
+                                                '<span class="copy-text">APA 7</span>' +
+                                            '</button>' +
+                                            (doi ? '<a class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 hover:text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all decoration-indigo-300" href="' + esc('https://doi.org/' + doi) + '" target="_blank" rel="noopener">DOI</a>' : '') +
+                                        '</div>' +
                                     '</div>' +
                                 '</article>'
                             );
@@ -578,6 +599,128 @@
                     if (retryBtn) retryBtn.addEventListener('click', function () { form.dispatchEvent(new Event('submit')); });
                 }).finally(function () {
                     submitEl.disabled = !curEl.value;
+                });
+            });
+
+            var formatAPA7 = function (publication) {
+                var title = (publication.title || '').trim();
+                if (title.endsWith('.')) title = title.slice(0, -1);
+                
+                var year = (publication.publication_year || '').trim();
+                var source = (publication.source || '').trim();
+                var volume = (publication.volume || '').trim();
+                var issue = (publication.issue || '').trim();
+                var pages = (publication.pages || '').trim();
+                var doi = (publication.doi || '').trim();
+                var publisher = (publication.publisher || '').trim();
+                var type = (publication.publication_type || '').trim();
+                
+                var rawAuthors = (publication.authors || '').split(',').map(function(a) { return a.trim(); }).filter(Boolean);
+                var formattedAuthors = rawAuthors.map(function(author) {
+                    if (author.indexOf(',') !== -1) return author;
+                    var parts = author.split(/\s+/).filter(Boolean);
+                    if (parts.length > 1) {
+                        var lastName = parts[parts.length - 1];
+                        var initials = parts.slice(0, -1).map(function(p) {
+                            return p.charAt(0) + '.';
+                        }).join(' ');
+                        return lastName + ', ' + initials;
+                    }
+                    return author;
+                });
+                
+                var authorString = '';
+                if (formattedAuthors.length === 1) {
+                    authorString = formattedAuthors[0];
+                } else if (formattedAuthors.length === 2) {
+                    authorString = formattedAuthors[0] + ', & ' + formattedAuthors[1];
+                } else if (formattedAuthors.length > 2) {
+                    authorString = formattedAuthors.slice(0, -1).join(', ') + ', & ' + formattedAuthors[formattedAuthors.length - 1];
+                }
+                if (authorString && !authorString.endsWith('.')) authorString += '.';
+                
+                var yearString = year ? '(' + year + ').' : '';
+                var titleString = title ? title + '.' : '';
+                
+                var journalString = '';
+                if (type === 'journal' || !type) {
+                    var parts = [];
+                    if (source) parts.push(source);
+                    var volIssue = '';
+                    if (volume) volIssue += volume;
+                    if (issue) volIssue += '(' + issue + ')';
+                    if (volIssue) parts.push(volIssue);
+                    if (pages) parts.push(pages);
+                    if (parts.length > 0) journalString = parts.join(', ') + '.';
+                } else if (type === 'book') {
+                    if (publisher) journalString = publisher + '.';
+                } else {
+                    if (source) journalString = source + '.';
+                }
+                
+                var doiString = '';
+                if (doi) {
+                    if (doi.startsWith('10.')) doiString = 'https://doi.org/' + doi;
+                    else if (doi.startsWith('http')) doiString = doi;
+                    else doiString = doi;
+                }
+                
+                var citationParts = [];
+                if (authorString) citationParts.push(authorString);
+                if (yearString) citationParts.push(yearString);
+                if (titleString) citationParts.push(titleString);
+                if (journalString) citationParts.push(journalString);
+                if (doiString) citationParts.push(doiString);
+                
+                return citationParts.join(' ');
+            };
+
+            document.addEventListener('click', function (e) {
+                var btn = e.target.closest('.btn-copy-apa7');
+                if (!btn) return;
+                
+                var article = btn.closest('.pub-item');
+                if (!article) return;
+                
+                var pub = {
+                    title: article.getAttribute('data-title'),
+                    authors: article.getAttribute('data-authors'),
+                    publication_year: article.getAttribute('data-year'),
+                    source: article.getAttribute('data-source'),
+                    volume: article.getAttribute('data-volume'),
+                    issue: article.getAttribute('data-issue'),
+                    pages: article.getAttribute('data-pages'),
+                    doi: article.getAttribute('data-doi'),
+                    publisher: article.getAttribute('data-publisher'),
+                    publication_type: article.getAttribute('data-type')
+                };
+                
+                var citation = formatAPA7(pub);
+                
+                navigator.clipboard.writeText(citation).then(function() {
+                    var copyText = btn.querySelector('.copy-text');
+                    var iconCopy = btn.querySelector('.icon-copy');
+                    
+                    if (copyText) copyText.textContent = 'คัดลอกแล้ว!';
+                    if (iconCopy) {
+                        iconCopy.innerHTML = '<polyline points="20 6 9 17 4 12"></polyline>';
+                        iconCopy.classList.add('text-emerald-600');
+                    }
+                    
+                    btn.classList.add('border-emerald-200', 'bg-emerald-50');
+                    btn.classList.remove('hover:text-indigo-600');
+                    
+                    setTimeout(function() {
+                        if (copyText) copyText.textContent = 'APA 7';
+                        if (iconCopy) {
+                            iconCopy.innerHTML = '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>';
+                            iconCopy.classList.remove('text-emerald-600');
+                        }
+                        btn.classList.remove('border-emerald-200', 'bg-emerald-50');
+                        btn.classList.add('hover:text-indigo-600');
+                    }, 2000);
+                }).catch(function(err) {
+                    console.error('Failed to copy text: ', err);
                 });
             });
 
