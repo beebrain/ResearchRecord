@@ -68,7 +68,6 @@ final class PublicController extends Controller
                 ')
                 ->join('publication_authors pa', 'pa.publication_id = p.id', 'inner')
                 ->join('user creator', 'creator.email = p.created_by_email', 'left')
-                ->where('p.approve', 1)
                 ->whereIn('pa.author_email', $emails)
                 ->groupBy('p.id')
                 ->orderBy('p.publication_year', 'DESC')
@@ -81,7 +80,6 @@ final class PublicController extends Controller
             $countRow = $db->table('publications p')
                 ->select('COUNT(DISTINCT p.id) as c')
                 ->join('publication_authors pa', 'pa.publication_id = p.id', 'inner')
-                ->where('p.approve', 1)
                 ->whereIn('pa.author_email', $emails)
                 ->get()
                 ->getRowArray();
@@ -90,7 +88,6 @@ final class PublicController extends Controller
             $pubCounts = $db->table('publication_authors pa')
                 ->select('pa.author_email, COUNT(DISTINCT pa.publication_id) as c')
                 ->join('publications p', 'p.id = pa.publication_id', 'inner')
-                ->where('p.approve', 1)
                 ->whereIn('pa.author_email', $emails)
                 ->groupBy('pa.author_email')
                 ->get()
@@ -154,7 +151,7 @@ final class PublicController extends Controller
         if ($emails !== []) {
             $publications = $db->table('publications p')
                 ->select('
-                    p.id, p.title, p.publication_type, p.source, p.publication_year, p.publication_month, p.doi, p.created_at,
+                    p.id, p.title, p.publication_type, p.source, p.publication_year, p.publication_month, p.doi, p.approve, p.created_at,
                     p.created_by_email, p.volume, p.issue, p.pages, p.publisher,
                     CONCAT(COALESCE(creator.thai_name, creator.gf_name, \'\'), \' \', COALESCE(creator.thai_lastname, creator.gl_name, \'\')) as created_by_name,
                     GROUP_CONCAT(pa.author_name ORDER BY pa.author_order SEPARATOR \', \') as authors,
@@ -162,7 +159,6 @@ final class PublicController extends Controller
                 ')
                 ->join('publication_authors pa', 'pa.publication_id = p.id', 'inner')
                 ->join('user creator', 'creator.email = p.created_by_email', 'left')
-                ->where('p.approve', 1)
                 ->whereIn('pa.author_email', $emails)
                 ->groupBy('p.id')
                 ->orderBy('p.publication_year', 'DESC')
@@ -175,7 +171,6 @@ final class PublicController extends Controller
             $countRow = $db->table('publications p')
                 ->select('COUNT(DISTINCT p.id) as c')
                 ->join('publication_authors pa', 'pa.publication_id = p.id', 'inner')
-                ->where('p.approve', 1)
                 ->whereIn('pa.author_email', $emails)
                 ->get()
                 ->getRowArray();
@@ -184,7 +179,6 @@ final class PublicController extends Controller
             $pubCounts = $db->table('publication_authors pa')
                 ->select('pa.author_email, COUNT(DISTINCT pa.publication_id) as c')
                 ->join('publications p', 'p.id = pa.publication_id', 'inner')
-                ->where('p.approve', 1)
                 ->whereIn('pa.author_email', $emails)
                 ->groupBy('pa.author_email')
                 ->get()

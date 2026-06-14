@@ -410,6 +410,19 @@
                             var issue = p.issue || '';
                             var pages = p.pages || '';
                             var publisher = p.publisher || '';
+                            
+                            var approveStatus = (p.approve === null || p.approve === undefined) ? 'pending'
+                                : (Number(p.approve) === 1) ? 'approved'
+                                : 'rejected';
+                            var badgeHtml = '';
+                            if (approveStatus === 'approved') {
+                                badgeHtml = '<span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200 shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>ผ่านการตรวจสอบ</span>';
+                            } else if (approveStatus === 'rejected') {
+                                badgeHtml = '<span class="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700 border border-red-200 shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>ไม่ผ่านการตรวจสอบ</span>';
+                            } else {
+                                badgeHtml = '<span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 border border-amber-200 shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>ยังไม่ได้รับการตรวจสอบ</span>';
+                            }
+                            
                             return (
                                 '<article class="pub-item rounded-xl border border-slate-200 px-4 py-3 hover:bg-slate-50 transition-colors" ' +
                                     'data-author-emails="' + esc(authorEmails) + '" ' +
@@ -422,10 +435,14 @@
                                     'data-pages="' + esc(pages) + '" ' +
                                     'data-publisher="' + esc(publisher) + '" ' +
                                     'data-type="' + esc(type) + '" ' +
+                                    'data-approve="' + (p.approve !== null && p.approve !== undefined ? p.approve : '') + '" ' +
                                     'data-doi="' + esc(doi) + '">' +
                                     '<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">' +
                                         '<div class="min-w-0">' +
-                                            '<div class="font-medium text-slate-900">' + esc(p.title || '') + '</div>' +
+                                            '<div class="flex flex-wrap items-center gap-2">' +
+                                                '<div class="font-medium text-slate-900">' + esc(p.title || '') + '</div>' +
+                                                badgeHtml +
+                                            '</div>' +
                                             (authors ? '<div class="pub-authors-text text-sm text-slate-700 mt-1">' + esc(authors) + '</div>' : '') +
                                             (creator ? '<div class="text-xs text-slate-600 mt-1">บันทึกโดย: <span class="font-medium text-slate-800">' + esc(creator) + '</span></div>' : '') +
                                             '<div class="text-xs text-slate-600 mt-2">' +
