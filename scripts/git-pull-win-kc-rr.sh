@@ -30,11 +30,6 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$PASS" ]]; then
-  echo "ตั้งรหัสผ่าน: WIN_KC_PASS='...' ./scripts/git-pull-win-kc-rr.sh" >&2
-  exit 1
-fi
-
 if ! command -v tailscale >/dev/null 2>&1; then
   echo "ไม่พบ tailscale CLI" >&2
   exit 1
@@ -48,25 +43,38 @@ fi
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || { echo "Missing command: $1" >&2; exit 2; }
 }
-require_cmd sshpass
 
 mkdir -p ~/.ssh
 ssh-keyscan -t ed25519,rsa,ecdsa -H "$HOST" win-kc49a7sh1gd.tail08d9fa.ts.net 2>/dev/null >> ~/.ssh/known_hosts || true
 
-export SSHPASS="$PASS"
 REPO_WIN="${REPO//\//\\\\}"
 
-SSH_BASE=(
-  sshpass -e ssh
+SSH_OPTS=(
   -F /dev/null
   -o StrictHostKeyChecking=accept-new
   -o UserKnownHostsFile="${HOME}/.ssh/known_hosts"
-  -o PubkeyAuthentication=no
-  -o PreferredAuthentications=password,keyboard-interactive
   -o ProxyCommand="tailscale nc %h 22"
   -o ConnectTimeout=30
-  "${USER}@${HOST}"
 )
+
+SSH_BASE=()
+if [[ -n "$PASS" ]]; then
+  require_cmd sshpass
+  export SSHPASS="$PASS"
+  SSH_BASE=(
+    sshpass -e ssh
+    "${SSH_OPTS[@]}"
+    -o PubkeyAuthentication=no
+    -o PreferredAuthentications=password,keyboard-interactive
+    "${USER}@${HOST}"
+  )
+else
+  SSH_BASE=(
+    ssh
+    "${SSH_OPTS[@]}"
+    "${USER}@${HOST}"
+  )
+fi
 
 if [[ "$INIT" -eq 1 ]]; then
   echo "=== init: clone repo (ครั้งแรก) ==="
