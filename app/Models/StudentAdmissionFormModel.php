@@ -23,6 +23,8 @@ class StudentAdmissionFormModel extends Model
         'curriculum_version_year',
         'ministry_approval_date',
         'university_approval_date',
+        'is_ministry_pending',
+        'is_university_pending',
         'quality_assessment_year1',
         'quality_assessment_result1',
         'quality_assessment_year2',

@@ -80,11 +80,23 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="form-label">วันที่ได้รับการพิจารณาความสอดคล้องจาก สป.อว.</label>
-                            <input type="date" name="ministry_approval_date" value="<?= esc($form['ministry_approval_date'] ?? '') ?>" class="form-input">
+                            <input type="date" name="ministry_approval_date" id="ministry_approval_date" value="<?= esc($form['ministry_approval_date'] ?? '') ?>" class="form-input <?= ($form['is_ministry_pending'] ?? 0) == 1 ? 'bg-gray-100 cursor-not-allowed' : '' ?>" <?= ($form['is_ministry_pending'] ?? 0) == 1 ? 'disabled' : '' ?>>
+                            <div class="mt-2">
+                                <label class="inline-flex items-center text-sm text-gray-700 cursor-pointer">
+                                    <input type="checkbox" name="is_ministry_pending" id="is_ministry_pending" value="1" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" <?= ($form['is_ministry_pending'] ?? 0) == 1 ? 'checked' : '' ?> onchange="toggleMinistryPending(this)">
+                                    <span class="ml-2 font-medium text-amber-600">อยู่ระหว่างรอการอนุมัติความสอดคล้องจาก สป.อว.</span>
+                                </label>
+                            </div>
                         </div>
                         <div>
                             <label class="form-label">สภามหาวิทยาลัยเห็นชอบเมื่อวันที่ (กรณีปรับปรุง)</label>
-                            <input type="date" name="university_approval_date" value="<?= esc($form['university_approval_date'] ?? '') ?>" class="form-input">
+                            <input type="date" name="university_approval_date" id="university_approval_date" value="<?= esc($form['university_approval_date'] ?? '') ?>" class="form-input <?= ($form['is_university_pending'] ?? 0) == 1 ? 'bg-gray-100 cursor-not-allowed' : '' ?>" <?= ($form['is_university_pending'] ?? 0) == 1 ? 'disabled' : '' ?>>
+                            <div class="mt-2">
+                                <label class="inline-flex items-center text-sm text-gray-700 cursor-pointer">
+                                    <input type="checkbox" name="is_university_pending" id="is_university_pending" value="1" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" <?= ($form['is_university_pending'] ?? 0) == 1 ? 'checked' : '' ?> onchange="toggleUniversityPending(this)">
+                                    <span class="ml-2 font-medium text-amber-600">อยู่ระหว่างรอสภามหาวิทยาลัยเห็นชอบ</span>
+                                </label>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -528,6 +540,30 @@
             }
         }
 
+        function toggleMinistryPending(cb) {
+            const input = document.getElementById('ministry_approval_date');
+            if (cb.checked) {
+                input.value = '';
+                input.disabled = true;
+                input.classList.add('bg-gray-100', 'cursor-not-allowed');
+            } else {
+                input.disabled = false;
+                input.classList.remove('bg-gray-100', 'cursor-not-allowed');
+            }
+        }
+
+        function toggleUniversityPending(cb) {
+            const input = document.getElementById('university_approval_date');
+            if (cb.checked) {
+                input.value = '';
+                input.disabled = true;
+                input.classList.add('bg-gray-100', 'cursor-not-allowed');
+            } else {
+                input.disabled = false;
+                input.classList.remove('bg-gray-100', 'cursor-not-allowed');
+            }
+        }
+
         // Add/Remove functions for retiring teachers
         function addRetiringTeacher() {
             const list = document.getElementById('retiring-teachers-list');
@@ -611,6 +647,10 @@
         async function saveForm(status = null) {
             const formData = new FormData(document.getElementById('admissionForm'));
             const data = Object.fromEntries(formData.entries());
+
+            // Handle checkboxes
+            data.is_ministry_pending = document.getElementById('is_ministry_pending')?.checked ? 1 : 0;
+            data.is_university_pending = document.getElementById('is_university_pending')?.checked ? 1 : 0;
 
             // Handle teachers data
             const teachers = [];

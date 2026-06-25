@@ -227,8 +227,13 @@ function generateAdmissionFormPDF(formData, useThaiFont = false) {
     });
     
     // Section 2: Ministry Approval
-    const ministryDate = form.ministry_approval_date ? formatDateFullThai(form.ministry_approval_date) : '-';
-    const universityDate = form.university_approval_date ? formatDateFullThai(form.university_approval_date) : '-';
+    const ministryText = form.is_ministry_pending == 1 
+        ? 'อยู่ระหว่างรอการอนุมัติความสอดคล้องจาก สป.อว.' 
+        : `เมื่อวันที่ ${form.ministry_approval_date ? formatDateFullThai(form.ministry_approval_date) : '..................'}`;
+        
+    const universityText = form.is_university_pending == 1 
+        ? 'อยู่ระหว่างเสนอสภามหาวิทยาลัยเห็นชอบ' 
+        : `สภามหาวิทยาลัยเห็นชอบแล้วเมื่อวันที่ ${form.university_approval_date ? formatDateFullThai(form.university_approval_date) : '..................'}`;
     
     content.push({
         text: '๒. หลักสูตรได้รับการพิจารณาความสอดคล้องจากสำนักปลัดกระทรวงอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม',
@@ -238,7 +243,7 @@ function generateAdmissionFormPDF(formData, useThaiFont = false) {
     });
     
     content.push({
-        text: `เมื่อวันที่ ${ministryDate} \n กรณีหลักสูตรอยู่ในระหว่างการพัฒนาหรือปรับปรุง สภามหาวิทยาลัยเห็นชอบแล้วเมื่อวันที่ ${universityDate}`,
+        text: `${ministryText} \n กรณีหลักสูตรอยู่ในระหว่างการพัฒนาหรือปรับปรุง ${universityText}`,
         fontSize: 14,
         margin: [30, 0, 0, 5]
     });

@@ -63,7 +63,7 @@ Edit `scripts/ftp_rr.env`:
 
 ```bash
 FTP_HOST=202.29.52.124
-FTP_PORT=21
+FTP_PORT=990
 FTP_USER=rac
 FTP_PASS=your-password
 FTP_REMOTE_ROOT=research_academic

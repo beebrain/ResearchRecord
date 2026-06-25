@@ -538,6 +538,8 @@ class AdminDashboardController extends Controller
             saf.admission_plan_count,
             saf.ministry_approval_date,
             saf.university_approval_date,
+            saf.is_ministry_pending,
+            saf.is_university_pending,
             saf.quality_assessment_result1,
             saf.quality_assessment_result2,
             saf.curriculum_head_approval_date,
@@ -628,6 +630,9 @@ class AdminDashboardController extends Controller
         if (!empty($data['ministry_approval_date'])) {
             $score += 15;
             $details['ministry'] = ['status' => 'success', 'text' => 'มีแล้ว'];
+        } elseif (($data['is_ministry_pending'] ?? 0) == 1) {
+            $score += 5; // Give partial score for pending state
+            $details['ministry'] = ['status' => 'info', 'text' => 'รออนุมัติจาก สป.อว.'];
         } else {
             $details['ministry'] = ['status' => 'warning', 'text' => 'ยังไม่มี'];
         }
@@ -636,6 +641,9 @@ class AdminDashboardController extends Controller
         if (!empty($data['university_approval_date'])) {
             $score += 15;
             $details['university'] = ['status' => 'success', 'text' => 'มีแล้ว'];
+        } elseif (($data['is_university_pending'] ?? 0) == 1) {
+            $score += 5; // Give partial score for pending state
+            $details['university'] = ['status' => 'info', 'text' => 'รออนุมัติจากสภา'];
         } else {
             $details['university'] = ['status' => 'warning', 'text' => 'ยังไม่มี'];
         }

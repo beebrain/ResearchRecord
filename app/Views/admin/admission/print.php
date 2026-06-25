@@ -102,8 +102,20 @@
     </div>
 
     <div class="section">
-        <p><strong>๒.</strong> หลักสูตรได้รับการพิจารณาความสอดคล้องจากสำนักปลัดกระทรวงอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม เมื่อวันที่ <?= $form['ministry_approval_date'] ? date('d/m/Y', strtotime($form['ministry_approval_date'])) : '..................' ?></p>
-        <p style="margin-left:20px;">กรณีหลักสูตรอยู่ในระหว่างการพัฒนาหรือปรับปรุง สภามหาวิทยาลัยเห็นชอบแล้วเมื่อวันที่ <?= $form['university_approval_date'] ? date('d/m/Y', strtotime($form['university_approval_date'])) : '..................' ?></p>
+        <p><strong>๒.</strong> หลักสูตรได้รับการพิจารณาความสอดคล้องจากสำนักปลัดกระทรวงอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม 
+            <?php if (($form['is_ministry_pending'] ?? 0) == 1): ?>
+                <strong>อยู่ระหว่างรอการอนุมัติความสอดคล้องจาก สป.อว.</strong>
+            <?php else: ?>
+                เมื่อวันที่ <strong><?= $form['ministry_approval_date'] ? format_date_thai($form['ministry_approval_date']) : '..................' ?></strong>
+            <?php endif; ?>
+        </p>
+        <p style="margin-left:20px;">กรณีหลักสูตรอยู่ในระหว่างการพัฒนาหรือปรับปรุง 
+            <?php if (($form['is_university_pending'] ?? 0) == 1): ?>
+                <strong>อยู่ระหว่างเสนอสภามหาวิทยาลัยเห็นชอบ</strong>
+            <?php else: ?>
+                สภามหาวิทยาลัยเห็นชอบแล้วเมื่อวันที่ <strong><?= $form['university_approval_date'] ? format_date_thai($form['university_approval_date']) : '..................' ?></strong>
+            <?php endif; ?>
+        </p>
     </div>
 
     <div class="section">

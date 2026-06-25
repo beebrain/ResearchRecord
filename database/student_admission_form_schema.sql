@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS `student_admission_forms` (
     -- Section 2: Ministry approval
     `ministry_approval_date` date DEFAULT NULL COMMENT 'วันที่ได้รับการพิจารณาความสอดคล้องจาก สป.อว.',
     `university_approval_date` date DEFAULT NULL COMMENT 'สภามหาวิทยาลัยเห็นชอบเมื่อวันที่ (กรณีปรับปรุง)',
+    `is_ministry_pending` tinyint(1) DEFAULT 0 COMMENT 'รอการอนุมัติจาก สป.อว.',
+    `is_university_pending` tinyint(1) DEFAULT 0 COMMENT 'รอการอนุมัติจากสภามหาวิทยาลัย',
     
     -- Section 3: Quality assessment (2 years back)
     `quality_assessment_year1` int(4) DEFAULT NULL COMMENT 'ปีการศึกษา (ปีแรก)',

@@ -53,8 +53,30 @@
                 <div class="bg-white rounded-lg shadow-sm p-6">
                     <h2 class="text-lg font-semibold text-blue-600 border-b-2 border-blue-500 pb-2 mb-4">๒. การพิจารณาความสอดคล้อง</h2>
                     <div class="grid grid-cols-2 gap-4">
-                        <div><span class="text-gray-500">วันที่ได้รับการพิจารณาจาก สป.อว.:</span> <strong><?= $form['ministry_approval_date'] ? date('d/m/Y', strtotime($form['ministry_approval_date'])) : '-' ?></strong></div>
-                        <div><span class="text-gray-500">สภามหาวิทยาลัยเห็นชอบ:</span> <strong><?= $form['university_approval_date'] ? date('d/m/Y', strtotime($form['university_approval_date'])) : '-' ?></strong></div>
+                        <div>
+                            <span class="text-gray-500">วันที่ได้รับการพิจารณาจาก สป.อว.:</span> 
+                            <strong>
+                                <?php 
+                                if (($form['is_ministry_pending'] ?? 0) == 1) {
+                                    echo '<span class="text-amber-600 font-medium">รออนุมัติจาก สป.อว.</span>';
+                                } else {
+                                    echo $form['ministry_approval_date'] ? format_date_thai($form['ministry_approval_date']) : '-';
+                                }
+                                ?>
+                            </strong>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">สภามหาวิทยาลัยเห็นชอบ:</span> 
+                            <strong>
+                                <?php 
+                                if (($form['is_university_pending'] ?? 0) == 1) {
+                                    echo '<span class="text-amber-600 font-medium">รออนุมัติจากสภามหาวิทยาลัย</span>';
+                                } else {
+                                    echo $form['university_approval_date'] ? format_date_thai($form['university_approval_date']) : '-';
+                                }
+                                ?>
+                            </strong>
+                        </div>
                     </div>
                 </div>
 

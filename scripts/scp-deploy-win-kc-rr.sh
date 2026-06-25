@@ -25,8 +25,6 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ -n "$PASS" ]] || { echo "WIN_KC_PASS required" >&2; exit 1; }
-command -v sshpass >/dev/null || { echo "sshpass required" >&2; exit 1; }
 command -v tailscale >/dev/null || { echo "tailscale required" >&2; exit 1; }
 
 REPO_PS="${REPO_WIN//\//\\}"
@@ -35,17 +33,27 @@ trap 'rm -f "${ARCHIVE}"' EXIT
 
 mkdir -p ~/.ssh
 ssh-keyscan -t ed25519,rsa,ecdsa -H "$HOST" win-kc49a7sh1gd.tail08d9fa.ts.net 2>/dev/null >> ~/.ssh/known_hosts || true
-export SSHPASS="$PASS"
 
-SSH=(sshpass -e ssh -F /dev/null -o StrictHostKeyChecking=accept-new
+SSH_OPTS=(
+  -F /dev/null
+  -o StrictHostKeyChecking=accept-new
   -o UserKnownHostsFile="${HOME}/.ssh/known_hosts"
-  -o PubkeyAuthentication=no -o PreferredAuthentications=password,keyboard-interactive
-  -o ProxyCommand="tailscale nc %h 22" -o ConnectTimeout=60 "${USER}@${HOST}")
+  -o ProxyCommand="tailscale nc %h 22"
+  -o ConnectTimeout=60
+)
 
-SCP=(sshpass -e scp -F /dev/null -o StrictHostKeyChecking=accept-new
-  -o UserKnownHostsFile="${HOME}/.ssh/known_hosts"
-  -o PubkeyAuthentication=no -o PreferredAuthentications=password,keyboard-interactive
-  -o ProxyCommand="tailscale nc %h 22" -o ConnectTimeout=120)
+SSH=()
+SCP=()
+
+if [[ -n "$PASS" ]]; then
+  command -v sshpass >/dev/null || { echo "sshpass required when password is set" >&2; exit 1; }
+  export SSHPASS="$PASS"
+  SSH=(sshpass -e ssh "${SSH_OPTS[@]}" -o PubkeyAuthentication=no -o PreferredAuthentications=password,keyboard-interactive "${USER}@${HOST}")
+  SCP=(sshpass -e scp "${SSH_OPTS[@]}" -o PubkeyAuthentication=no -o PreferredAuthentications=password,keyboard-interactive)
+else
+  SSH=(ssh "${SSH_OPTS[@]}" "${USER}@${HOST}")
+  SCP=(scp "${SSH_OPTS[@]}")
+fi
 
 echo "=== packing local tree ==="
 tar -C "${ROOT_DIR}" -czf "${ARCHIVE}" \

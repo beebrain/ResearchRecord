@@ -3486,6 +3486,17 @@ class AdminController extends Controller
             $userData = $this->session->get('user_data');
             $input['updated_by_email'] = UserIdentity::sessionEmail() ?: ($userData['email'] ?? null);
 
+            // Handle pending flags and clear date fields if pending
+            $input['is_ministry_pending'] = isset($input['is_ministry_pending']) && ($input['is_ministry_pending'] == 1 || $input['is_ministry_pending'] === '1' || $input['is_ministry_pending'] === true) ? 1 : 0;
+            $input['is_university_pending'] = isset($input['is_university_pending']) && ($input['is_university_pending'] == 1 || $input['is_university_pending'] === '1' || $input['is_university_pending'] === true) ? 1 : 0;
+
+            if ($input['is_ministry_pending'] == 1) {
+                $input['ministry_approval_date'] = null;
+            }
+            if ($input['is_university_pending'] == 1) {
+                $input['university_approval_date'] = null;
+            }
+
             // Clean empty date values to NULL before update
             $dateFields = ['ministry_approval_date', 'university_approval_date', 'curriculum_head_approval_date', 'dean_approval_date'];
             foreach ($dateFields as $field) {

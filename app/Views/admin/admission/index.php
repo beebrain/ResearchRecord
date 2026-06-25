@@ -631,21 +631,35 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">วันที่ได้รับการพิจารณา</label>
-                                <input type="text" class="datetimepicker-be w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 cursor-pointer" 
+                                <input type="text" class="datetimepicker-be w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 cursor-pointer ${form.is_ministry_pending == 1 ? 'bg-gray-100 cursor-not-allowed' : ''}" 
                                        id="ministry_approval_date_picker"
                                        data-target="ministry_approval_date"
-                                       value="${formatDateToBE(form.ministry_approval_date)}" 
+                                       value="${form.is_ministry_pending == 1 ? '' : formatDateToBE(form.ministry_approval_date)}" 
+                                       ${form.is_ministry_pending == 1 ? 'disabled' : ''}
                                        readonly>
-                                <input type="hidden" name="ministry_approval_date" id="ministry_approval_date" value="${form.ministry_approval_date || ''}">
+                                <input type="hidden" name="ministry_approval_date" id="ministry_approval_date" value="${form.is_ministry_pending == 1 ? '' : (form.ministry_approval_date || '')}">
+                                <div class="mt-2">
+                                    <label class="inline-flex items-center text-sm text-gray-700 cursor-pointer">
+                                        <input type="checkbox" name="is_ministry_pending" id="is_ministry_pending" value="1" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" ${form.is_ministry_pending == 1 ? 'checked' : ''} onchange="toggleMinistryPending(this)">
+                                        <span class="ml-2 font-medium text-amber-600">อยู่ระหว่างรอการอนุมัติความสอดคล้องจาก สป.อว.</span>
+                                    </label>
+                                </div>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">สภามหาวิทยาลัยเห็นชอบ</label>
-                                <input type="text" class="datetimepicker-be w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 cursor-pointer" 
+                                <input type="text" class="datetimepicker-be w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 cursor-pointer ${form.is_university_pending == 1 ? 'bg-gray-100 cursor-not-allowed' : ''}" 
                                        id="university_approval_date_picker"
                                        data-target="university_approval_date"
-                                       value="${formatDateToBE(form.university_approval_date)}" 
+                                       value="${form.is_university_pending == 1 ? '' : formatDateToBE(form.university_approval_date)}" 
+                                       ${form.is_university_pending == 1 ? 'disabled' : ''}
                                        readonly>
-                                <input type="hidden" name="university_approval_date" id="university_approval_date" value="${form.university_approval_date || ''}">
+                                <input type="hidden" name="university_approval_date" id="university_approval_date" value="${form.is_university_pending == 1 ? '' : (form.university_approval_date || '')}">
+                                <div class="mt-2">
+                                    <label class="inline-flex items-center text-sm text-gray-700 cursor-pointer">
+                                        <input type="checkbox" name="is_university_pending" id="is_university_pending" value="1" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" ${form.is_university_pending == 1 ? 'checked' : ''} onchange="toggleUniversityPending(this)">
+                                        <span class="ml-2 font-medium text-amber-600">อยู่ระหว่างรอสภามหาวิทยาลัยเห็นชอบ</span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1832,8 +1846,8 @@
                     <!-- Section 2 -->
                     <div class="border-l-4 border-blue-500 pl-4">
                         <h3 class="text-lg font-semibold text-blue-600 mb-2">๒. การพิจารณาจาก สป.อว.</h3>
-                        <p><strong>วันที่ได้รับการพิจารณา:</strong> ${formatDateForDisplay(form.ministry_approval_date) || '-'}</p>
-                        <p><strong>สภามหาวิทยาลัยเห็นชอบ:</strong> ${formatDateForDisplay(form.university_approval_date) || '-'}</p>
+                        <p><strong>วันที่ได้รับการพิจารณา:</strong> ${form.is_ministry_pending == 1 ? '<span class="text-amber-600 font-medium">รออนุมัติจาก สป.อว.</span>' : (formatDateForDisplay(form.ministry_approval_date) || '-')}</p>
+                        <p><strong>สภามหาวิทยาลัยเห็นชอบ:</strong> ${form.is_university_pending == 1 ? '<span class="text-amber-600 font-medium">รออนุมัติจากสภามหาวิทยาลัย</span>' : (formatDateForDisplay(form.university_approval_date) || '-')}</p>
                     </div>
                     
                     <!-- Section 3 -->
@@ -2111,6 +2125,30 @@
             incompleteFields.toggle(isIncomplete);
         }
 
+        function toggleMinistryPending(cb) {
+            const isChecked = $(cb).is(':checked');
+            const datePicker = $('#ministry_approval_date_picker');
+            const hiddenDate = $('#ministry_approval_date');
+            if (isChecked) {
+                datePicker.val('').prop('disabled', true).addClass('bg-gray-100 cursor-not-allowed');
+                hiddenDate.val('');
+            } else {
+                datePicker.prop('disabled', false).removeClass('bg-gray-100 cursor-not-allowed');
+            }
+        }
+
+        function toggleUniversityPending(cb) {
+            const isChecked = $(cb).is(':checked');
+            const datePicker = $('#university_approval_date_picker');
+            const hiddenDate = $('#university_approval_date');
+            if (isChecked) {
+                datePicker.val('').prop('disabled', true).addClass('bg-gray-100 cursor-not-allowed');
+                hiddenDate.val('');
+            } else {
+                datePicker.prop('disabled', false).removeClass('bg-gray-100 cursor-not-allowed');
+            }
+        }
+
         function saveForm(status = null) {
             if (!currentFormId) return;
 
@@ -2121,6 +2159,8 @@
             // Handle checkboxes
             data.target_highschool = $('input[name="target_highschool"]').is(':checked') ? 1 : 0;
             data.target_diploma = $('input[name="target_diploma"]').is(':checked') ? 1 : 0;
+            data.is_ministry_pending = $('#is_ministry_pending').is(':checked') ? 1 : 0;
+            data.is_university_pending = $('#is_university_pending').is(':checked') ? 1 : 0;
 
             // Collect qualifications as JSON arrays
             data.qualification_highschool = JSON.stringify(getQualificationsArray('highschool'));
