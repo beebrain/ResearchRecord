@@ -6,14 +6,18 @@
  * NEW: sci.uru.ac.th/recordresearch
  * FTP: port 990 (implicit FTPS / FileZilla)
  *
- * Usage: php scripts/ftp_redirect_upload.php
+ * Usage:
+ *   cp scripts/ftp_rr.example.env scripts/ftp_rr.env   # set FTP_PASS locally
+ *   php scripts/ftp_redirect_upload.php
  */
 
-// ─── Config ────────────────────────────────────────────────────────
-define('FTP_HOST',    '202.29.52.124');
-define('FTP_USER',    'rac');
-define('FTP_PASS',    'rac@URU@2025');
-define('FTP_PORT',    990);
+require __DIR__ . '/load-ftp-rr-env.php';
+
+// ─── Config (secrets from scripts/ftp_rr.env — never commit passwords) ──
+define('FTP_HOST',    ftpRrEnv('FTP_HOST', '202.29.52.124') ?? '202.29.52.124');
+define('FTP_USER',    ftpRrEnv('FTP_USER', 'rac') ?? 'rac');
+define('FTP_PASS',    requireFtpRrEnv('FTP_PASS'));
+define('FTP_PORT',    (int) (ftpRrEnv('FTP_PORT', '990') ?? 990));
 define('FTP_TIMEOUT', 30);
 define('NEW_URL',     'https://sci.uru.ac.th/recordresearch/');
 

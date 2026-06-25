@@ -16,7 +16,7 @@ app.defaultLocale = 'th'
 database.default.hostname = localhost
 database.default.database = rac
 database.default.username = rac
-database.default.password = rac@URU@2026
+database.default.password = CHANGE_ME
 database.default.DBDriver = MySQLi
 database.default.port = 3306
 database.default.DBDebug = false
@@ -25,11 +25,11 @@ encryption.key = hex:${KEY}
 
 newscience.baseUrl = "https://sci.uru.ac.th"
 newscience_sso.enabled = true
-newscience_sso.sharedSecret = "pisit_secret"
+newscience_sso.sharedSecret = "CHANGE_ME"
 uruoauth.enabled = false
 
-RESEARCH_API_KEY = URU_RESEARCH
-RESEARCH_SYNC_HMAC_SECRET = "hello URU"
+RESEARCH_API_KEY = CHANGE_ME
+RESEARCH_SYNC_HMAC_SECRET = "CHANGE_ME"
 CURRICULUM_API_TOKEN = $(openssl rand -hex 24)
 EOF
 

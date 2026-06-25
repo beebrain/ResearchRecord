@@ -1,19 +1,23 @@
 <?php
 /**
- * Compare row counts: remote rac (202.29.52.124) vs local rac (localhost) on win-kc.
+ * Compare row counts: remote rac vs local rac (run on win-kc).
+ * Secrets: env or scripts/ftp_rr.env — never in repo.
+ *
  * Run: php scripts/compare-rac-databases.php
  */
+require __DIR__ . '/load-ftp-rr-env.php';
+
 $remote = [
-    'host' => '202.29.52.124',
-    'user' => 'rac',
-    'pass' => 'rac@URU@2025',
-    'db'   => 'rac',
+    'host' => deployEnv('OLD_HOST', '202.29.52.124') ?? '202.29.52.124',
+    'user' => deployEnv('OLD_USER', 'rac') ?? 'rac',
+    'pass' => requireDeployEnv('DB_PROD_PASS'),
+    'db'   => deployEnv('OLD_DB', 'rac') ?? 'rac',
 ];
 $local = [
     'host' => 'localhost',
-    'user' => 'rac',
-    'pass' => 'rac@URU@2026',
-    'db'   => 'rac',
+    'user' => deployEnv('WIN_KC_DB_USER', 'rac') ?? 'rac',
+    'pass' => requireDeployEnv('WIN_KC_DB_PASS'),
+    'db'   => deployEnv('WIN_KC_DB_NAME', 'rac') ?? 'rac',
 ];
 
 function connect(array $cfg): mysqli

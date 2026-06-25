@@ -5,24 +5,37 @@
  * Run inside Docker (shared_php):
  *   docker exec shared_php php scripts/diff-rac-old-vs-winkc.php
  *
- * Env (optional):
- *   OLD_HOST, OLD_PORT, OLD_USER, OLD_PASS, OLD_DB
- *   LOCAL_HOST, LOCAL_USER, LOCAL_PASS, LOCAL_DB
+ * Secrets: scripts/ftp_rr.env (DB_PROD_PASS) — never commit passwords.
+ * Env overrides: OLD_* / LOCAL_* / DB_PROD_PASS / LOCAL_MYSQL_PASS
  */
+require __DIR__ . '/load-ftp-rr-env.php';
+
+$oldPass = deployEnv('OLD_PASS') ?? deployEnv('DB_PROD_PASS');
+if ($oldPass === null || $oldPass === '') {
+    fwrite(STDERR, "Set DB_PROD_PASS in scripts/ftp_rr.env or OLD_PASS in environment.\n");
+    exit(2);
+}
+
+$localPass = deployEnv('LOCAL_PASS') ?? deployEnv('LOCAL_MYSQL_PASS');
+if ($localPass === null || $localPass === '') {
+    fwrite(STDERR, "Set LOCAL_MYSQL_PASS in scripts/ftp_rr.env (Docker MySQL root password).\n");
+    exit(2);
+}
+
 $old = [
-    'host' => getenv('OLD_HOST') ?: '202.29.52.124',
-    'port' => (int) (getenv('OLD_PORT') ?: 3306),
-    'user' => getenv('OLD_USER') ?: 'rac',
-    'pass' => getenv('OLD_PASS') ?: 'rac@URU@2025',
+    'host' => deployEnv('OLD_HOST', '202.29.52.124') ?? '202.29.52.124',
+    'port' => (int) (deployEnv('OLD_PORT', '3306') ?? '3306'),
+    'user' => deployEnv('OLD_USER', 'rac') ?? 'rac',
+    'pass' => $oldPass,
     'db'   => getenv('OLD_DB') ?: 'rac',
     'label'=> 'OLD (research.academic)',
 ];
 $winkc = [
-    'host' => getenv('LOCAL_HOST') ?: 'shared_mysql',
-    'port' => (int) (getenv('LOCAL_PORT') ?: 3306),
-    'user' => getenv('LOCAL_USER') ?: 'root',
-    'pass' => getenv('LOCAL_PASS') ?: 'rootpass',
-    'db'   => getenv('LOCAL_DB') ?: 'rac_winkc',
+    'host' => deployEnv('LOCAL_HOST', 'shared_mysql') ?? 'shared_mysql',
+    'port' => (int) (deployEnv('LOCAL_PORT', '3306') ?? '3306'),
+    'user' => deployEnv('LOCAL_MYSQL_USER', 'root') ?? 'root',
+    'pass' => $localPass,
+    'db'   => deployEnv('LOCAL_DB', 'rac_winkc') ?? 'rac_winkc',
     'label'=> 'win-kc (local sync)',
 ];
 

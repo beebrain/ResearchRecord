@@ -10,17 +10,32 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKUP_DIR="${ROOT}/deploy-backups/db"
 TIMESTAMP="${TIMESTAMP:-$(date +%Y%m%d_%H%M%S)}"
+ENV_FILE="${ROOT}/scripts/ftp_rr.env"
+EXAMPLE_ENV_FILE="${ROOT}/scripts/ftp_rr.example.env"
+
+[[ -f "${EXAMPLE_ENV_FILE}" ]] && source "${EXAMPLE_ENV_FILE}"
+[[ -f "${ENV_FILE}" ]] && source "${ENV_FILE}"
 
 WIN_KC_HOST="${WIN_KC_HOST:-100.74.66.65}"
 WIN_KC_USER="${WIN_KC_USER:-Administrator}"
 WIN_KC_DB_USER="${WIN_KC_DB_USER:-rac}"
-WIN_KC_DB_PASS="${WIN_KC_DB_PASS:-rac@URU@2026}"
+WIN_KC_DB_PASS="${WIN_KC_DB_PASS:-${DB_PROD_PASS:-}}"
 WIN_KC_DB_NAME="${WIN_KC_DB_NAME:-rac}"
+
+if [[ -z "${WIN_KC_DB_PASS}" ]]; then
+  echo "Set WIN_KC_DB_PASS or DB_PROD_PASS in scripts/ftp_rr.env (never commit secrets)." >&2
+  exit 2
+fi
 
 DOCKER_MYSQL="${DOCKER_MYSQL_CONTAINER:-shared_mysql}"
 LOCAL_ROOT_USER="${LOCAL_MYSQL_USER:-root}"
-LOCAL_ROOT_PASS="${LOCAL_MYSQL_PASS:-rootpass}"
+LOCAL_ROOT_PASS="${LOCAL_MYSQL_PASS:-}"
 LOCAL_DB="${LOCAL_MYSQL_DATABASE:-rac_winkc}"
+
+if [[ -z "${LOCAL_ROOT_PASS}" ]]; then
+  echo "Set LOCAL_MYSQL_PASS in scripts/ftp_rr.env (never commit secrets)." >&2
+  exit 2
+fi
 
 MYSQLDUMP='C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe'
 
