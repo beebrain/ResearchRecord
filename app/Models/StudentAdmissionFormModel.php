@@ -163,11 +163,21 @@ class StudentAdmissionFormModel extends Model
                 $form['studying_teachers_parsed'] = [];
             }
 
+            // Preserve saved display names before enriching from linked users
+            $savedChairName = trim((string) ($form['curriculum_head_name'] ?? ''));
+            $savedDeanName  = trim((string) ($form['dean_name'] ?? ''));
+
             // Format chair/dean names from linked user records (include academic title)
             if (! empty($form['chair_email'])) {
-                $chairName = $this->formatOfficialPersonName(
+                $chairTitle = $this->resolveAcademicTitle(
+                    (string) $form['chair_email'],
                     $form['chair_title'] ?? '',
                     $form['chair_title_en'] ?? '',
+                    $savedChairName,
+                    $form['teachers'] ?? []
+                );
+                $chairName = $this->formatOfficialPersonName(
+                    $chairTitle,
                     $form['chair_user_name'] ?? '',
                     $form['chair_user_lastname'] ?? '',
                     $form['chair_gf_name'] ?? '',
@@ -188,9 +198,15 @@ class StudentAdmissionFormModel extends Model
             }
 
             if (! empty($form['dean_email'])) {
-                $deanName = $this->formatOfficialPersonName(
+                $deanTitle = $this->resolveAcademicTitle(
+                    (string) $form['dean_email'],
                     $form['dean_title'] ?? '',
                     $form['dean_title_en'] ?? '',
+                    $savedDeanName,
+                    $form['teachers'] ?? []
+                );
+                $deanName = $this->formatOfficialPersonName(
+                    $deanTitle,
                     $form['dean_user_name'] ?? '',
                     $form['dean_user_lastname'] ?? '',
                     $form['dean_gf_name'] ?? '',
@@ -211,11 +227,95 @@ class StudentAdmissionFormModel extends Model
     }
 
     /**
-     * Build display name with academic title (titleThai / title).
+     * Resolve academic title from user record, saved display name, teachers, or publications.
+     *
+     * @param list<array<string,mixed>> $teacherRows
      */
-    private function formatOfficialPersonName(
+    private function resolveAcademicTitle(
+        string $email,
         ?string $titleThai,
         ?string $titleEn,
+        ?string $savedFullName,
+        array $teacherRows = []
+    ): string {
+        $titleThai = trim((string) $titleThai);
+        $titleEn   = trim((string) $titleEn);
+        if ($titleThai !== '') {
+            return $titleThai;
+        }
+        if ($titleEn !== '') {
+            return $titleEn;
+        }
+
+        $parsedTitle = $this->parseTitleFromDisplayName($savedFullName);
+        if ($parsedTitle !== '') {
+            return $parsedTitle;
+        }
+
+        $emailNorm = \App\Libraries\UserIdentity::normalizeEmail($email);
+        foreach ($teacherRows as $teacher) {
+            $teacherEmail = \App\Libraries\UserIdentity::normalizeEmail(
+                (string) ($teacher['user_email'] ?? $teacher['user_id'] ?? '')
+            );
+            if ($teacherEmail === '' || $teacherEmail !== $emailNorm) {
+                continue;
+            }
+            $position = trim((string) ($teacher['titleThai'] ?? $teacher['position'] ?? ''));
+            if ($position !== '') {
+                return $position;
+            }
+        }
+
+        return $this->inferTitleFromPublicationAuthors($emailNorm);
+    }
+
+    private function parseTitleFromDisplayName(?string $fullName): string
+    {
+        $fullName = trim((string) $fullName);
+        if ($fullName === '') {
+            return '';
+        }
+
+        if (preg_match(
+            '/^(ศ\.ดร\.|รศ\.ดร\.|ผศ\.ดร\.|อาจารย์\s*ดร\.|ดร\.|อาจารย์|รศ\.|ผศ\.|ศ\.|Mr\.|Mrs\.|Ms\.|Dr\.|Prof\.)\s+/u',
+            $fullName,
+            $matches
+        )) {
+            return trim($matches[1]);
+        }
+
+        return '';
+    }
+
+    private function inferTitleFromPublicationAuthors(string $email): string
+    {
+        if ($email === '') {
+            return '';
+        }
+
+        $rows = $this->db->table('publication_authors')
+            ->select('author_name')
+            ->where('author_email', $email)
+            ->orderBy('id', 'DESC')
+            ->limit(15)
+            ->get()
+            ->getResultArray();
+
+        foreach ($rows as $row) {
+            $title = $this->parseTitleFromDisplayName($row['author_name'] ?? '');
+            if ($title !== '') {
+                return $title;
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * Build display name with academic title prefix.
+     */
+    private function formatOfficialPersonName(
+        ?string $title,
         ?string $thaiName,
         ?string $thaiLastname,
         ?string $gfName,
@@ -225,19 +325,15 @@ class StudentAdmissionFormModel extends Model
         $thaiLastname = trim((string) $thaiLastname);
         $gfName = trim((string) $gfName);
         $glName = trim((string) $glName);
-        $titleThai = trim((string) $titleThai);
-        $titleEn = trim((string) $titleEn);
+        $title = trim((string) $title);
+        $titlePart = $title !== '' ? $title . ' ' : '';
 
         if ($thaiName !== '' && $thaiLastname !== '') {
-            $title = $titleThai !== '' ? $titleThai . ' ' : '';
-
-            return trim($title . $thaiName . ' ' . $thaiLastname);
+            return trim($titlePart . $thaiName . ' ' . $thaiLastname);
         }
 
         if ($gfName !== '' && $glName !== '') {
-            $title = $titleEn !== '' ? $titleEn . ' ' : '';
-
-            return trim($title . $gfName . ' ' . $glName);
+            return trim($titlePart . $gfName . ' ' . $glName);
         }
 
         return '';
