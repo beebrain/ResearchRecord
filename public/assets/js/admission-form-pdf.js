@@ -1221,102 +1221,74 @@ function generateAdmissionFormPDF(formData, useThaiFont = false) {
         alignment: 'justify'
     });
     
-    // Approval Section: 2 Columns (Curriculum Head & Dean)
+    // Approval Section: 2 equal columns (aligned signature blocks)
     const headDate = form.curriculum_head_approval_date ? formatDateFullThai(form.curriculum_head_approval_date) : '';
     const deanDate = form.dean_approval_date ? formatDateFullThai(form.dean_approval_date) : '';
-    
-    content.push({
-        columns: [
-            // Left Column: Curriculum Head
+    const introMinHeight = 52;
+    const sigLine = 'ลงชื่อ .................................................................';
+
+    const approvalCell = (title, introText, personName, roleLabel, dateText) => ({
+        stack: [
             {
-                stack: [
-                    {
-                        text: 'ความเห็นชอบของประธานหลักสูตร',
-                        fontSize: 14,
-                        bold: true,
-                        color: '#0066cc',
-                        margin: [0, 0, 0, 5]
-                    },
-                    {
-                        text: `นำเสนอและผ่านความเห็นชอบของคณะกรรมการบริหารหลักสูตรแล้วเมื่อ ${headDate || '.........'}`,
-                        fontSize: 14,
-                        margin: [0, 0, 0, 15]
-                    },
-                    {
-                        text: 'ลงชื่อ .................................................................................',
-                        fontSize: 14,
-                        margin: [0, 0, 0, 5]
-                    },
-                    {
-                        text: `(${form.curriculum_head_name || '-'})`,
-                        fontSize: 14,
-                        alignment: 'center',
-                        margin: [0, 0, 0, 3]
-                    },
-                    {
-                        text: 'ประธานหลักสูตร',
-                        fontSize: 14,
-                        alignment: 'center',
-                        margin: [0, 0, 0, 3]
-                    },
-                    {
-                        text: headDate ? `${headDate}` : 'วัน เดือน ปี: ......../......../........',
-                        fontSize: 14,
-                        alignment: 'center',
-                        margin: [0, 0, 0, 0]
-                    }
-                ],
-                width: '*'
+                text: title,
+                fontSize: 14,
+                bold: true,
+                color: '#0066cc',
+                margin: [0, 0, 0, 5],
             },
-            // Right Column: Dean
             {
-                stack: [
-                    {
-                        text: 'ความเห็นชอบของคณบดี',
-                        fontSize: 14,
-                        bold: true,
-                        color: '#0066cc',
-                        margin: [0, 0, 0, 5]
-                    },
-                    {
-                        text: `รับทราบและเห็นควรนำเสนอคณะกรรมการ (${form.faculty_name || 'ของคณะ'})`,
-                        fontSize: 14,
-                        margin: [0, 0, 0, 3]
-                    },
-                    {
-                        text: '',
-                        fontSize: 14,
-                        margin: [0, 0, 0, 15]
-                    },
-                    {
-                        text: 'ลงชื่อ ................................................................................',
-                        fontSize: 14,
-                        margin: [0, 0, 0, 5]
-                    },
-                    {
-                        text: `(${form.dean_name || '-'})`,
-                        fontSize: 14,
-                        alignment: 'center',
-                        margin: [0, 0, 0, 3]
-                    },
-                    {
-                        text: 'คณบดี',
-                        fontSize: 14,
-                        alignment: 'center',
-                        margin: [0, 0, 0, 3]
-                    },
-                    {
-                        text: deanDate ? `${deanDate}` : 'วัน เดือน ปี: ......../......../........',
-                        fontSize: 14,
-                        alignment: 'center',
-                        margin: [0, 0, 0, 0]
-                    }
-                ],
-                width: '*'
-            }
+                stack: [{ text: introText, fontSize: 14 }],
+                minHeight: introMinHeight,
+                margin: [0, 0, 0, 8],
+            },
+            {
+                text: sigLine,
+                fontSize: 14,
+                alignment: 'center',
+                margin: [0, 0, 0, 5],
+            },
+            {
+                text: `(${personName || '-'})`,
+                fontSize: 14,
+                alignment: 'center',
+                margin: [0, 0, 0, 3],
+            },
+            {
+                text: roleLabel,
+                fontSize: 14,
+                alignment: 'center',
+                margin: [0, 0, 0, 3],
+            },
+            {
+                text: dateText,
+                fontSize: 14,
+                alignment: 'center',
+            },
         ],
-        columnGap: 20,
-        margin: [0, 10, 10, 15]
+    });
+
+    content.push({
+        table: {
+            widths: ['*', '*'],
+            body: [[
+                approvalCell(
+                    'ความเห็นชอบของประธานหลักสูตร',
+                    `นำเสนอและผ่านความเห็นชอบของคณะกรรมการบริหารหลักสูตรแล้วเมื่อ ${headDate || '.........'}`,
+                    form.curriculum_head_name,
+                    'ประธานหลักสูตร',
+                    headDate ? headDate : 'วัน เดือน ปี: ......../......../........'
+                ),
+                approvalCell(
+                    'ความเห็นชอบของคณบดี',
+                    `รับทราบและเห็นควรนำเสนอคณะกรรมการ (${form.faculty_name || 'ของคณะ'})`,
+                    form.dean_name,
+                    'คณบดี',
+                    deanDate ? deanDate : 'วัน เดือน ปี: ......../......../........'
+                ),
+            ]],
+        },
+        layout: 'noBorders',
+        margin: [0, 10, 0, 15],
     });
     
     // Build PDF document definition
