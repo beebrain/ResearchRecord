@@ -182,6 +182,10 @@ class AuthenController extends Controller
             }
 
             if ($existingUser) {
+                if ((int) ($existingUser['active'] ?? 0) !== 1) {
+                    throw new \Exception('บัญชีถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ');
+                }
+
                 // Update existing user with fresh API data
                 // Note: faculty_id, department_id, and major are NOT updated
                 $updateData = [
@@ -476,7 +480,7 @@ class AuthenController extends Controller
             return redirect()->to(site_url('auth/login'))->with('error', 'Token หมดอายุ กรุณาเข้าใหม่จาก newScience');
         }
 
-        $email = trim($payload['email']);
+        $email = \App\Libraries\UserIdentity::normalizeEmail(trim($payload['email']));
         $name = trim($payload['name'] ?? '');
         $profileFromPayload = $this->ssoProfileFromPayload($payload, $name);
 
@@ -485,11 +489,28 @@ class AuthenController extends Controller
             return redirect()->to(site_url('auth/login'))->with('error', 'บัญชีนักศึกษาไม่สามารถเข้าใช้งาน Research Record ได้');
         }
 
+        if (! \App\Libraries\UserIdentity::isLiveUruEmail($email)) {
+            log_message('warning', self::SSO_LOG_PREFIX . 'ssoEntry rejected non-live email=' . $email);
+            return redirect()->to(site_url('auth/login'))->with(
+                'error',
+                'กรุณาเข้าสู่ระบบด้วยอีเมล @live.uru.ac.th เท่านั้น (ไม่รองรับ Gmail หรืออีเมลอื่น)'
+            );
+        }
+
         if (empty($profileFromPayload['extra']['user_type'])) {
             $profileFromPayload['extra']['user_type'] = 'TEACHER';
         }
 
         $user = $this->userModel->where('email', $email)->first();
+        if ($user && (int) ($user['active'] ?? 0) !== 1) {
+            log_message('warning', self::SSO_LOG_PREFIX . 'ssoEntry rejected suspended email=' . $email);
+
+            return redirect()->to(site_url('auth/login'))->with(
+                'error',
+                'บัญชีถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ'
+            );
+        }
+
         if (!$user) {
             $newUser = array_merge([
                 'email' => $email,

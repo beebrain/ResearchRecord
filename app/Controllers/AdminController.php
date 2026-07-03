@@ -2137,9 +2137,13 @@ class AdminController extends Controller
 
             log_message('info', 'updateUserRole - Parsed data: userId=' . $userId . ', userEmail=' . $userEmail . ', userType=' . $userType . ', facultyId=' . $facultyId . ', role=' . $role);
 
-            // If email is provided, find user by email
+            $active = array_key_exists('active', $data)
+                ? ((int) $data['active'] === 1 ? 1 : 0)
+                : null;
+
+            // If email is provided, find user by email (include suspended)
             if ($userEmail && !$userId) {
-                $userByEmail = $this->userModel->getUserByEmail($userEmail);
+                $userByEmail = $this->userModel->find(\App\Libraries\UserIdentity::normalizeEmail($userEmail));
                 if ($userByEmail) {
                     $userId = $userByEmail['email'];
                     log_message('info', 'updateUserRole - Found user by email: ' . $userEmail . ' -> userId=' . $userId);
@@ -2218,6 +2222,17 @@ class AdminController extends Controller
                 }
             }
 
+            if ($active === 0) {
+                $currentEmail = \App\Libraries\UserIdentity::normalizeEmail((string) $this->session->get('user_email'));
+                $targetEmail  = \App\Libraries\UserIdentity::normalizeEmail((string) $userId);
+                if ($currentEmail !== '' && $currentEmail === $targetEmail) {
+                    return $this->response->setJSON([
+                        'success' => false,
+                        'message' => 'ไม่สามารถระงับบัญชีของตัวเองได้',
+                    ]);
+                }
+            }
+
             // Update user type and/or faculty
             // Always update faculty_id directly to user table when provided
             $userUpdateData = [];
@@ -2234,6 +2249,10 @@ class AdminController extends Controller
             if ($thaiName !== null && $thaiLastname !== null) {
                 $userUpdateData['thai_name'] = $thaiName;
                 $userUpdateData['thai_lastname'] = $thaiLastname;
+            }
+
+            if ($active !== null) {
+                $userUpdateData['active'] = $active;
             }
 
             if (!empty($userUpdateData)) {

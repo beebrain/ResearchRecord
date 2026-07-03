@@ -2,6 +2,7 @@
 
 namespace App\Filters;
 
+use App\Models\UserModel;
 use CodeIgniter\Filters\FilterInterface;
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
@@ -49,6 +50,27 @@ class AdminAuthFilter implements FilterInterface
             }
 
             return redirect()->to(site_url('auth/login'));
+        }
+
+        $email = (string) $session->get('user_email');
+        if ($email !== '') {
+            $user = (new UserModel())->find($email);
+            if (! is_array($user) || (int) ($user['active'] ?? 0) !== 1) {
+                $session->destroy();
+                if ($request->isAJAX()) {
+                    $response = service('response');
+
+                    return $response->setJSON([
+                        'success' => false,
+                        'message' => 'บัญชีถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ',
+                    ])->setStatusCode(401);
+                }
+
+                return redirect()->to(site_url('auth/login'))->with(
+                    'error',
+                    'บัญชีถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ'
+                );
+            }
         }
 
         // Check if user is admin through normal login

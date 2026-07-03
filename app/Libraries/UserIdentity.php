@@ -13,6 +13,11 @@ final class UserIdentity
         return strtolower(trim($email));
     }
 
+    public static function isLiveUruEmail(string $email): bool
+    {
+        return (bool) preg_match('/@live\.uru\.ac\.th$/', self::normalizeEmail($email));
+    }
+
     /**
      * @return array<string,mixed>|null
      */

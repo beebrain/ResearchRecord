@@ -381,7 +381,7 @@ class UserModel extends Model
             ->join('teacher_curriculum tc', 'tc.teacher_email = user.email AND tc.is_primary = 1 AND tc.status = 1', 'left')
             ->join('curriculum c', 'c.id = tc.curriculum_id', 'left')
             ->join('faculties cf', 'cf.id = c.faculty_id', 'left')
-            ->where('user.active', 1)
+            ->orderBy('user.active', 'DESC')
             ->orderBy('user.role', 'DESC')
             ->orderBy('user.gf_name', 'ASC');
 

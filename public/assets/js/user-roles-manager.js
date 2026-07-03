@@ -161,6 +161,16 @@ function initUsersTable(data) {
                 }
             },
             {
+                data: 'active',
+                render: function(data) {
+                    const isActive = parseInt(data, 10) === 1;
+                    if (isActive) {
+                        return '<span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded">ใช้งานได้</span>';
+                    }
+                    return '<span class="px-2 py-1 bg-red-100 text-red-800 text-xs font-medium rounded">ระงับแล้ว</span>';
+                }
+            },
+            {
                 data: 'managed_faculties',
                 render: function(data, type, row) {
                     if (row.role === 'faculty_admin' && data) {
@@ -193,7 +203,7 @@ function initUsersTable(data) {
                 }
             }
         ],
-        order: [[3, 'desc'], [0, 'asc']],
+        order: [[5, 'asc'], [0, 'asc']],
         pageLength: 25,
         language: {
             search: 'Search users:',
@@ -240,6 +250,9 @@ function editUserRole(userEmail) {
 
     // Set system role
     $('#userRole').val(user.role || 'user');
+
+    // Account status (active=1, suspended=0)
+    $('#userSuspended').prop('checked', parseInt(user.active, 10) !== 1);
 
     // Populate faculty checkboxes for admin role
     populateFacultyCheckboxes(user.managed_faculties);
@@ -365,7 +378,7 @@ function openRoleModal() {
  */
 function setupEventListeners() {
     // Role form submission
-    $('#roleForm').on('submit', function(e) {
+    $('#roleForm').on('submit', async function(e) {
         e.preventDefault();
 
         const userId = $('#userId').val();
@@ -375,6 +388,7 @@ function setupEventListeners() {
         const role = $('#userRole').val();
         const thaiName = $('#userThaiName').val().trim();
         const thaiLastname = $('#userThaiLastname').val().trim();
+        const isSuspended = $('#userSuspended').is(':checked');
 
         if (!thaiName || !thaiLastname) {
             showNotification('กรุณากรอกชื่อและนามสกุลภาษาไทย', 'warning');
@@ -408,8 +422,24 @@ function setupEventListeners() {
             role: role,
             managed_faculties: managedFaculties,
             thai_name: thaiName,
-            thai_lastname: thaiLastname
+            thai_lastname: thaiLastname,
+            active: isSuspended ? 0 : 1
         };
+
+        if (isSuspended) {
+            const confirmSuspend = await Swal.fire({
+                title: 'ยืนยันการระงับบัญชี?',
+                text: 'ผู้ใช้จะไม่สามารถเข้าสู่ระบบได้ และ session ที่เปิดอยู่จะถูกตัดทันที',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'ระงับการใช้งาน',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: '#dc2626'
+            });
+            if (!confirmSuspend.isConfirmed) {
+                return;
+            }
+        }
 
         console.log('=== updateUserRole REQUEST ===');
         console.log('Request data:', requestData);

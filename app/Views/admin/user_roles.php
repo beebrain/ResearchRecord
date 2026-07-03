@@ -66,6 +66,7 @@
                                     <th>Main Faculty</th>
                                     <th>Curriculum</th>
                                     <th>System Role</th>
+                                    <th>Status</th>
                                     <th>Managed Faculties</th>
                                     <th>Actions</th>
                                 </tr>
@@ -166,6 +167,19 @@
                         <!-- Checkboxes will be populated here -->
                     </div>
                     <p class="text-xs text-gray-500 mt-2">Select faculties this admin can manage</p>
+                </div>
+
+                <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <label class="flex items-start gap-3 cursor-pointer">
+                        <input type="checkbox" id="userSuspended" name="suspended" value="1"
+                            class="mt-1 w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500">
+                        <span>
+                            <span class="block text-sm font-medium text-gray-900">ระงับการใช้งาน</span>
+                            <span class="block text-xs text-gray-500 mt-1">
+                                ผู้ใช้จะไม่สามารถเข้าสู่ระบบได้ และจะถูกออกจากระบบทันที (รวม SSO, สิทธิ์ admin, การเลือกใน autocomplete)
+                            </span>
+                        </span>
+                    </label>
                 </div>
             </form>
             <div class="flex justify-end space-x-3 px-8 py-6 border-t border-gray-100 rounded-b-2xl">
