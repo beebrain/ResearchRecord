@@ -22,11 +22,13 @@ if ($content === false) {
     exit(1);
 }
 
-if (! str_contains($content, 'use App\\Libraries\\PortalPersonNames;')) {
-    $content = str_replace(
+$normalized = str_replace("\r\n", "\n", $content);
+
+if (! str_contains($normalized, 'use App\\Libraries\\PortalPersonNames;')) {
+    $normalized = str_replace(
         "use CodeIgniter\\Model;\n",
         "use CodeIgniter\\Model;\nuse App\\Libraries\\PortalPersonNames;\n",
-        $content,
+        $normalized,
         $count
     );
     if ($count === 0) {
@@ -35,46 +37,26 @@ if (! str_contains($content, 'use App\\Libraries\\PortalPersonNames;')) {
     }
 }
 
-$oldExisting = <<<'PHP'
-        if ($user !== null) {
-            $uid = (int) ($user['uid'] ?? $user['id'] ?? 0);
-            log_message('info', 'UserModel::findOrCreateFromPortalUser existing user skip portal sync uid=' . $uid . ' portal_email=' . $email);
-            return $user;
-        }
-PHP;
+$oldExisting = "        if (\$user !== null) {\n            \$uid = (int) (\$user['uid'] ?? \$user['id'] ?? 0);\n            log_message('info', 'UserModel::findOrCreateFromPortalUser existing user skip portal sync uid=' . \$uid . ' portal_email=' . \$email);\n            return \$user;\n        }";
 
-$newExisting = <<<'PHP'
-        if ($user !== null) {
-            $uid = (int) ($user['uid'] ?? $user['id'] ?? 0);
-            $this->syncPortalNamesFromOAuth($uid, $portalUser);
-            log_message('info', 'UserModel::findOrCreateFromPortalUser existing user portal sync uid=' . $uid . ' portal_email=' . $email);
+$newExisting = "        if (\$user !== null) {\n            \$uid = (int) (\$user['uid'] ?? \$user['id'] ?? 0);\n            \$this->syncPortalNamesFromOAuth(\$uid, \$portalUser);\n            log_message('info', 'UserModel::findOrCreateFromPortalUser existing user portal sync uid=' . \$uid . ' portal_email=' . \$email);\n\n            return \$this->find(\$uid) ?: \$user;\n        }";
 
-            return $this->find($uid) ?: $user;
-        }
-PHP;
-
-if (str_contains($content, $oldExisting)) {
-    $content = str_replace($oldExisting, $newExisting, $content);
-} elseif (! str_contains($content, 'syncPortalNamesFromOAuth')) {
+if (str_contains($normalized, $oldExisting)) {
+    $normalized = str_replace($oldExisting, $newExisting, $normalized);
+} elseif (! str_contains($normalized, 'syncPortalNamesFromOAuth')) {
     fwrite(STDERR, "Existing-user block not found (already patched?)\n");
     exit(1);
 }
 
-$oldTf = <<<'PHP'
-            'tf_name' => trim($portalUser['tf_name'] ?? $portalUser['first_name_th'] ?? $portalUser['firstname_th'] ?? $portalUser['thai_name'] ?? $portalUser['th_name'] ?? ''),
-            'tl_name' => trim($portalUser['tl_name'] ?? $portalUser['last_name_th'] ?? $portalUser['lastname_th'] ?? $portalUser['thai_lastname'] ?? ''),
-PHP;
+$oldTf = "            'tf_name' => trim(\$portalUser['tf_name'] ?? \$portalUser['first_name_th'] ?? \$portalUser['firstname_th'] ?? \$portalUser['thai_name'] ?? \$portalUser['th_name'] ?? ''),\n            'tl_name' => trim(\$portalUser['tl_name'] ?? \$portalUser['last_name_th'] ?? \$portalUser['lastname_th'] ?? \$portalUser['thai_lastname'] ?? ''),";
 
-$newTf = <<<'PHP'
-            'tf_name' => PortalPersonNames::thaiFirstLast($portalUser)[0],
-            'tl_name' => PortalPersonNames::thaiFirstLast($portalUser)[1],
-PHP;
+$newTf = "            'tf_name' => PortalPersonNames::thaiFirstLast(\$portalUser)[0],\n            'tl_name' => PortalPersonNames::thaiFirstLast(\$portalUser)[1],";
 
-if (str_contains($content, $oldTf)) {
-    $content = str_replace($oldTf, $newTf, $content);
+if (str_contains($normalized, $oldTf)) {
+    $normalized = str_replace($oldTf, $newTf, $normalized);
 }
 
-if (! str_contains($content, 'function syncPortalNamesFromOAuth')) {
+if (! str_contains($normalized, 'function syncPortalNamesFromOAuth')) {
     $method = <<<'PHP'
 
     /**
@@ -118,12 +100,14 @@ if (! str_contains($content, 'function syncPortalNamesFromOAuth')) {
 PHP;
 
     $needle = "    public function findOrCreateFromPortalUser(array \$portalUser): ?array\n    {";
-    if (! str_contains($content, $needle)) {
+    if (! str_contains($normalized, $needle)) {
         fwrite(STDERR, "Cannot insert syncPortalNamesFromOAuth method\n");
         exit(1);
     }
-    $content = str_replace($needle, $method . "\n" . $needle, $content);
+    $normalized = str_replace($needle, $method . "\n" . $needle, $normalized);
 }
+
+$content = str_replace("\n", "\r\n", $normalized);
 
 if (file_put_contents($userPath, $content) === false) {
     fwrite(STDERR, "Write failed\n");
