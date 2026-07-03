@@ -1119,17 +1119,7 @@
                                     ${form.chair_email ? `
                                         <p class="text-xs text-gray-500 mt-1">
                                             <span class="text-green-600">✓</span> ดึงข้อมูลจากระบบ: 
-                                            ${(() => {
-                                                let name = '';
-                                                if (form.chair_name && form.chair_lastname) {
-                                                    const title = form.chair_title ? form.chair_title + ' ' : '';
-                                                    name = title + form.chair_name + ' ' + form.chair_lastname;
-                                                } else if (form.chair_gf_name && form.chair_gl_name) {
-                                                    const title = form.chair_title_en ? form.chair_title_en + ' ' : '';
-                                                    name = title + form.chair_gf_name + ' ' + form.chair_gl_name;
-                                                }
-                                                return name || '-';
-                                            })()}
+                                            ${form.chair_system_name || form.curriculum_head_name || '-'}
                                         </p>
                                     ` : '<p class="text-xs text-gray-500 mt-1">ยังไม่ได้ตั้งประธานหลักสูตรในระบบ</p>'}
                                 </div>
@@ -1142,23 +1132,7 @@
                                     ${form.dean_email ? `
                                         <p class="text-xs text-gray-500 mt-1">
                                             <span class="text-orange-600">✓</span> ดึงข้อมูลจากระบบ: 
-                                            ${(() => {
-                                                let name = '';
-                                                // Use dean_name_db and dean_lastname_db to avoid conflict with form.dean_name
-                                                const deanName = form.dean_name_db || form.dean_name_from_db;
-                                                const deanLastname = form.dean_lastname_db || form.dean_lastname_from_db;
-                                                const deanGfName = form.dean_gf_name;
-                                                const deanGlName = form.dean_gl_name;
-                                                
-                                                if (deanName && deanLastname) {
-                                                    const title = form.dean_title ? form.dean_title + ' ' : '';
-                                                    name = title + deanName + ' ' + deanLastname;
-                                                } else if (deanGfName && deanGlName) {
-                                                    const title = form.dean_title_en ? form.dean_title_en + ' ' : '';
-                                                    name = title + deanGfName + ' ' + deanGlName;
-                                                }
-                                                return name || '-';
-                                            })()}
+                                            ${form.dean_system_name || form.dean_name || '-'}
                                         </p>
                                     ` : '<p class="text-xs text-gray-500 mt-1">ยังไม่ได้ตั้งคณบดีในระบบ</p>'}
                                 </div>
@@ -2306,87 +2280,23 @@
 
         // Auto-fill function (called automatically when form loads)
         function fillFromSystemAuto(form) {
-            // Fill curriculum head name
-            if (form.chair_email) {
-                let chairName = '';
-                if (form.chair_name && form.chair_lastname) {
-                    const title = form.chair_title ? form.chair_title + ' ' : '';
-                    chairName = title + form.chair_name + ' ' + form.chair_lastname;
-                } else if (form.chair_gf_name && form.chair_gl_name) {
-                    const title = form.chair_title_en ? form.chair_title_en + ' ' : '';
-                    chairName = title + form.chair_gf_name + ' ' + form.chair_gl_name;
-                }
-                // Auto-fill only if field is empty
-                if (chairName && !form.curriculum_head_name) {
-                    $('#curriculum_head_name_input').val(chairName);
-                }
+            if (form.chair_system_name) {
+                $('#curriculum_head_name_input').val(form.chair_system_name);
             }
-
-            // Fill dean name
-            if (form.dean_email) {
-                let deanName = '';
-                // Use dean_name_from_db to avoid conflict with form.dean_name (saved value)
-                const deanNameDb = form.dean_name_from_db || '';
-                const deanLastnameDb = form.dean_lastname_from_db || '';
-                const deanGfName = form.dean_gf_name || '';
-                const deanGlName = form.dean_gl_name || '';
-
-                // Try Thai name first
-                if (deanNameDb && deanLastnameDb) {
-                    const title = form.dean_title ? form.dean_title + ' ' : '';
-                    deanName = title + deanNameDb + ' ' + deanLastnameDb;
-                }
-                // Fallback to English name
-                else if (deanGfName && deanGlName) {
-                    const title = form.dean_title_en ? form.dean_title_en + ' ' : '';
-                    deanName = title + deanGfName + ' ' + deanGlName;
-                }
-
-                // Auto-fill with full name from system (always, to ensure complete name)
-                // This fixes the issue where saved value might be incomplete
-                if (deanName) {
-                    $('#dean_name_input').val(deanName);
-                }
+            if (form.dean_system_name) {
+                $('#dean_name_input').val(form.dean_system_name);
             }
         }
 
         // Manual fill function (called when button is clicked)
         function fillFromSystem() {
-            // Get data from the form object (passed from renderEditForm)
             const form = window.currentFormData || {};
 
-            // Fill curriculum head name (always fill, even if already has value)
-            if (form.chair_email) {
-                let chairName = '';
-                if (form.chair_name && form.chair_lastname) {
-                    const title = form.chair_title ? form.chair_title + ' ' : '';
-                    chairName = title + form.chair_name + ' ' + form.chair_lastname;
-                } else if (form.chair_gf_name && form.chair_gl_name) {
-                    const title = form.chair_title_en ? form.chair_title_en + ' ' : '';
-                    chairName = title + form.chair_gf_name + ' ' + form.chair_gl_name;
-                }
-                if (chairName) {
-                    $('#curriculum_head_name_input').val(chairName);
-                }
+            if (form.chair_system_name) {
+                $('#curriculum_head_name_input').val(form.chair_system_name);
             }
-
-            // Fill dean name (always fill, even if already has value)
-            if (form.dean_email) {
-                let deanName = '';
-                // Use dean_name_from_db to avoid conflict
-                const deanNameDb = form.dean_name_from_db;
-                const deanLastnameDb = form.dean_lastname_from_db;
-
-                if (deanNameDb && deanLastnameDb) {
-                    const title = form.dean_title ? form.dean_title + ' ' : '';
-                    deanName = title + deanNameDb + ' ' + deanLastnameDb;
-                } else if (form.dean_gf_name && form.dean_gl_name) {
-                    const title = form.dean_title_en ? form.dean_title_en + ' ' : '';
-                    deanName = title + form.dean_gf_name + ' ' + form.dean_gl_name;
-                }
-                if (deanName) {
-                    $('#dean_name_input').val(deanName);
-                }
+            if (form.dean_system_name) {
+                $('#dean_name_input').val(form.dean_system_name);
             }
 
             Swal.fire({

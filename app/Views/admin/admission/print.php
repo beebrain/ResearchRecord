@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>แบบเสนอขอเปิดรับนักศึกษาใหม่ ประจำปีการศึกษา <?= esc($form['academic_year']) ?></title>
+    <title>แบบเสนอขอเปิดรับนักศึกษาใหม่ ประจำปี พ.ศ. <?= esc($form['academic_year']) ?></title>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         @page {
@@ -93,7 +93,7 @@
 
     <div class="header">
         <p style="text-align:right;font-size:12px;">(ระดับหลักสูตร)</p>
-        <h1>แบบเสนอขอเปิดรับนักศึกษาใหม่ ประจำปีการศึกษา <?= esc($form['academic_year']) ?></h1>
+        <h1>แบบเสนอขอเปิดรับนักศึกษาใหม่ ประจำปี พ.ศ. <?= esc($form['academic_year']) ?></h1>
         <p>คณะ<?= esc($form['faculty_name'] ?? '...............') ?></p>
     </div>
 
@@ -120,8 +120,8 @@
 
     <div class="section">
         <p><strong>๓.</strong> ผลการประเมินคุณภาพการศึกษาระดับหลักสูตร ๒ ปีย้อนหลัง</p>
-        <p style="margin-left:40px;">ปีการศึกษา <?= esc($form['quality_assessment_year1'] ?? '............') ?> ผลการประเมินอยู่ในเกณฑ์ <?= esc($form['quality_assessment_result1'] ?? '.....................') ?></p>
-        <p style="margin-left:40px;">ปีการศึกษา <?= esc($form['quality_assessment_year2'] ?? '............') ?> ผลการประเมินอยู่ในเกณฑ์ <?= esc($form['quality_assessment_result2'] ?? '.....................') ?></p>
+        <p style="margin-left:40px;">ปี พ.ศ. <?= esc($form['quality_assessment_year1'] ?? '............') ?> ผลการประเมินอยู่ในเกณฑ์ <?= esc($form['quality_assessment_result1'] ?? '.....................') ?></p>
+        <p style="margin-left:40px;">ปี พ.ศ. <?= esc($form['quality_assessment_year2'] ?? '............') ?> ผลการประเมินอยู่ในเกณฑ์ <?= esc($form['quality_assessment_result2'] ?? '.....................') ?></p>
     </div>
 
     <div class="section">

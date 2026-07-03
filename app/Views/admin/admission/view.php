@@ -29,7 +29,7 @@
         <main class="flex-1 p-4 lg:p-6">
             <div class="bg-white rounded-lg shadow-sm p-4 mb-4 flex justify-between items-center">
                 <div>
-                    <h1 class="text-xl font-bold text-gray-800">แบบเสนอขอเปิดรับนักศึกษาใหม่ ประจำปีการศึกษา <?= esc($form['academic_year']) ?></h1>
+                    <h1 class="text-xl font-bold text-gray-800">แบบเสนอขอเปิดรับนักศึกษาใหม่ ประจำปี พ.ศ. <?= esc($form['academic_year']) ?></h1>
                     <p class="text-gray-600">คณะ<?= esc($form['faculty_name'] ?? '-') ?> | หลักสูตร<?= esc($form['curriculum_name_display'] ?? '-') ?></p>
                 </div>
                 <div class="flex gap-2">
@@ -84,8 +84,8 @@
                 <div class="bg-white rounded-lg shadow-sm p-6">
                     <h2 class="text-lg font-semibold text-blue-600 border-b-2 border-blue-500 pb-2 mb-4">๓. ผลการประเมินคุณภาพ ๒ ปีย้อนหลัง</h2>
                     <div class="grid grid-cols-2 gap-4">
-                        <div>ปีการศึกษา <?= esc($form['quality_assessment_year1'] ?? '-') ?>: <strong><?= esc($form['quality_assessment_result1'] ?? '-') ?></strong></div>
-                        <div>ปีการศึกษา <?= esc($form['quality_assessment_year2'] ?? '-') ?>: <strong><?= esc($form['quality_assessment_result2'] ?? '-') ?></strong></div>
+                        <div>ปี พ.ศ. <?= esc($form['quality_assessment_year1'] ?? '-') ?>: <strong><?= esc($form['quality_assessment_result1'] ?? '-') ?></strong></div>
+                        <div>ปี พ.ศ. <?= esc($form['quality_assessment_year2'] ?? '-') ?>: <strong><?= esc($form['quality_assessment_result2'] ?? '-') ?></strong></div>
                     </div>
                 </div>
 

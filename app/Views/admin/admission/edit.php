@@ -48,7 +48,7 @@
             <!-- Header -->
             <div class="bg-white rounded-lg shadow-sm p-4 mb-4 flex justify-between items-center">
                 <div>
-                    <h1 class="text-xl font-bold text-gray-800">แบบเสนอขอเปิดรับนักศึกษาใหม่ ประจำปีการศึกษา <?= esc($form['academic_year']) ?></h1>
+                    <h1 class="text-xl font-bold text-gray-800">แบบเสนอขอเปิดรับนักศึกษาใหม่ ประจำปี พ.ศ. <?= esc($form['academic_year']) ?></h1>
                     <p class="text-gray-600">คณะ<?= esc($form['faculty_name'] ?? '-') ?> | หลักสูตร<?= esc($form['curriculum_name_display'] ?? '-') ?></p>
                 </div>
                 <div class="flex gap-2">
@@ -108,7 +108,7 @@
                         <div class="space-y-4">
                             <div class="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label class="form-label">ปีการศึกษา (ปีแรก)</label>
+                                    <label class="form-label">ปี พ.ศ. (ปีแรก)</label>
                                     <input type="number" name="quality_assessment_year1" value="<?= esc($form['quality_assessment_year1'] ?? '') ?>" class="form-input">
                                 </div>
                                 <div>
@@ -120,7 +120,7 @@
                         <div class="space-y-4">
                             <div class="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label class="form-label">ปีการศึกษา (ปีที่สอง)</label>
+                                    <label class="form-label">ปี พ.ศ. (ปีที่สอง)</label>
                                     <input type="number" name="quality_assessment_year2" value="<?= esc($form['quality_assessment_year2'] ?? '') ?>" class="form-input">
                                 </div>
                                 <div>

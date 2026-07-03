@@ -127,14 +127,14 @@ class StudentAdmissionFormModel extends Model
                                faculties.dean_email,
                                chair.titleThai as chair_title,
                                chair.title as chair_title_en,
-                               chair.thai_name as chair_name,
-                               chair.thai_lastname as chair_lastname,
+                               chair.thai_name as chair_user_name,
+                               chair.thai_lastname as chair_user_lastname,
                                chair.gf_name as chair_gf_name,
                                chair.gl_name as chair_gl_name,
                                dean.titleThai as dean_title,
                                dean.title as dean_title_en,
-                               dean.thai_name as dean_name,
-                               dean.thai_lastname as dean_lastname,
+                               dean.thai_name as dean_user_name,
+                               dean.thai_lastname as dean_user_lastname,
                                dean.gf_name as dean_gf_name,
                                dean.gl_name as dean_gl_name')
             ->join('curriculum', 'curriculum.id = student_admission_forms.curriculum_id', 'left')
@@ -163,18 +163,18 @@ class StudentAdmissionFormModel extends Model
                 $form['studying_teachers_parsed'] = [];
             }
 
-            // Format chair name (ประธานหลักสูตร)
-            if (!empty($form['chair_email'])) {
-                $chairName = '';
-                if (!empty($form['chair_name']) && !empty($form['chair_lastname'])) {
-                    $title = !empty($form['chair_title']) ? $form['chair_title'] . ' ' : '';
-                    $chairName = $title . $form['chair_name'] . ' ' . $form['chair_lastname'];
-                } elseif (!empty($form['chair_gf_name']) && !empty($form['chair_gl_name'])) {
-                    $title = !empty($form['chair_title_en']) ? $form['chair_title_en'] . ' ' : '';
-                    $chairName = $title . $form['chair_gf_name'] . ' ' . $form['chair_gl_name'];
-                }
-                // Auto-fill if not already set
-                if (empty($form['curriculum_head_name']) && !empty($chairName)) {
+            // Format chair/dean names from linked user records (include academic title)
+            if (! empty($form['chair_email'])) {
+                $chairName = $this->formatOfficialPersonName(
+                    $form['chair_title'] ?? '',
+                    $form['chair_title_en'] ?? '',
+                    $form['chair_user_name'] ?? '',
+                    $form['chair_user_lastname'] ?? '',
+                    $form['chair_gf_name'] ?? '',
+                    $form['chair_gl_name'] ?? ''
+                );
+                if ($chairName !== '') {
+                    $form['chair_system_name'] = $chairName;
                     $form['curriculum_head_name'] = $chairName;
                 }
             }
@@ -187,47 +187,60 @@ class StudentAdmissionFormModel extends Model
                 $form['dean_id'] = $form['dean_email'];
             }
 
-            // Format dean name (คณบดี) - store original values to avoid conflict
-            if (!empty($form['dean_email'])) {
-                // IMPORTANT: When using SELECT with student_admission_forms.*, 
-                // the JOIN fields (dean.thai_name as dean_name) may be overridden by 
-                // student_admission_forms.dean_name (saved value). We need to preserve 
-                // the JOIN values before they get overwritten.
+            if (! empty($form['dean_email'])) {
+                $deanName = $this->formatOfficialPersonName(
+                    $form['dean_title'] ?? '',
+                    $form['dean_title_en'] ?? '',
+                    $form['dean_user_name'] ?? '',
+                    $form['dean_user_lastname'] ?? '',
+                    $form['dean_gf_name'] ?? '',
+                    $form['dean_gl_name'] ?? ''
+                );
 
-                // Store original dean name from user table (from JOIN: dean.thai_name as dean_name)
-                $deanNameFromUser = $form['dean_name'] ?? ''; // This should be from dean.thai_name (JOIN)
-                $deanLastnameFromUser = $form['dean_lastname'] ?? ''; // This should be from dean.thai_lastname (JOIN)
+                $form['dean_name_from_db'] = $form['dean_user_name'] ?? '';
+                $form['dean_lastname_from_db'] = $form['dean_user_lastname'] ?? '';
 
-                // Get the saved value from the form table separately
-                $savedForm = $this->where('id', $id)->select('dean_name')->first();
-                $savedDeanName = $savedForm['dean_name'] ?? '';
-
-                // Store the user table values (full name from system) for display
-                $form['dean_name_from_db'] = $deanNameFromUser;
-                $form['dean_lastname_from_db'] = $deanLastnameFromUser;
-
-                // Build full name from user table
-                $deanName = '';
-                if (!empty($deanNameFromUser) && !empty($deanLastnameFromUser)) {
-                    $title = !empty($form['dean_title']) ? $form['dean_title'] . ' ' : '';
-                    $deanName = $title . $deanNameFromUser . ' ' . $deanLastnameFromUser;
-                } elseif (!empty($form['dean_gf_name']) && !empty($form['dean_gl_name'])) {
-                    $title = !empty($form['dean_title_en']) ? $form['dean_title_en'] . ' ' : '';
-                    $deanName = $title . $form['dean_gf_name'] . ' ' . $form['dean_gl_name'];
-                }
-
-                // Always use the full name from user table if available (ensures complete name)
-                // This fixes the issue where saved value might be incomplete
-                if (!empty($deanName)) {
+                if ($deanName !== '') {
+                    $form['dean_system_name'] = $deanName;
                     $form['dean_name'] = $deanName;
-                } elseif (!empty($savedDeanName)) {
-                    // Fallback to saved value if no user table data
-                    $form['dean_name'] = $savedDeanName;
                 }
             }
         }
 
         return $form;
+    }
+
+    /**
+     * Build display name with academic title (titleThai / title).
+     */
+    private function formatOfficialPersonName(
+        ?string $titleThai,
+        ?string $titleEn,
+        ?string $thaiName,
+        ?string $thaiLastname,
+        ?string $gfName,
+        ?string $glName
+    ): string {
+        $thaiName = trim((string) $thaiName);
+        $thaiLastname = trim((string) $thaiLastname);
+        $gfName = trim((string) $gfName);
+        $glName = trim((string) $glName);
+        $titleThai = trim((string) $titleThai);
+        $titleEn = trim((string) $titleEn);
+
+        if ($thaiName !== '' && $thaiLastname !== '') {
+            $title = $titleThai !== '' ? $titleThai . ' ' : '';
+
+            return trim($title . $thaiName . ' ' . $thaiLastname);
+        }
+
+        if ($gfName !== '' && $glName !== '') {
+            $title = $titleEn !== '' ? $titleEn . ' ' : '';
+
+            return trim($title . $gfName . ' ' . $glName);
+        }
+
+        return '';
     }
 
     /**

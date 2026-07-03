@@ -184,11 +184,11 @@ function generateAdmissionFormPDF(formData, useThaiFont = false) {
     // Build content array
     const content = [];
     
-    // Header: Title - ดึงปีการศึกษาจากฐานข้อมูล
+    // Header: Title - ดึงปี พ.ศ. จากฐานข้อมูล
     const academicYear = form.academic_year || 2569;
     const academicYearThai = toThaiYear(academicYear);
     content.push({
-        text: `แบบเสนอขอเปิดรับนักศึกษาใหม่ ประจำปีการศึกษา ${academicYearThai}`,
+        text: `แบบเสนอขอเปิดรับนักศึกษาใหม่ ประจำปี พ.ศ. ${academicYearThai}`,
         fontSize: 16,
         bold: true,
         alignment: 'center',
@@ -259,14 +259,14 @@ function generateAdmissionFormPDF(formData, useThaiFont = false) {
     
     // Year 1
     content.push({
-        text: `ปีการศึกษา ${form.quality_assessment_year1 || '-'} ผลการประเมินอยู่ในเกณฑ์ ${form.quality_assessment_result1 || '-'}`,
+        text: `ปี พ.ศ. ${form.quality_assessment_year1 || '-'} ผลการประเมินอยู่ในเกณฑ์ ${form.quality_assessment_result1 || '-'}`,
         fontSize: 14,
         margin: [30, 0, 0, 5]
     });
     
     // Year 2
     content.push({
-        text: `ปีการศึกษา ${form.quality_assessment_year2 || '-'} ผลการประเมินอยู่ในเกณฑ์ ${form.quality_assessment_result2 || '-'}`,
+        text: `ปี พ.ศ. ${form.quality_assessment_year2 || '-'} ผลการประเมินอยู่ในเกณฑ์ ${form.quality_assessment_result2 || '-'}`,
         fontSize: 14,
         margin: [30, 0, 0, 5]
     });
@@ -651,7 +651,7 @@ function generateAdmissionFormPDF(formData, useThaiFont = false) {
         // Works block — APA citations under the standard heading.
         const teacherPubs = pubsByTeacher[email] || [];
         const worksStack = [{
-            text: 'ผลงานวิชาการ (อย่างน้อย 1 รายการในรอบ 5 ปี (ปีการศึกษา ' +
+            text: 'ผลงานวิชาการ (อย่างน้อย 1 รายการในรอบ 5 ปี (ปี พ.ศ. ' +
                 ((currentYear - 4) + '–' + currentYear) + '))',
             bold: true,
             fontSize: 11,
