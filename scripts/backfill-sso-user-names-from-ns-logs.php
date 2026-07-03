@@ -124,6 +124,8 @@ function parsePortalNamesFromLogs(string $logDir): array
 
             $gf = trim((string) ($summary['gf_name'] ?? ''));
             $gl = trim((string) ($summary['gl_name'] ?? ''));
+            $tf = trim((string) ($summary['tf_name'] ?? ''));
+            $tl = trim((string) ($summary['tl_name'] ?? ''));
             if ($gf === '' && $gl === '') {
                 continue;
             }
@@ -136,6 +138,8 @@ function parsePortalNamesFromLogs(string $logDir): array
                 'login_uid'   => trim((string) ($summary['login_uid'] ?? $data['login_uid'] ?? '')),
                 'gf_name'     => $gf,
                 'gl_name'     => $gl,
+                'tf_name'     => $tf,
+                'tl_name'     => $tl,
                 'source_file' => basename($file),
                 'source_line' => $i + 1,
             ];
@@ -174,6 +178,9 @@ function buildUpdate(array $row, array $portal): ?array
     if (containsThai($gf) || containsThai($gl)) {
         $update['thai_name']     = $gf;
         $update['thai_lastname'] = $gl;
+    } elseif (containsThai(($p['tf_name'] ?? '') . ($p['tl_name'] ?? ''))) {
+        $update['thai_name']     = $p['tf_name'];
+        $update['thai_lastname'] = $p['tl_name'];
     } else {
         // English Portal names — keep Thai columns if already set; else mirror English
         if (trim((string) ($row['thai_name'] ?? '')) === '' || strcasecmp((string) $row['thai_name'], 'User') === 0) {

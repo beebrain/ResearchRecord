@@ -526,12 +526,17 @@ class AuthenController extends Controller
             ], $profileFromPayload['extra']);
             $insertedEmail = $this->userModel->insertUserData($newUser);
             if (!$insertedEmail) {
-                log_message('error', self::SSO_LOG_PREFIX . 'ssoEntry failed to create user email=' . $email);
-                return redirect()->to(site_url('auth/login'))->with('error', 'ไม่สามารถสร้างผู้ใช้ได้');
+                $user = $this->userModel->find($email);
+                if (!$user) {
+                    log_message('error', self::SSO_LOG_PREFIX . 'ssoEntry failed to create user email=' . $email);
+                    return redirect()->to(site_url('auth/login'))->with('error', 'ไม่สามารถสร้างผู้ใช้ได้');
+                }
+                log_message('info', self::SSO_LOG_PREFIX . 'ssoEntry insert returned false but user exists email=' . $email);
+            } else {
+                $user = $this->userModel->find($insertedEmail);
+                log_message('info', self::SSO_LOG_PREFIX . 'ssoEntry created user email=' . $email . ' name=' . trim($profileFromPayload['gf_name'] . ' ' . $profileFromPayload['gl_name']));
+                $this->createAuthorFromAPI($user);
             }
-            $user = $this->userModel->find($insertedEmail);
-            log_message('info', self::SSO_LOG_PREFIX . 'ssoEntry created user email=' . $email . ' name=' . trim($profileFromPayload['gf_name'] . ' ' . $profileFromPayload['gl_name']));
-            $this->createAuthorFromAPI($user);
         } else {
             $patch = $this->ssoPlaceholderPatch($user, $profileFromPayload);
             if ($patch !== []) {
@@ -595,10 +600,15 @@ class AuthenController extends Controller
 
         $thaiName = trim((string) ($payload['thai_name'] ?? ''));
         $thaiLast = trim((string) ($payload['thai_lastname'] ?? ''));
+        if ($thaiName === '' && $thaiLast === '') {
+            $tfName = trim((string) ($payload['tf_name'] ?? ''));
+            $tlName = trim((string) ($payload['tl_name'] ?? ''));
+            if ($tfName !== '' || $tlName !== '') {
+                $thaiName = $tfName;
+                $thaiLast = $tlName;
+            }
+        }
         if ($thaiName === '' && preg_match('/[\x{0E00}-\x{0E7F}]/u', $gfName . $glName)) {
-            $thaiName = $gfName;
-            $thaiLast = $glName;
-        } elseif ($thaiName === '' && $gfName !== '') {
             $thaiName = $gfName;
             $thaiLast = $glName;
         }
@@ -647,9 +657,17 @@ class AuthenController extends Controller
         if ($gf !== '' && strcasecmp($gf, 'User') !== 0) {
             $patch['gf_name'] = $gf;
             $patch['gl_name'] = $gl;
-            if (($profileFromPayload['thai_name'] ?? '') !== '') {
-                $patch['thai_name'] = $profileFromPayload['thai_name'];
-                $patch['thai_lastname'] = $profileFromPayload['thai_lastname'];
+            $payloadThaiName = trim((string) ($profileFromPayload['thai_name'] ?? ''));
+            $payloadThaiLast = trim((string) ($profileFromPayload['thai_lastname'] ?? ''));
+            if ($payloadThaiName !== '') {
+                $existingThai = trim((string) ($user['thai_name'] ?? '') . (string) ($user['thai_lastname'] ?? ''));
+                $incomingThai = $payloadThaiName . $payloadThaiLast;
+                $hasIncomingThai = (bool) preg_match('/[\x{0E00}-\x{0E7F}]/u', $incomingThai);
+                $hasExistingThai = (bool) preg_match('/[\x{0E00}-\x{0E7F}]/u', $existingThai);
+                if ($hasIncomingThai || ! $hasExistingThai) {
+                    $patch['thai_name'] = $payloadThaiName;
+                    $patch['thai_lastname'] = $payloadThaiLast;
+                }
             }
         }
 

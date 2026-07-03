@@ -72,7 +72,7 @@ class UserModel extends Model
             return false;
         }
 
-        if ($this->insert($userData)) {
+        if ($this->insert($userData, false)) {
             return $userData['email'];
         }
 
