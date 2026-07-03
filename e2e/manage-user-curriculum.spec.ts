@@ -60,27 +60,26 @@ test.describe('Dynamic Verification — User Curriculum Management', () => {
     const chairBtn = page.locator('button:has-text("เลือกประธานหลักสูตร")').first();
     await expect(chairBtn).toBeVisible({ timeout: 10_000 });
 
-    const deanSelectionPromise = page.waitForResponse(
-      (res) => res.url().includes('getUsersForDeanSelection') && res.status() === 200,
+    await chairBtn.click();
+
+    // Verify modal is visible (search API fires only after typing or loading existing chair)
+    await expect(page.locator('#chairModal')).toBeVisible();
+    await expect(page.locator('#chairTeacherSearch')).toBeVisible();
+
+    // Type to trigger autocomplete search
+    const searchInput = page.locator('#chairTeacherSearch');
+    const chairSearchPromise = page.waitForResponse(
+      (res) => res.url().includes('searchTeachersForChairSelection') && res.status() === 200,
       { timeout: 10_000 }
     );
-    await chairBtn.click();
-    await deanSelectionPromise;
+    await searchInput.fill('สม');
+    await chairSearchPromise;
 
-    // Verify modal is visible
-    await expect(page.locator('#chairModal')).toBeVisible();
-    
-    // Select an option from chairSelect (excluding empty)
-    const select = page.locator('#chairSelect');
-    const count = await select.locator('option').count();
-    console.log(`Chair select options count: ${count}`);
-    
-    if (count > 1) {
-      await select.selectOption({ index: 1 });
-    }
+    // Dismiss autocomplete dropdown before closing modal
+    await searchInput.press('Escape');
     
     // Close the modal
-    await page.locator('button:has-text("ยกเลิก")').first().click();
+    await page.locator('#chairModal button:has-text("ยกเลิก")').click();
     await expect(page.locator('#chairModal')).toBeHidden();
 
     // 2. Test search user filtering

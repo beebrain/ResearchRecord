@@ -202,6 +202,15 @@ class Database extends Config
         // we don't overwrite live data on accident.
         if (ENVIRONMENT === 'testing') {
             $this->defaultGroup = 'tests';
+
+            // Local integration: use dev MySQL instead of SQLite in-memory.
+            if (getenv('INTEGRATION_DB') === '1') {
+                $this->tests = array_replace($this->tests, $this->default, [
+                    'DBPrefix'    => '',
+                    'DBDriver'    => 'MySQLi',
+                    'foreignKeys' => true,
+                ]);
+            }
         }
     }
 }

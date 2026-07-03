@@ -189,6 +189,7 @@ $routes->group('admin', ['filter' => 'adminauth'], function ($routes) {
     $routes->post('updateCurriculum', 'AdminController::updateCurriculum');
     $routes->post('deleteCurriculum', 'AdminController::deleteCurriculum');
     $routes->post('toggleCurriculumStatus', 'AdminController::toggleCurriculumStatus');
+    $routes->match(['get', 'post'], 'searchTeachersForChairSelection', 'AdminController::searchTeachersForChairSelection');
     $routes->post('setCurriculumChair', 'AdminController::setCurriculumChair');
 
     // User Role Management (Super Admin only)

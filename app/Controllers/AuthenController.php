@@ -478,35 +478,51 @@ class AuthenController extends Controller
 
         $email = trim($payload['email']);
         $name = trim($payload['name'] ?? '');
+        $profileFromPayload = $this->ssoProfileFromPayload($payload, $name);
+
+        if ($this->isSsoStudentPayload($payload, $profileFromPayload)) {
+            log_message('warning', self::SSO_LOG_PREFIX . 'ssoEntry rejected student email=' . $email);
+            return redirect()->to(site_url('auth/login'))->with('error', 'บัญชีนักศึกษาไม่สามารถเข้าใช้งาน Research Record ได้');
+        }
+
+        if (empty($profileFromPayload['extra']['user_type'])) {
+            $profileFromPayload['extra']['user_type'] = 'TEACHER';
+        }
 
         $user = $this->userModel->where('email', $email)->first();
         if (!$user) {
-            $nameParts = preg_split('/\s+/', $name, 2);
-            $gfName = $nameParts[0] ?? '';
-            $glName = $nameParts[1] ?? '';
-            $newUser = [
+            $newUser = array_merge([
                 'email' => $email,
-                'login_uid' => $email,
-                'gf_name' => $gfName,
-                'gl_name' => $glName,
-                'thai_name' => $name,
-                'thai_lastname' => '',
+                'login_uid' => $profileFromPayload['login_uid'] ?: $email,
+                'gf_name' => $profileFromPayload['gf_name'],
+                'gl_name' => $profileFromPayload['gl_name'],
+                'thai_name' => $profileFromPayload['thai_name'],
+                'thai_lastname' => $profileFromPayload['thai_lastname'],
                 'active' => 1,
                 'edoc' => 1,
                 'profile_customer' => 'newscience_sso',
-            ];
+                'created_at' => date('Y-m-d H:i:s'),
+            ], $profileFromPayload['extra']);
             $insertedEmail = $this->userModel->insertUserData($newUser);
             if (!$insertedEmail) {
                 log_message('error', self::SSO_LOG_PREFIX . 'ssoEntry failed to create user email=' . $email);
                 return redirect()->to(site_url('auth/login'))->with('error', 'ไม่สามารถสร้างผู้ใช้ได้');
             }
             $user = $this->userModel->find($insertedEmail);
-            log_message('info', self::SSO_LOG_PREFIX . 'ssoEntry created user email=' . $email);
+            log_message('info', self::SSO_LOG_PREFIX . 'ssoEntry created user email=' . $email . ' name=' . trim($profileFromPayload['gf_name'] . ' ' . $profileFromPayload['gl_name']));
+            $this->createAuthorFromAPI($user);
+        } else {
+            $patch = $this->ssoPlaceholderPatch($user, $profileFromPayload);
+            if ($patch !== []) {
+                $this->userModel->update($email, $patch);
+                $user = array_merge($user, $patch);
+                log_message('info', self::SSO_LOG_PREFIX . 'ssoEntry synced profile email=' . $email . ' fields=' . implode(',', array_keys($patch)));
+            }
         }
 
         $userData = $user;
         $this->setUserSession($userData, null);
-        log_message('info', self::SSO_LOG_PREFIX . 'ssoEntry success email=' . $email);
+        log_message('info', self::SSO_LOG_PREFIX . 'ssoEntry success email=' . $email . ' name=' . trim(($userData['gf_name'] ?? '') . ' ' . ($userData['gl_name'] ?? '')));
 
         $entryPath = \App\Libraries\PublicationReturnNavigation::applySsoPayload($payload);
 
@@ -537,6 +553,118 @@ class AuthenController extends Controller
 
         // PHP แปลง + ใน query string เป็น space (กรณี encoding แบบ form)
         return str_replace(' ', '+', $token);
+    }
+
+    /**
+     * Map SSO JWT payload (+ optional extended fields from newScience) to user columns.
+     *
+     * @return array{login_uid:string,gf_name:string,gl_name:string,thai_name:string,thai_lastname:string,extra:array<string,mixed>}
+     */
+    private function ssoProfileFromPayload(array $payload, string $name): array
+    {
+        $gfName = trim((string) ($payload['gf_name'] ?? ''));
+        $glName = trim((string) ($payload['gl_name'] ?? ''));
+        $loginUid = trim((string) ($payload['login_uid'] ?? ''));
+
+        if ($gfName === '' && $glName === '' && $name !== '' && strcasecmp($name, 'User') !== 0) {
+            $parts = preg_split('/\s+/u', $name, 2);
+            $gfName = trim($parts[0] ?? '');
+            $glName = trim($parts[1] ?? '');
+        }
+
+        $thaiName = trim((string) ($payload['thai_name'] ?? ''));
+        $thaiLast = trim((string) ($payload['thai_lastname'] ?? ''));
+        if ($thaiName === '' && preg_match('/[\x{0E00}-\x{0E7F}]/u', $gfName . $glName)) {
+            $thaiName = $gfName;
+            $thaiLast = $glName;
+        } elseif ($thaiName === '' && $gfName !== '') {
+            $thaiName = $gfName;
+            $thaiLast = $glName;
+        }
+
+        $extra = [];
+        foreach ([
+            'faculty_id', 'department_id', 'user_type', 'title', 'titleThai',
+            'major', 'profile_picture',
+        ] as $field) {
+            if (isset($payload[$field]) && $payload[$field] !== '' && $payload[$field] !== null) {
+                $extra[$field] = $payload[$field];
+            }
+        }
+
+        if (($extra['titleThai'] ?? null) === null && ! empty($payload['titleThai'])) {
+            $extra['titleThai'] = $payload['titleThai'];
+        }
+
+        return [
+            'login_uid'     => $loginUid,
+            'gf_name'       => $gfName,
+            'gl_name'       => $glName,
+            'thai_name'     => $thaiName,
+            'thai_lastname' => $thaiLast,
+            'extra'         => $extra,
+        ];
+    }
+
+    private function isSsoPlaceholderUser(array $user): bool
+    {
+        $gf = trim((string) ($user['gf_name'] ?? ''));
+        $th = trim((string) ($user['thai_name'] ?? ''));
+
+        return strcasecmp($gf, 'User') === 0
+            || strcasecmp($th, 'User') === 0
+            || ($gf === '' && ($user['profile_customer'] ?? '') === 'newscience_sso');
+    }
+
+    /** @return array<string,mixed> */
+    private function ssoPlaceholderPatch(array $user, array $profileFromPayload): array
+    {
+        $patch = [];
+        $gf = $profileFromPayload['gf_name'] ?? '';
+        $gl = $profileFromPayload['gl_name'] ?? '';
+
+        if ($gf !== '' && strcasecmp($gf, 'User') !== 0) {
+            $patch['gf_name'] = $gf;
+            $patch['gl_name'] = $gl;
+            if (($profileFromPayload['thai_name'] ?? '') !== '') {
+                $patch['thai_name'] = $profileFromPayload['thai_name'];
+                $patch['thai_lastname'] = $profileFromPayload['thai_lastname'];
+            }
+        }
+
+        $loginUid = $profileFromPayload['login_uid'] ?? '';
+        if ($loginUid !== '' && ($user['login_uid'] ?? '') === ($user['email'] ?? '')) {
+            $patch['login_uid'] = $loginUid;
+        }
+
+        foreach ($profileFromPayload['extra'] ?? [] as $field => $value) {
+            if (empty($user[$field])) {
+                $patch[$field] = $value;
+            }
+        }
+
+        return $patch;
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     * @param array<string,mixed> $profileFromPayload
+     */
+    private function isSsoStudentPayload(array $payload, array $profileFromPayload): bool
+    {
+        $userType = strtoupper(trim((string) ($payload['user_type'] ?? $profileFromPayload['extra']['user_type'] ?? '')));
+        if ($userType === 'STUDENT') {
+            return true;
+        }
+
+        $loginUid = trim((string) ($payload['login_uid'] ?? $profileFromPayload['login_uid'] ?? ''));
+        $email    = strtolower(trim((string) ($payload['email'] ?? '')));
+
+        if ($loginUid !== '' && preg_match('/^u\d+$/i', $loginUid)) {
+            return true;
+        }
+
+        return $email !== '' && preg_match('/^u\d+@live\.uru\.ac\.th$/i', $email);
     }
 
     /**

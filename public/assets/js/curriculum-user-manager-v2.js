@@ -1147,13 +1147,30 @@ function handleChairButtonClick(e) {
  */
 window.openChairModal = function(curriculumId, curriculumName, currentChairId = null) {
     try {
-        // Load users for chair selection
-        loadUsersForChair(curriculumId, currentChairId);
-        
-        // Set curriculum info
         $('#chairModalCurriculumId').val(curriculumId);
         $('#chairModalCurriculumName').text(curriculumName);
+        hideChairConflictWarning();
+
+        if (!window.chairAutocompleteReady) {
+            ChairTeacherAutocomplete.init('#chairTeacherAutocomplete', {
+                onSelectionChange: updateChairConflictWarning,
+            });
+            window.chairAutocompleteReady = true;
+        }
+
+        ChairTeacherAutocomplete.setCurriculumId(curriculumId);
+        ChairTeacherAutocomplete.clear();
+
+        if (currentChairId) {
+            ChairTeacherAutocomplete.loadByEmail(currentChairId);
+        } else {
+            ChairTeacherAutocomplete.setStatus('พิมพ์ชื่อหรืออีเมลเพื่อค้นหาอาจารย์');
+        }
+
         $('#chairModal').removeClass('hidden');
+        setTimeout(function () {
+            $('#chairTeacherSearch').trigger('focus');
+        }, 100);
     } catch (error) {
         console.error('Error opening chair modal:', error);
         Swal.fire({
@@ -1165,86 +1182,50 @@ window.openChairModal = function(curriculumId, curriculumName, currentChairId = 
     }
 };
 
+function hideChairConflictWarning() {
+    $('#chairConflictWarning').addClass('hidden');
+    $('#chairConflictList').empty();
+}
+
+function updateChairConflictWarning(item) {
+    hideChairConflictWarning();
+    if (!item || !item.has_conflict) {
+        return;
+    }
+
+    const list = $('#chairConflictList');
+    list.empty();
+    (item.warnings || []).forEach(function (warning) {
+        list.append($('<li></li>').text(warning));
+    });
+    $('#chairConflictWarning').removeClass('hidden');
+}
+
+/**
+ * Clear chair selection in modal
+ */
+window.clearChairSelection = function() {
+    ChairTeacherAutocomplete.clear();
+    hideChairConflictWarning();
+};
+
 /**
  * Close chair modal
  */
 window.closeChairModal = function() {
     $('#chairModal').addClass('hidden');
-    $('#chairSelect').val('').trigger('change');
+    ChairTeacherAutocomplete.clear();
+    hideChairConflictWarning();
 };
-
-/**
- * Load users for chair selection (only members of the curriculum)
- */
-function loadUsersForChair(curriculumId, currentChairId = null) {
-    if (!curriculumId) {
-        Swal.fire({
-            title: 'เกิดข้อผิดพลาด!',
-            text: 'ไม่พบข้อมูลหลักสูตร',
-            icon: 'error',
-            confirmButtonText: 'ตกลง'
-        });
-        return;
-    }
-    
-    $.ajax({
-        url: appRoute('admin/getUsersForDeanSelection'), // POST: IIS drops GET params
-        method: 'POST',
-        dataType: 'json',
-        data: {
-            curriculum_id: curriculumId
-        },
-        success: function(response) {
-            if (response.success) {
-                const chairSelect = $('#chairSelect');
-                chairSelect.empty().append('<option value="">-- ไม่ระบุ --</option>');
-                
-                if (response.data && response.data.length > 0) {
-                    response.data.forEach(function(user) {
-                        const option = $('<option></option>')
-                            .attr('value', user.email)
-                            .text(user.name + (user.email ? ' (' + user.email + ')' : ''));
-                        if (currentChairId && user.email == currentChairId) {
-                            option.prop('selected', true);
-                        }
-                        chairSelect.append(option);
-                    });
-                } else {
-                    // No members in curriculum
-                    chairSelect.append('<option value="" disabled>ไม่มีสมาชิกในหลักสูตรนี้</option>');
-                }
-            } else {
-                Swal.fire({
-                    title: 'เกิดข้อผิดพลาด!',
-                    text: response.message || 'ไม่สามารถโหลดรายชื่อผู้ใช้ได้',
-                    icon: 'error',
-                    confirmButtonText: 'ตกลง'
-                });
-            }
-        },
-        error: function(xhr, status, error) {
-            console.error('Failed to load users for chair selection:', {
-                status: status,
-                error: error,
-                response: xhr.responseText
-            });
-            Swal.fire({
-                title: 'เกิดข้อผิดพลาด!',
-                text: 'ไม่สามารถโหลดรายชื่อผู้ใช้ได้',
-                icon: 'error',
-                confirmButtonText: 'ตกลง'
-            });
-        }
-    });
-}
 
 /**
  * Save curriculum chair
  */
 window.saveCurriculumChair = function() {
     const curriculumId = $('#chairModalCurriculumId').val();
-    const chairId = $('#chairSelect').val() || null;
-    
+    const chairId = ChairTeacherAutocomplete.getSelectedEmail() || null;
+    const selected = ChairTeacherAutocomplete.getSelected();
+
     if (!curriculumId) {
         Swal.fire({
             title: 'เกิดข้อผิดพลาด!',
@@ -1254,47 +1235,98 @@ window.saveCurriculumChair = function() {
         });
         return;
     }
-    
-    $.ajax({
-        url: appRoute('admin/setCurriculumChair'),
-        method: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify({
-            curriculum_id: curriculumId,
-            chair_email: chairId
-        }),
-        dataType: 'json',
-        success: function(response) {
-            if (response.success) {
-                Swal.fire({
-                    title: 'สำเร็จ!',
-                    text: response.message,
-                    icon: 'success',
-                    confirmButtonText: 'ตกลง',
-                    timer: 2000,
-                    timerProgressBar: true
-                });
-                closeChairModal();
-                // Reload curriculums
-                loadCurriculums($('#curriculum-faculty-filter').val() || 'all');
-            } else {
+
+    const submit = function(confirmConflict) {
+        $('#chairSaveBtn').prop('disabled', true);
+
+        $.ajax({
+            url: appRoute('admin/setCurriculumChair'),
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                curriculum_id: curriculumId,
+                chair_email: chairId,
+                confirm_conflict: !!confirmConflict,
+            }),
+            dataType: 'json',
+            success: function(response) {
+                $('#chairSaveBtn').prop('disabled', false);
+
+                if (response.requires_confirmation) {
+                    const warningHtml = (response.warnings || [])
+                        .map(function (w) { return '<li>' + escapeHtml(w) + '</li>'; })
+                        .join('');
+
+                    Swal.fire({
+                        title: 'ยืนยันการตั้งประธาน?',
+                        html: '<p class="text-sm text-gray-700 mb-2">อาจารย์ท่านนี้มีตำแหน่งในหลักสูตรอื่นแล้ว:</p><ul class="text-left text-sm text-amber-800 list-disc pl-5">' + warningHtml + '</ul>',
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonText: 'ยืนยันบันทึก',
+                        cancelButtonText: 'ยกเลิก',
+                        confirmButtonColor: '#059669',
+                    }).then(function(result) {
+                        if (result.isConfirmed) {
+                            submit(true);
+                        }
+                    });
+                    return;
+                }
+
+                if (response.success) {
+                    Swal.fire({
+                        title: 'สำเร็จ!',
+                        text: response.message,
+                        icon: 'success',
+                        confirmButtonText: 'ตกลง',
+                        timer: 2000,
+                        timerProgressBar: true
+                    });
+                    closeChairModal();
+                    loadCurriculums($('#curriculum-faculty-filter').val() || 'all');
+                } else {
+                    Swal.fire({
+                        title: 'เกิดข้อผิดพลาด!',
+                        text: response.message || 'ไม่สามารถตั้งประธานหลักสูตรได้',
+                        icon: 'error',
+                        confirmButtonText: 'ตกลง'
+                    });
+                }
+            },
+            error: function(xhr, status, error) {
+                $('#chairSaveBtn').prop('disabled', false);
+                console.error('Error setting curriculum chair:', { xhr, status, error });
                 Swal.fire({
                     title: 'เกิดข้อผิดพลาด!',
-                    text: response.message || 'ไม่สามารถตั้งประธานหลักสูตรได้',
+                    text: 'เกิดข้อผิดพลาดในการตั้งประธานหลักสูตร',
                     icon: 'error',
                     confirmButtonText: 'ตกลง'
                 });
             }
-        },
-        error: function(xhr, status, error) {
-            console.error('Error setting curriculum chair:', { xhr, status, error });
-            Swal.fire({
-                title: 'เกิดข้อผิดพลาด!',
-                text: 'เกิดข้อผิดพลาดในการตั้งประธานหลักสูตร',
-                icon: 'error',
-                confirmButtonText: 'ตกลง'
-            });
-        }
-    });
+        });
+    };
+
+    if (selected && selected.has_conflict) {
+        const warningHtml = (selected.warnings || [])
+            .map(function (w) { return '<li>' + escapeHtml(w) + '</li>'; })
+            .join('');
+
+        Swal.fire({
+            title: 'ยืนยันการตั้งประธาน?',
+            html: '<p class="text-sm text-gray-700 mb-2">อาจารย์ท่านนี้มีตำแหน่งในหลักสูตรอื่นแล้ว:</p><ul class="text-left text-sm text-amber-800 list-disc pl-5">' + warningHtml + '</ul>',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'ยืนยันบันทึก',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#059669',
+        }).then(function(result) {
+            if (result.isConfirmed) {
+                submit(true);
+            }
+        });
+        return;
+    }
+
+    submit(false);
 };
 

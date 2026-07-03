@@ -8,6 +8,19 @@ let users = [];
 let faculties = [];
 let currentUserId = null;
 
+function hasThaiScript(text) {
+    return /[\u0E00-\u0E7F]/.test(text || '');
+}
+
+function formatUserDisplayName(data) {
+    const thai = `${data.thai_name || ''} ${data.thai_lastname || ''}`.trim();
+    const eng = `${data.gf_name || ''} ${data.gl_name || ''}`.trim();
+    if (thai && hasThaiScript(thai)) {
+        return { primary: thai, secondary: eng };
+    }
+    return { primary: eng || thai || 'ไม่มีชื่อ', secondary: thai && thai !== eng ? thai : '' };
+}
+
 // Initialize on page load
 $(document).ready(function() {
     loadFaculties();
@@ -82,16 +95,15 @@ function initUsersTable(data) {
             {
                 data: null,
                 render: function(data) {
-                    const thaiName = (data.thai_name || '') + ' ' + (data.thai_lastname || '');
-                    const engName = (data.gf_name || '') + ' ' + (data.gl_name || '');
+                    const names = formatUserDisplayName(data);
                     const userType = data.user_type || '';
                     const userTypeBadge = userType ?
                         (userType === 'TEACHER' ? '<span class="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">Teacher</span>' :
                          userType === 'STAFF' ? '<span class="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded">Staff</span>' :
                          userType === 'STUDENT' ? '<span class="text-xs px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded">Student</span>' : '') : '';
                     return `<div>
-                        <div class="font-medium text-gray-900">${thaiName} ${userTypeBadge}</div>
-                        <div class="text-sm text-gray-500">${engName}</div>
+                        <div class="font-medium text-gray-900">${names.primary} ${userTypeBadge}</div>
+                        ${names.secondary ? `<div class="text-sm text-gray-500">${names.secondary}</div>` : ''}
                     </div>`;
                 }
             },
@@ -214,8 +226,10 @@ function editUserRole(userEmail) {
     // Populate form. Fall back to email (uid was dropped); the `|| ''` is important because
     // jQuery .val(undefined) acts as a getter and would leave the previous user's id behind.
     $('#userId').val(user.uid || user.email || '');
-    const userName = (user.thai_name || '') + ' ' + (user.thai_lastname || '') + ' (' + user.email + ')';
-    $('#userName').val(userName);
+    const engName = `${user.gf_name || ''} ${user.gl_name || ''}`.trim();
+    $('#userEngName').val(engName || '-');
+    $('#userThaiName').val(user.thai_name || '');
+    $('#userThaiLastname').val(user.thai_lastname || '');
     $('#userEmail').val(user.email || '');
 
     // Set user type
@@ -359,6 +373,13 @@ function setupEventListeners() {
         const userType = $('#userType').val();
         const facultyId = $('#userFaculty').val();
         const role = $('#userRole').val();
+        const thaiName = $('#userThaiName').val().trim();
+        const thaiLastname = $('#userThaiLastname').val().trim();
+
+        if (!thaiName || !thaiLastname) {
+            showNotification('กรุณากรอกชื่อและนามสกุลภาษาไทย', 'warning');
+            return;
+        }
 
         // Validation: Teacher must have faculty
         if (userType === 'TEACHER' && !facultyId) {
@@ -385,7 +406,9 @@ function setupEventListeners() {
             user_type: userType,
             faculty_id: facultyId || null,
             role: role,
-            managed_faculties: managedFaculties
+            managed_faculties: managedFaculties,
+            thai_name: thaiName,
+            thai_lastname: thaiLastname
         };
 
         console.log('=== updateUserRole REQUEST ===');

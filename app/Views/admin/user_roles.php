@@ -113,10 +113,26 @@
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">User</label>
-                    <input type="text" id="userName" readonly
+                    <label class="block text-sm font-medium text-gray-700 mb-2">ชื่อ (อังกฤษ / จาก Portal)</label>
+                    <input type="text" id="userEngName" readonly
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50">
                 </div>
+
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">ชื่อภาษาไทย *</label>
+                        <input type="text" id="userThaiName" name="thai_name" required maxlength="100"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="เช่น จุลรักษ์">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">นามสกุลภาษาไทย *</label>
+                        <input type="text" id="userThaiLastname" name="thai_lastname" required maxlength="100"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="เช่น รักพงษ์">
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500 -mt-2">Super Admin แก้ชื่อไทยได้เมื่อ Portal/SSO ส่งมาเป็นภาษาอังกฤษ</p>
 
                 <!-- User Type (Teacher/Staff) -->
                 <div>

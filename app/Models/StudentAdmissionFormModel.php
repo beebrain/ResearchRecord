@@ -255,6 +255,31 @@ class StudentAdmissionFormModel extends Model
     }
 
     /**
+     * Get forms by curriculum IDs (for chair filtering)
+     */
+    public function getFormsByCurricula(array $curriculumIds, ?int $year = null): array
+    {
+        if ($curriculumIds === []) {
+            return [];
+        }
+
+        $builder = $this->select('student_admission_forms.*,
+                                  curriculum.name as curriculum_name_display,
+                                  faculties.name as faculty_name')
+            ->join('curriculum', 'curriculum.id = student_admission_forms.curriculum_id', 'left')
+            ->join('faculties', 'faculties.id = student_admission_forms.faculty_id', 'left')
+            ->whereIn('student_admission_forms.curriculum_id', $curriculumIds);
+
+        if ($year) {
+            $builder->where('academic_year', $year);
+        }
+
+        return $builder->orderBy('faculties.name', 'ASC')
+            ->orderBy('curriculum.name', 'ASC')
+            ->findAll();
+    }
+
+    /**
      * Create forms for all curricula for a new academic year
      * Called when a new year starts to auto-generate forms
      */
@@ -805,15 +830,27 @@ class StudentAdmissionFormModel extends Model
     /**
      * Get statistics for dashboard
      */
-    public function getStatistics(?array $facultyIds = null, ?int $year = null)
+    public function getStatistics(?array $facultyIds = null, ?int $year = null, ?array $curriculumIds = null)
     {
+        if ($curriculumIds !== null && $curriculumIds === []) {
+            return [
+                'total'           => 0,
+                'draft_count'     => 0,
+                'submitted_count' => 0,
+                'approved_count'  => 0,
+                'rejected_count'  => 0,
+            ];
+        }
+
         $builder = $this->select('COUNT(*) as total,
                                   SUM(CASE WHEN status = "draft" THEN 1 ELSE 0 END) as draft_count,
                                   SUM(CASE WHEN status = "submitted" THEN 1 ELSE 0 END) as submitted_count,
                                   SUM(CASE WHEN status = "approved" THEN 1 ELSE 0 END) as approved_count,
                                   SUM(CASE WHEN status = "rejected" THEN 1 ELSE 0 END) as rejected_count');
 
-        if ($facultyIds && !empty($facultyIds)) {
+        if ($curriculumIds !== null && $curriculumIds !== []) {
+            $builder->whereIn('curriculum_id', $curriculumIds);
+        } elseif ($facultyIds && ! empty($facultyIds)) {
             $builder->whereIn('faculty_id', $facultyIds);
         }
 

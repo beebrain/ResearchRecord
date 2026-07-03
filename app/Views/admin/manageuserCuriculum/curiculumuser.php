@@ -69,6 +69,60 @@
             background: #555;
         }
 
+        /* Chair teacher autocomplete */
+        .chair-ac-wrap {
+            position: relative;
+        }
+
+        .chair-ac-input {
+            min-height: 44px;
+        }
+
+        .chair-ac-list {
+            position: absolute;
+            z-index: 60;
+            left: 0;
+            right: 0;
+            margin-top: 4px;
+            max-height: 280px;
+            overflow-y: auto;
+            background: #fff;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+        }
+
+        .chair-ac-option {
+            min-height: 44px;
+            cursor: pointer;
+            transition: background-color 150ms ease;
+        }
+
+        .chair-ac-option:hover,
+        .chair-ac-option.is-active {
+            background: #ecfdf5;
+        }
+
+        .chair-ac-option:focus {
+            outline: 2px solid #059669;
+            outline-offset: -2px;
+        }
+
+        .chair-ac-badge-chair {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .chair-ac-badge-coordinator {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .chair-ac-badge-member {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
         /* Drag and Drop Styles */
         .draggable {
             cursor: move;
@@ -220,37 +274,50 @@
         window.BASE_URL = '<?= rtrim(base_url(), '/') ?>';
     </script>
     <script src="<?= base_url('assets/js/app-routes.js') ?>?v=<?= @filemtime(FCPATH . 'assets/js/app-routes.js') ?: time() ?>"></script>
+    <script src="<?= base_url('assets/js/chair-teacher-autocomplete.js') ?>?v=<?= @filemtime(FCPATH . 'assets/js/chair-teacher-autocomplete.js') ?: time() ?>"></script>
     <script src="<?= base_url('assets/js/curriculum-user-manager-v2.js') ?>?v=<?= @filemtime(FCPATH . 'assets/js/curriculum-user-manager-v2.js') ?: time() ?>"></script>
 
     <!-- Chair Selection Modal -->
-    <div id="chairModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-lg bg-white">
+    <div id="chairModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" role="dialog" aria-modal="true" aria-labelledby="chairModalTitle">
+        <div class="relative top-12 mx-auto p-5 border w-full max-w-lg shadow-lg rounded-lg bg-white">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-bold text-gray-900">ตั้งประธานหลักสูตร</h3>
-                <button onclick="closeChairModal()" class="text-gray-400 hover:text-gray-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <h3 id="chairModalTitle" class="text-xl font-bold text-gray-900">ตั้งประธานหลักสูตร</h3>
+                <button type="button" onclick="closeChairModal()" class="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100" aria-label="ปิด">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                     </svg>
                 </button>
             </div>
-            <div class="mb-4">
-                <p class="text-sm text-gray-600 mb-2">หลักสูตร: <span id="chairModalCurriculumName" class="font-medium text-gray-900"></span></p>
+            <div class="mb-4 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
+                <p class="text-sm text-gray-600">หลักสูตรที่กำลังตั้งประธาน</p>
+                <p id="chairModalCurriculumName" class="font-medium text-gray-900"></p>
                 <input type="hidden" id="chairModalCurriculumId">
             </div>
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-2">ประธานหลักสูตร</label>
-                <select id="chairSelect" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500">
-                    <option value="">-- ไม่ระบุ --</option>
-                </select>
-                <p class="text-xs text-gray-500 mt-1">เลือกประธานหลักสูตรจากสมาชิกในหลักสูตรนี้เท่านั้น</p>
+            <div class="mb-3">
+                <label for="chairTeacherSearch" class="block text-sm font-medium text-gray-700 mb-2">ค้นหาอาจารย์ในมหาวิทยาลัย</label>
+                <div id="chairTeacherAutocomplete" class="chair-ac-wrap"></div>
+                <p class="text-xs text-gray-500 mt-2">พิมพ์ชื่อหรืออีเมลอย่างน้อย 2 ตัวอักษร — ระบบจะแสดงตำแหน่งประธาน/ผู้รับผิดชอบในหลักสูตรอื่น (ถ้ามี)</p>
             </div>
-            <div class="flex justify-end space-x-3">
+            <div id="chairConflictWarning" class="hidden mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-900" role="alert">
+                <p class="font-medium flex items-start gap-2">
+                    <svg class="w-5 h-5 shrink-0 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path>
+                    </svg>
+                    <span>คำเตือน: อาจารย์ท่านนี้มีตำแหน่งในหลักสูตรอื่นแล้ว</span>
+                </p>
+                <ul id="chairConflictList" class="mt-2 ml-7 list-disc space-y-1 text-amber-800"></ul>
+            </div>
+            <div class="flex flex-wrap justify-end gap-2 relative z-[70]">
+                <button type="button" onclick="clearChairSelection()"
+                    class="px-4 py-2 min-h-[44px] bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                    ล้าง / ไม่ระบุประธาน
+                </button>
                 <button type="button" onclick="closeChairModal()"
-                    class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                    class="px-4 py-2 min-h-[44px] bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
                     ยกเลิก
                 </button>
-                <button type="button" onclick="saveCurriculumChair()"
-                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                <button type="button" id="chairSaveBtn" onclick="saveCurriculumChair()"
+                    class="px-4 py-2 min-h-[44px] bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                     บันทึก
                 </button>
             </div>

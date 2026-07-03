@@ -21,6 +21,9 @@ class AdminController extends Controller
     protected $session;
     protected $db;
 
+    /** @var \App\Services\ChairSelectionService|null */
+    private $chairSelectionService;
+
     public function __construct()
     {
         $this->userModel = new UserModel();
@@ -32,6 +35,15 @@ class AdminController extends Controller
         $this->db = \Config\Database::connect();
 
         helper(['form', 'url', 'year']);
+    }
+
+    private function chairSelectionService(): \App\Services\ChairSelectionService
+    {
+        if ($this->chairSelectionService === null) {
+            $this->chairSelectionService = new \App\Services\ChairSelectionService($this->db);
+        }
+
+        return $this->chairSelectionService;
     }
 
     /**
@@ -2120,6 +2132,8 @@ class AdminController extends Controller
             $facultyId = $data['faculty_id'] ?? null;
             $role = $data['role'] ?? 'user';
             $managedFaculties = $data['managed_faculties'] ?? null;
+            $thaiName = isset($data['thai_name']) ? trim((string) $data['thai_name']) : null;
+            $thaiLastname = isset($data['thai_lastname']) ? trim((string) $data['thai_lastname']) : null;
 
             log_message('info', 'updateUserRole - Parsed data: userId=' . $userId . ', userEmail=' . $userEmail . ', userType=' . $userType . ', facultyId=' . $facultyId . ', role=' . $role);
 
@@ -2189,6 +2203,21 @@ class AdminController extends Controller
                 }
             }
 
+            if ($thaiName !== null || $thaiLastname !== null) {
+                if ($thaiName === null || $thaiLastname === null || $thaiName === '' || $thaiLastname === '') {
+                    return $this->response->setJSON([
+                        'success' => false,
+                        'message' => 'กรุณากรอกชื่อและนามสกุลภาษาไทยให้ครบ',
+                    ]);
+                }
+                if (mb_strlen($thaiName) > 100 || mb_strlen($thaiLastname) > 100) {
+                    return $this->response->setJSON([
+                        'success' => false,
+                        'message' => 'ชื่อภาษาไทยยาวเกินไป (สูงสุด 100 ตัวอักษร)',
+                    ]);
+                }
+            }
+
             // Update user type and/or faculty
             // Always update faculty_id directly to user table when provided
             $userUpdateData = [];
@@ -2200,6 +2229,11 @@ class AdminController extends Controller
             // Always update faculty_id when provided (or explicitly set to null for staff)
             if ($facultyId !== null || $userType === 'STAFF') {
                 $userUpdateData['faculty_id'] = $facultyId;
+            }
+
+            if ($thaiName !== null && $thaiLastname !== null) {
+                $userUpdateData['thai_name'] = $thaiName;
+                $userUpdateData['thai_lastname'] = $thaiLastname;
             }
 
             if (!empty($userUpdateData)) {
@@ -2225,7 +2259,7 @@ class AdminController extends Controller
             if ($updated) {
                 return $this->response->setJSON([
                     'success' => true,
-                    'message' => 'User role updated successfully'
+                    'message' => 'บันทึกข้อมูลผู้ใช้และสิทธิ์เรียบร้อยแล้ว',
                 ]);
             }
 
@@ -3208,6 +3242,129 @@ class AdminController extends Controller
     // ===================================================================
 
     /**
+     * Curriculum IDs a chair may access for admission forms.
+     *
+     * @return list<int>
+     */
+    private function resolveChairAdmissionCurricula($user, $facultyFilter = ''): array
+    {
+        $chairCurricula = RoleHelper::getChairCurricula($user);
+        if ($chairCurricula === []) {
+            return [];
+        }
+
+        $chairCurricula = array_map('intval', $chairCurricula);
+
+        if ($facultyFilter === '' || $facultyFilter === null) {
+            return $chairCurricula;
+        }
+
+        $chairFaculties = array_map('intval', RoleHelper::getChairFaculties($user));
+        if (! in_array((int) $facultyFilter, $chairFaculties, true)) {
+            return [];
+        }
+
+        $ids = $this->curriculumModel
+            ->select('id')
+            ->whereIn('id', $chairCurricula)
+            ->where('faculty_id', (int) $facultyFilter)
+            ->findColumn('id');
+
+        return array_map('intval', $ids ?: []);
+    }
+
+    private function currentAdmissionUser(): ?array
+    {
+        $userData = $this->session->get('user_data');
+        $email    = UserIdentity::sessionEmail() ?: ($userData['email'] ?? '');
+        if ($email === '') {
+            return null;
+        }
+
+        $user = $this->userModel->find($email);
+
+        return is_array($user) ? $user : null;
+    }
+
+    private function canViewAdmissionForm(array $form, ?array $user): bool
+    {
+        if ($user === null) {
+            return false;
+        }
+
+        if ($this->session->get('god_mode') === true || RoleHelper::isSuperAdmin($user)) {
+            return true;
+        }
+
+        $curriculumId = (int) ($form['curriculum_id'] ?? 0);
+        $facultyId    = (int) ($form['faculty_id'] ?? 0);
+
+        if (RoleHelper::isFacultyAdmin($user)) {
+            return in_array($facultyId, RoleHelper::getManagedFaculties($user), true);
+        }
+
+        if (RoleHelper::isDean($user)) {
+            return in_array($facultyId, RoleHelper::getDeanFaculties($user), true);
+        }
+
+        if (RoleHelper::isChair($user)) {
+            return in_array($curriculumId, array_map('intval', RoleHelper::getChairCurricula($user)), true);
+        }
+
+        return false;
+    }
+
+    private function canEditAdmissionFormContent(array $form, ?array $user): bool
+    {
+        if ($user === null) {
+            return false;
+        }
+
+        if ($this->session->get('god_mode') === true || RoleHelper::isSuperAdmin($user)) {
+            return true;
+        }
+
+        $curriculumId = (int) ($form['curriculum_id'] ?? 0);
+        $facultyId    = (int) ($form['faculty_id'] ?? 0);
+
+        if (RoleHelper::isFacultyAdmin($user)) {
+            return in_array($facultyId, RoleHelper::getManagedFaculties($user), true);
+        }
+
+        if (RoleHelper::isChair($user)) {
+            return in_array($curriculumId, array_map('intval', RoleHelper::getChairCurricula($user)), true);
+        }
+
+        return false;
+    }
+
+    /**
+     * Dean/faculty admin may update workflow status; chair/admin may edit full form content.
+     */
+    private function canSaveAdmissionForm(array $form, ?array $user, array $input): bool
+    {
+        if (! $this->canViewAdmissionForm($form, $user)) {
+            return false;
+        }
+
+        if ($this->canEditAdmissionFormContent($form, $user)) {
+            return true;
+        }
+
+        if ($user === null) {
+            return false;
+        }
+
+        if (! RoleHelper::isDean($user) && ! RoleHelper::isFacultyAdmin($user)) {
+            return false;
+        }
+
+        $newStatus = $input['status'] ?? null;
+
+        return in_array($newStatus, ['approved', 'rejected', 'submitted'], true);
+    }
+
+    /**
      * Show list of student admission forms
      */
     public function admissionIndex($year = null, $faculty = null)
@@ -3239,6 +3396,7 @@ class AdminController extends Controller
         // Get forms based on user role
         $userData = $this->session->get('user_data');
         $user = $this->userModel->find(UserIdentity::sessionEmail() ?: ($userData['email'] ?? ''));
+        $statsCurriculumIds = null;
 
         if ($this->session->get('god_mode') === true || RoleHelper::isSuperAdmin($user)) {
             // Super admin: see all forms
@@ -3272,25 +3430,22 @@ class AdminController extends Controller
                 $forms = [];
             }
         } elseif (RoleHelper::isChair($user)) {
-            // Chair: see forms from their curriculum's faculty
+            // Chair: only forms for curricula where this user is chair
+            $scopedCurricula = $this->resolveChairAdmissionCurricula($user, $selectedFaculty);
+            $forms = $admissionModel->getFormsByCurricula($scopedCurricula, $selectedYear);
+            $statsCurriculumIds = $scopedCurricula;
             $chairFaculties = RoleHelper::getChairFaculties($user);
-            if (!empty($chairFaculties)) {
-                if ($selectedFaculty && in_array($selectedFaculty, $chairFaculties)) {
-                    $forms = $admissionModel->getFormsByFaculties([$selectedFaculty], $selectedYear);
-                } else {
-                    $forms = $admissionModel->getFormsByFaculties($chairFaculties, $selectedYear);
-                }
-                // Filter faculties dropdown to only show chair's faculties
-                $faculties = array_filter($faculties, fn($f) => in_array($f['id'], $chairFaculties));
-            } else {
-                $forms = [];
-            }
+            $faculties = ! empty($chairFaculties)
+                ? array_filter($faculties, fn($f) => in_array($f['id'], $chairFaculties))
+                : [];
         } else {
             $forms = [];
         }
 
         // Get statistics
-        $stats = $admissionModel->getStatistics($selectedFaculty ? [$selectedFaculty] : null, $selectedYear);
+        $stats = $statsCurriculumIds !== null
+            ? $admissionModel->getStatistics(null, $selectedYear, $statsCurriculumIds)
+            : $admissionModel->getStatistics($selectedFaculty ? [$selectedFaculty] : null, $selectedYear);
 
         // Determine role for status management
         $userRole = 'teacher'; // default
@@ -3341,6 +3496,7 @@ class AdminController extends Controller
         // Get forms based on user role
         $userData = $this->session->get('user_data');
         $user = $this->userModel->find(UserIdentity::sessionEmail() ?: ($userData['email'] ?? ''));
+        $statsCurriculumIds = null;
 
         if ($this->session->get('god_mode') === true || RoleHelper::isSuperAdmin($user)) {
             // Super admin: see all forms
@@ -3370,23 +3526,17 @@ class AdminController extends Controller
                 $forms = [];
             }
         } elseif (RoleHelper::isChair($user)) {
-            // Chair: see forms from their curriculum's faculty
-            $chairFaculties = RoleHelper::getChairFaculties($user);
-            if (!empty($chairFaculties)) {
-                if ($faculty && in_array($faculty, $chairFaculties)) {
-                    $forms = $admissionModel->getFormsByFaculties([$faculty], $year);
-                } else {
-                    $forms = $admissionModel->getFormsByFaculties($chairFaculties, $year);
-                }
-            } else {
-                $forms = [];
-            }
+            $scopedCurricula = $this->resolveChairAdmissionCurricula($user, $faculty);
+            $forms = $admissionModel->getFormsByCurricula($scopedCurricula, $year);
+            $statsCurriculumIds = $scopedCurricula;
         } else {
             $forms = [];
         }
 
         // Get statistics
-        $stats = $admissionModel->getStatistics($faculty ? [$faculty] : null, $year);
+        $stats = $statsCurriculumIds !== null
+            ? $admissionModel->getStatistics(null, $year, $statsCurriculumIds)
+            : $admissionModel->getStatistics($faculty ? [$faculty] : null, $year);
 
         return $this->response->setJSON([
             'success' => true,
@@ -3454,6 +3604,11 @@ class AdminController extends Controller
             return redirect()->to(base_url('index.php/admin/admission'))->with('error', 'ไม่พบข้อมูล');
         }
 
+        $user = $this->currentAdmissionUser();
+        if (! $this->canViewAdmissionForm($form, $user)) {
+            return redirect()->to(base_url('index.php/admin/admission'))->with('error', 'ไม่มีสิทธิ์เข้าถึง');
+        }
+
         // Get faculties and curricula for dropdowns
         $faculties = $this->facultyModel->where('status', 1)->findAll();
         $curricula = $this->curriculumModel->where('status', 1)->findAll();
@@ -3480,7 +3635,19 @@ class AdminController extends Controller
 
         try {
             $admissionModel = new \App\Models\StudentAdmissionFormModel();
+            $form = $admissionModel->find($id);
+            if (! is_array($form)) {
+                return $this->response->setJSON(['success' => false, 'message' => 'Not found']);
+            }
+
             $input = $this->request->getJSON(true) ?? $this->request->getPost();
+            $user  = $this->currentAdmissionUser();
+            if (! $this->canSaveAdmissionForm($form, $user, is_array($input) ? $input : [])) {
+                return $this->response->setStatusCode(403)->setJSON([
+                    'success' => false,
+                    'message' => 'Access denied',
+                ]);
+            }
 
             // Update form data
             $userData = $this->session->get('user_data');
@@ -3548,6 +3715,14 @@ class AdminController extends Controller
 
         if (!$form) {
             return $this->response->setJSON(['success' => false, 'message' => 'Not found']);
+        }
+
+        $user = $this->currentAdmissionUser();
+        if (! $this->canViewAdmissionForm($form, $user)) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'success' => false,
+                'message' => 'Access denied',
+            ]);
         }
 
         log_message('info', sprintf('ADMISSION_PDF_SERVER admission/get id=%s user=%s', $id, UserIdentity::sessionEmail() ?: 'unknown'));
@@ -3862,6 +4037,74 @@ class AdminController extends Controller
     }
 
     /**
+     * Search teachers university-wide for chair assignment (autocomplete).
+     */
+    public function searchTeachersForChairSelection()
+    {
+        try {
+            if (! $this->canManageCurriculumChair()) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'Access denied',
+                ]);
+            }
+
+            $curriculumId = (int) ($this->request->getPostGet('curriculum_id') ?? 0);
+            $exactEmail   = UserIdentity::normalizeEmail((string) ($this->request->getPostGet('email') ?? ''));
+            $query        = trim((string) ($this->request->getPostGet('q') ?? ''));
+
+            if ($curriculumId <= 0) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'Curriculum ID is required',
+                ]);
+            }
+
+            if ($exactEmail !== '') {
+                $user = $this->userModel->find($exactEmail);
+                if (! is_array($user) || (int) ($user['active'] ?? 0) !== 1) {
+                    return $this->response->setJSON(['success' => true, 'data' => []]);
+                }
+
+                return $this->response->setJSON([
+                    'success' => true,
+                    'data'    => [$this->chairSelectionService()->formatTeacherForSelection($user, $curriculumId)],
+                ]);
+            }
+
+            if (mb_strlen($query) < 2) {
+                return $this->response->setJSON(['success' => true, 'data' => []]);
+            }
+
+            $data = $this->chairSelectionService()->searchTeachers($query, $curriculumId);
+
+            return $this->response->setJSON([
+                'success' => true,
+                'data'    => $data,
+            ]);
+        } catch (\Exception $e) {
+            log_message('error', 'searchTeachersForChairSelection error: ' . $e->getMessage());
+
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Failed to search teachers',
+            ]);
+        }
+    }
+
+    private function canManageCurriculumChair(): bool
+    {
+        if ($this->session->get('god_mode') === true) {
+            return true;
+        }
+
+        $userData = $this->session->get('user_data') ?? [];
+        $userRole = $userData['role'] ?? null;
+
+        return $userRole === 'super_admin' || $userRole === 'faculty_admin';
+    }
+
+    /**
      * Set curriculum chair (ประธานหลักสูตร)
      */
     public function setCurriculumChair()
@@ -3875,6 +4118,7 @@ class AdminController extends Controller
             $curriculumId = $data['curriculum_id'] ?? null;
             $chairEmail = $data['chair_email'] ?? $data['chair_id'] ?? null; // chair_id kept for backward compatibility; null to remove chair
             $chairEmail = !empty($chairEmail) ? UserIdentity::normalizeEmail((string) $chairEmail) : null;
+            $confirmConflict = ! empty($data['confirm_conflict']);
 
             if (!$curriculumId) {
                 return $this->response->setJSON([
@@ -3922,6 +4166,23 @@ class AdminController extends Controller
                     return $this->response->setJSON([
                         'success' => false,
                         'message' => 'Invalid chair user'
+                    ]);
+                }
+
+                if (($chair['user_type'] ?? '') !== 'TEACHER') {
+                    return $this->response->setJSON([
+                        'success' => false,
+                        'message' => 'ประธานหลักสูตรต้องเป็นอาจารย์ในระบบ',
+                    ]);
+                }
+
+                $conflicts = $this->chairSelectionService()->getChairSelectionConflicts($chairEmail, (int) $curriculumId);
+                if ($conflicts['has_conflict'] && ! $confirmConflict) {
+                    return $this->response->setJSON([
+                        'success'               => false,
+                        'requires_confirmation' => true,
+                        'warnings'              => $conflicts['warnings'],
+                        'message'               => 'อาจารย์ท่านนี้มีตำแหน่งในหลักสูตรอื่นแล้ว กรุณายืนยันก่อนบันทึก',
                     ]);
                 }
             }
