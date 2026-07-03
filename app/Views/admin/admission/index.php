@@ -124,7 +124,7 @@
                         <div class="flex items-center gap-3">
                             <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">✅</div>
                             <div>
-                                <p class="text-xs font-medium text-green-600">อนุมัติแล้ว</p>
+                                <p class="text-xs font-medium text-green-600">ตรวจสอบแล้ว</p>
                                 <p class="text-2xl font-bold text-green-700"><?= $stats['approved_count'] ?? 0 ?></p>
                             </div>
                         </div>
@@ -259,7 +259,7 @@
                                                         echo '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium status-submitted">ส่งแล้ว</span>';
                                                         break;
                                                     case 'approved':
-                                                        echo '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium status-approved">อนุมัติแล้ว</span>';
+                                                        echo '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium status-approved">ตรวจสอบแล้ว</span>';
                                                         break;
                                                     case 'rejected':
                                                         echo '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium status-rejected">ส่งกลับเพื่อแก้ไข</span>';
@@ -338,9 +338,106 @@
         const statusMap = {
             'draft': ['ฉบับร่าง', 'status-draft'],
             'submitted': ['ส่งแล้ว', 'status-submitted'],
-            'approved': ['อนุมัติแล้ว', 'status-approved'],
+            'approved': ['ตรวจสอบแล้ว', 'status-approved'],
             'rejected': ['ส่งกลับเพื่อแก้ไข', 'status-rejected']
         };
+
+        // teacher_curriculum.role (instructor/coordinator/…) is not an academic title
+        function mapAcademicPosition(pos) {
+            if (!pos) return '';
+            const s = String(pos).trim();
+            const lower = s.toLowerCase();
+            if (['instructor', 'coordinator', 'assistant', 'chair'].includes(lower)) return '';
+            const map = {
+                instructor: 'อาจารย์', lecturer: 'อาจารย์', teacher: 'อาจารย์',
+                'assistant professor': 'ผศ.', 'associate professor': 'รศ.', professor: 'ศ.',
+                'dr.': 'ดร.', dr: 'ดร.'
+            };
+            return map[lower] || s;
+        }
+
+        function parseTitleFromDisplayName(fullName) {
+            const m = String(fullName || '').trim().match(/^(ศ\.ดร\.|รศ\.ดร\.|ผศ\.ดร\.|อาจารย์\s*ดร\.|ดร\.|อาจารย์|รศ\.|ผศ\.|ศ\.)\s+/u);
+            return m ? m[1].trim() : '';
+        }
+
+        function buildOfficialName(title, thaiName, thaiLastname) {
+            const t = mapAcademicPosition(title).trim();
+            const n = [thaiName || '', thaiLastname || ''].join(' ').trim();
+            if (!n) return t;
+            return t ? (t + ' ' + n) : n;
+        }
+
+        function resolveOfficialPosition(form, role) {
+            const titleKey = role === 'chair' ? 'chair_title' : 'dean_title';
+            const emailKey = role === 'chair' ? 'chair_email' : 'dean_email';
+            const nameKey = role === 'chair' ? 'curriculum_head_name' : 'dean_name';
+            let pos = mapAcademicPosition(form[titleKey] || '');
+            if (!pos && form.teachers) {
+                const match = form.teachers.find(t => (t.user_id || t.user_email) === form[emailKey]);
+                if (match) {
+                    pos = mapAcademicPosition(match.titleThai || match.position || '');
+                }
+            }
+            if (!pos) {
+                pos = parseTitleFromDisplayName(form[nameKey] || '');
+            }
+            return pos;
+        }
+
+        function positionSelectHtml(selected) {
+            const opts = ['อาจารย์', 'ดร.', 'ผศ.', 'ผศ.ดร.', 'รศ.', 'รศ.ดร.', 'ศ.', 'ศ.ดร.'];
+            let html = `<option value=""${!selected ? ' selected' : ''}>-- เลือก --</option>`;
+            html += opts.map(opt => `<option value="${opt}"${selected === opt ? ' selected' : ''}>${opt}</option>`).join('');
+            return html;
+        }
+
+        function syncOfficialFromTeacher(userId, position) {
+            const form = window.currentFormData || {};
+            if (form.chair_email && form.chair_email === userId) {
+                form.chair_title = position;
+                $('#chair_position_select').val(position);
+                const name = buildOfficialName(position, form.chair_user_name, form.chair_user_lastname);
+                $('#curriculum_head_name_input').val(name);
+                $('#chair_system_hint').text(name || '-');
+            }
+            if (form.dean_email && form.dean_email === userId) {
+                form.dean_title = position;
+                $('#dean_position_select').val(position);
+                const name = buildOfficialName(position, form.dean_user_name, form.dean_user_lastname);
+                $('#dean_name_input').val(name);
+                $('#dean_system_hint').text(name || '-');
+            }
+        }
+
+        function updateOfficialPosition(role, position) {
+            const form = window.currentFormData || {};
+            const email = role === 'chair' ? form.chair_email : form.dean_email;
+            if (!email) return;
+
+            if (role === 'chair') {
+                form.chair_title = position;
+                const name = buildOfficialName(position, form.chair_user_name, form.chair_user_lastname);
+                $('#curriculum_head_name_input').val(name);
+                $('#chair_system_hint').text(name || '-');
+            } else {
+                form.dean_title = position;
+                const name = buildOfficialName(position, form.dean_user_name, form.dean_user_lastname);
+                $('#dean_name_input').val(name);
+                $('#dean_system_hint').text(name || '-');
+            }
+
+            // ซิงก์ dropdown ข้อ 4 ถ้าคนเดียวกัน
+            $(`select.teacher-position-select[data-user-id="${email}"]`).each(function() {
+                $(this).val(position);
+                const row = $(this).closest('tr');
+                const tn = $(this).data('thaiName') || '';
+                const tl = $(this).data('thaiLastname') || '';
+                row.find('td:last').text((position ? position + ' ' : '') + [tn, tl].join(' ').trim());
+            });
+
+            updateTeacherPosition(email, position);
+        }
 
         // Escape HTML to prevent XSS
         function escapeHtml(text) {
@@ -596,6 +693,10 @@
             }
 
             const positionOptions = ['อาจารย์', 'ดร.', 'ผศ.', 'ผศ.ดร.', 'รศ.', 'รศ.ดร.', 'ศ.', 'ศ.ดร.'];
+            const chairPos = resolveOfficialPosition(form, 'chair');
+            const deanPos = resolveOfficialPosition(form, 'dean');
+            const chairDisplayName = form.curriculum_head_name || buildOfficialName(chairPos, form.chair_user_name, form.chair_user_lastname);
+            const deanDisplayName = form.dean_name || buildOfficialName(deanPos, form.dean_user_name, form.dean_user_lastname);
 
             let html = `
                 <form id="admissionForm">
@@ -696,17 +797,21 @@
                                 </thead>
                                 <tbody>
                                     ${(form.teachers || []).map((t, i) => {
-                                        const currentPos = (t.titleThai || t.position || '').trim();
+                                        const currentPos = mapAcademicPosition(t.titleThai || t.position || '').trim();
+                                        const nameWithTitle = (currentPos ? currentPos + ' ' : '') + [t.thai_name || '', t.thai_lastname || ''].join(' ').trim();
                                         return `
                                         <tr>
                                             <td class="px-3 py-2 text-center border">${i + 1}</td>
                                             <td class="px-2 py-1 border">
-                                                <select class="w-full px-2 py-1 border rounded text-sm bg-white" 
-                                                        onchange="updateTeacherPosition('${t.user_id}', this.value)">
-                                                    ${positionOptions.map(opt => `<option value="${opt}" ${currentPos === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+                                                <select class="teacher-position-select w-full px-2 py-1 border rounded text-sm bg-white"
+                                                        data-user-id="${t.user_id || ''}"
+                                                        data-thai-name="${t.thai_name || ''}"
+                                                        data-thai-lastname="${t.thai_lastname || ''}"
+                                                        onchange="updateTeacherPosition('${t.user_id}', this.value, this)">
+                                                    ${positionSelectHtml(currentPos)}
                                                 </select>
                                             </td>
-                                            <td class="px-3 py-2 border">${t.thai_name || ''} ${t.thai_lastname || ''}</td>
+                                            <td class="px-3 py-2 border teacher-name-cell">${nameWithTitle}</td>
                                         </tr>
                                     `}).join('') || '<tr><td colspan="3" class="px-3 py-2 text-center text-gray-500">ไม่มีข้อมูลอาจารย์</td></tr>'}
                                 </tbody>
@@ -1114,12 +1219,18 @@
                                     <input type="hidden" name="curriculum_head_approval_date" id="curriculum_head_approval_date_modal" value="${form.curriculum_head_approval_date || ''}">
                                 </div>
                                 <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">ตำแหน่งวิชาการ</label>
+                                    <select id="chair_position_select" class="w-full px-3 py-2 border rounded-lg bg-white mb-2"
+                                            onchange="updateOfficialPosition('chair', this.value)"
+                                            ${form.chair_email ? '' : 'disabled'}>
+                                        ${positionSelectHtml(chairPos)}
+                                    </select>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อประธานหลักสูตร</label>
-                                    <input type="text" name="curriculum_head_name" value="${form.curriculum_head_name || ''}" class="w-full px-3 py-2 border rounded-lg" placeholder="ชื่อ" id="curriculum_head_name_input">
+                                    <input type="text" name="curriculum_head_name" value="${chairDisplayName || ''}" class="w-full px-3 py-2 border rounded-lg" placeholder="ชื่อ" id="curriculum_head_name_input">
                                     ${form.chair_email ? `
                                         <p class="text-xs text-gray-500 mt-1">
                                             <span class="text-green-600">✓</span> ดึงข้อมูลจากระบบ: 
-                                            ${form.chair_system_name || form.curriculum_head_name || '-'}
+                                            <span id="chair_system_hint">${chairDisplayName || '-'}</span>
                                         </p>
                                     ` : '<p class="text-xs text-gray-500 mt-1">ยังไม่ได้ตั้งประธานหลักสูตรในระบบ</p>'}
                                 </div>
@@ -1127,12 +1238,18 @@
                             <div class="p-4 bg-emerald-50 rounded-lg">
                                 <h4 class="font-medium text-orange-700 mb-3">คณบดี</h4>
                                 <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">ตำแหน่งวิชาการ</label>
+                                    <select id="dean_position_select" class="w-full px-3 py-2 border rounded-lg bg-white mb-2"
+                                            onchange="updateOfficialPosition('dean', this.value)"
+                                            ${form.dean_email ? '' : 'disabled'}>
+                                        ${positionSelectHtml(deanPos)}
+                                    </select>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อคณบดี</label>
-                                    <input type="text" name="dean_name" value="${form.dean_name || ''}" class="w-full px-3 py-2 border rounded-lg overflow-visible" placeholder="ชื่อ" id="dean_name_input">
+                                    <input type="text" name="dean_name" value="${deanDisplayName || ''}" class="w-full px-3 py-2 border rounded-lg overflow-visible" placeholder="ชื่อ" id="dean_name_input">
                                     ${form.dean_email ? `
                                         <p class="text-xs text-gray-500 mt-1">
                                             <span class="text-orange-600">✓</span> ดึงข้อมูลจากระบบ: 
-                                            ${form.dean_system_name || form.dean_name || '-'}
+                                            <span id="dean_system_hint">${deanDisplayName || '-'}</span>
                                         </p>
                                     ` : '<p class="text-xs text-gray-500 mt-1">ยังไม่ได้ตั้งคณบดีในระบบ</p>'}
                                 </div>
@@ -1283,7 +1400,7 @@
             } else if (userRole === 'dean' || userRole === 'faculty_admin') {
                 if (currentStatus === 'submitted') {
                     footerHtml += `<button onclick="saveForm('rejected')" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg">❌ ส่งกลับเพื่อแก้ไข</button>`;
-                    footerHtml += `<button onclick="saveForm('approved')" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg">✅ อนุมัติ</button>`;
+                    footerHtml += `<button onclick="saveForm('approved')" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg">✅ ตรวจสอบแล้ว</button>`;
                     footerHtml += `<button onclick="saveForm()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">💾 บันทึก</button>`;
                 } else {
                     footerHtml += `<button onclick="saveForm()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">💾 บันทึก</button>`;
@@ -1295,8 +1412,29 @@
             $('#modalFooterActions').html(footerHtml);
         }
 
-        function updateTeacherPosition(userId, position) {
+        function updateTeacherPosition(userId, position, selectEl) {
             if (!userId) return;
+
+            if (selectEl) {
+                const tn = selectEl.dataset.thaiName || '';
+                const tl = selectEl.dataset.thaiLastname || '';
+                const row = selectEl.closest('tr');
+                if (row) {
+                    const nameCell = row.querySelector('.teacher-name-cell');
+                    if (nameCell) {
+                        nameCell.textContent = (position ? position + ' ' : '') + [tn, tl].join(' ').trim();
+                    }
+                }
+            }
+
+            const form = window.currentFormData || {};
+            if (form.teachers) {
+                const t = form.teachers.find(x => (x.user_id || x.user_email) === userId);
+                if (t) {
+                    t.titleThai = position;
+                    t.position = position;
+                }
+            }
 
             $.ajax({
                 url: appRoute('admin/admission/update-position'),
@@ -1304,11 +1442,12 @@
                 contentType: 'application/json',
                 data: JSON.stringify({
                     user_id: userId,
-                    position: position
+                    position: position,
+                    form_id: currentFormId
                 }),
                 success: function(result) {
                     if (result.success) {
-                        // Show brief success indicator
+                        syncOfficialFromTeacher(userId, position);
                         Swal.fire({
                             toast: true,
                             position: 'top-end',
@@ -1613,7 +1752,7 @@
                     let yearCells = years.map(y => `<td class="px-2 py-1 border text-center">${teacherPubs[y] || 0}</td>`).join('');
                     return `<tr>
                         <td class="px-2 py-1 border text-center">${i+1}</td>
-                        <td class="px-2 py-1 border">${t.titleThai || '-'}</td>
+                        <td class="px-2 py-1 border">${mapAcademicPosition(t.titleThai || t.position) || '-'}</td>
                         <td class="px-2 py-1 border">${t.thai_name || ''} ${t.thai_lastname || ''}</td>
                         ${yearCells}
                         <td class="px-2 py-1 border text-center font-semibold text-green-600">${total}</td>
@@ -1735,7 +1874,7 @@
 
                     section5Html += `<div class="bg-gray-50 p-3 rounded-lg">
                                 <div class="flex justify-between items-center mb-2">
-                                    <span class="font-medium">${teacherIndex + 1}. ${t.titleThai || ''} ${t.thai_name || ''} ${t.thai_lastname || ''}</span>
+                                    <span class="font-medium">${teacherIndex + 1}. ${mapAcademicPosition(t.titleThai || t.position) || ''} ${t.thai_name || ''} ${t.thai_lastname || ''}</span>
                                     <span class="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">${pubCount} ผลงาน</span>
                                 </div>
                                 ${pubList}
@@ -2280,24 +2419,23 @@
 
         // Auto-fill function (called automatically when form loads)
         function fillFromSystemAuto(form) {
-            if (form.chair_system_name) {
-                $('#curriculum_head_name_input').val(form.chair_system_name);
+            const chairPos = resolveOfficialPosition(form, 'chair');
+            const deanPos = resolveOfficialPosition(form, 'dean');
+            if (form.chair_user_name || form.chair_system_name) {
+                $('#curriculum_head_name_input').val(buildOfficialName(chairPos, form.chair_user_name, form.chair_user_lastname));
+                $('#chair_position_select').val(chairPos);
+                $('#chair_system_hint').text($('#curriculum_head_name_input').val() || '-');
             }
-            if (form.dean_system_name) {
-                $('#dean_name_input').val(form.dean_system_name);
+            if (form.dean_user_name || form.dean_system_name) {
+                $('#dean_name_input').val(buildOfficialName(deanPos, form.dean_user_name, form.dean_user_lastname));
+                $('#dean_position_select').val(deanPos);
+                $('#dean_system_hint').text($('#dean_name_input').val() || '-');
             }
         }
 
         // Manual fill function (called when button is clicked)
         function fillFromSystem() {
-            const form = window.currentFormData || {};
-
-            if (form.chair_system_name) {
-                $('#curriculum_head_name_input').val(form.chair_system_name);
-            }
-            if (form.dean_system_name) {
-                $('#dean_name_input').val(form.dean_system_name);
-            }
+            fillFromSystemAuto(window.currentFormData || {});
 
             Swal.fire({
                 toast: true,

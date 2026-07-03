@@ -596,7 +596,7 @@ class AdminDashboardController extends Controller
         switch ($data['status']) {
             case 'approved':
                 $statusPoints = 20;
-                $details['form_status'] = ['status' => 'success', 'text' => 'อนุมัติแล้ว'];
+                $details['form_status'] = ['status' => 'success', 'text' => 'ตรวจสอบแล้ว'];
                 break;
             case 'submitted':
                 $statusPoints = 15;

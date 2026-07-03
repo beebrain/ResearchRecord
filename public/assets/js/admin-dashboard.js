@@ -619,7 +619,7 @@ function updateReadinessTable(data) {
     const statusBadge = {
         'draft': '<span class="px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-700">ร่าง</span>',
         'submitted': '<span class="px-2 py-0.5 text-xs rounded bg-blue-100 text-blue-700">รอพิจารณา</span>',
-        'approved': '<span class="px-2 py-0.5 text-xs rounded bg-green-100 text-green-700">อนุมัติ</span>',
+        'approved': '<span class="px-2 py-0.5 text-xs rounded bg-green-100 text-green-700">ตรวจสอบแล้ว</span>',
         'rejected': '<span class="px-2 py-0.5 text-xs rounded bg-red-100 text-red-700">ปฏิเสธ</span>'
     };
     

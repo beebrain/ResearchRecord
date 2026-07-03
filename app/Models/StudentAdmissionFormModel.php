@@ -185,7 +185,9 @@ class StudentAdmissionFormModel extends Model
                 );
                 if ($chairName !== '') {
                     $form['chair_system_name'] = $chairName;
-                    $form['curriculum_head_name'] = $chairName;
+                    if ($savedChairName === '') {
+                        $form['curriculum_head_name'] = $chairName;
+                    }
                 }
             }
 
@@ -218,13 +220,62 @@ class StudentAdmissionFormModel extends Model
 
                 if ($deanName !== '') {
                     $form['dean_system_name'] = $deanName;
-                    $form['dean_name'] = $deanName;
+                    if ($savedDeanName === '') {
+                        $form['dean_name'] = $deanName;
+                    }
                 }
             }
         }
 
         return $form;
     }
+
+    /** @var list<string> */
+    public const ACADEMIC_POSITION_OPTIONS = [
+        'อาจารย์', 'ดร.', 'ผศ.', 'ผศ.ดร.', 'รศ.', 'รศ.ดร.', 'ศ.', 'ศ.ดร.',
+    ];
+
+    /**
+     * Resolve academic title for chair/dean blocks in admission UI.
+     *
+     * @param array<string,mixed> $form
+     */
+    public function resolveOfficialPositionForForm(array $form, string $role): string
+    {
+        if ($role === 'chair') {
+            return $this->resolveAcademicTitle(
+                (string) ($form['chair_email'] ?? ''),
+                $form['chair_title'] ?? '',
+                $form['chair_title_en'] ?? '',
+                $form['curriculum_head_name'] ?? '',
+                $form['teachers'] ?? []
+            );
+        }
+
+        return $this->resolveAcademicTitle(
+            (string) ($form['dean_email'] ?? ''),
+            $form['dean_title'] ?? '',
+            $form['dean_title_en'] ?? '',
+            $form['dean_name'] ?? '',
+            $form['teachers'] ?? []
+        );
+    }
+
+    /**
+     * Build official display name with academic title prefix.
+     */
+    public function buildOfficialDisplayName(
+        ?string $title,
+        ?string $thaiName,
+        ?string $thaiLastname,
+        ?string $gfName = null,
+        ?string $glName = null
+    ): string {
+        return $this->formatOfficialPersonName($title, $thaiName, $thaiLastname, $gfName, $glName);
+    }
+
+    /** @var list<string> teacher_curriculum.role values — not academic titles */
+    private const CURRICULUM_ROLES = ['instructor', 'coordinator', 'assistant', 'chair'];
 
     /**
      * Resolve academic title from user record, saved display name, teachers, or publications.
@@ -238,13 +289,9 @@ class StudentAdmissionFormModel extends Model
         ?string $savedFullName,
         array $teacherRows = []
     ): string {
-        $titleThai = trim((string) $titleThai);
-        $titleEn   = trim((string) $titleEn);
-        if ($titleThai !== '') {
-            return $titleThai;
-        }
-        if ($titleEn !== '') {
-            return $titleEn;
+        $titleThaiNorm = $this->normalizeAcademicTitle($titleThai);
+        if ($titleThaiNorm !== '') {
+            return $titleThaiNorm;
         }
 
         $parsedTitle = $this->parseTitleFromDisplayName($savedFullName);
@@ -260,13 +307,78 @@ class StudentAdmissionFormModel extends Model
             if ($teacherEmail === '' || $teacherEmail !== $emailNorm) {
                 continue;
             }
-            $position = trim((string) ($teacher['titleThai'] ?? $teacher['position'] ?? ''));
+            $position = $this->normalizeAcademicTitle($teacher['titleThai'] ?? $teacher['position'] ?? '');
             if ($position !== '') {
                 return $position;
             }
         }
 
+        $titleEnNorm = $this->normalizeAcademicTitle($titleEn);
+        if ($titleEnNorm !== '') {
+            return $titleEnNorm;
+        }
+
         return $this->inferTitleFromPublicationAuthors($emailNorm);
+    }
+
+    /**
+     * Map English SSO / curriculum-role strings to Thai academic titles.
+     * Returns empty when the value is not a printable academic title.
+     */
+    private function normalizeAcademicTitle(?string $raw): string
+    {
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return '';
+        }
+
+        $lower = strtolower($raw);
+        if (in_array($lower, self::CURRICULUM_ROLES, true)) {
+            return '';
+        }
+
+        static $enMap = [
+            'instructor'          => 'อาจารย์',
+            'lecturer'            => 'อาจารย์',
+            'teacher'             => 'อาจารย์',
+            'assistant professor' => 'ผศ.',
+            'asst. professor'     => 'ผศ.',
+            'asst professor'      => 'ผศ.',
+            'associate professor' => 'รศ.',
+            'assoc. professor'    => 'รศ.',
+            'assoc professor'     => 'รศ.',
+            'professor'           => 'ศ.',
+            'prof.'               => 'ศ.',
+            'prof'                => 'ศ.',
+            'dr.'                 => 'ดร.',
+            'dr'                  => 'ดร.',
+        ];
+
+        if (isset($enMap[$lower])) {
+            return $enMap[$lower];
+        }
+
+        if (preg_match('/^(ศ\.ดร\.|รศ\.ดร\.|ผศ\.ดร\.|อาจารย์\s*ดร\.|ดร\.|อาจารย์|รศ\.|ผศ\.|ศ\.)/u', $raw)) {
+            return $raw;
+        }
+
+        if (preg_match('/\p{Thai}/u', $raw)) {
+            return $raw;
+        }
+
+        return '';
+    }
+
+    /**
+     * @param array<string,mixed> $teacher
+     */
+    private function normalizeTeacherAcademicPosition(array &$teacher): void
+    {
+        $title = $this->normalizeAcademicTitle($teacher['titleThai'] ?? '');
+        if ($title === '') {
+            $title = $this->normalizeAcademicTitle($teacher['position'] ?? '');
+        }
+        $teacher['position'] = $title;
     }
 
     private function parseTitleFromDisplayName(?string $fullName): string
@@ -459,6 +571,10 @@ class StudentAdmissionFormModel extends Model
             ->getResultArray();
 
         if (!empty($savedTeachers)) {
+            foreach ($savedTeachers as &$teacher) {
+                $this->normalizeTeacherAcademicPosition($teacher);
+            }
+            unset($teacher);
             $this->attachTeacherEducation($savedTeachers);
             return $savedTeachers;
         }
@@ -472,8 +588,9 @@ class StudentAdmissionFormModel extends Model
         $curriculumId = $form['curriculum_id'];
 
         $defaultTeachers = $db->table('teacher_curriculum tc')
-            ->select('tc.id, tc.teacher_email as user_id, tc.teacher_email as user_email, tc.role as position,
+            ->select('tc.id, tc.teacher_email as user_id, tc.teacher_email as user_email, tc.role as curriculum_role,
                       u.thai_name, u.thai_lastname, u.titleThai,
+                      u.titleThai as position,
                       CONCAT_WS(" ", COALESCE(u.titleThai, ""), u.thai_name, u.thai_lastname) as full_name,
                       CONCAT_WS(" ", u.gf_name, u.gl_name) as user_name_en,
                       CONCAT_WS(" ", u.thai_name, u.thai_lastname) as user_name_th')
@@ -493,7 +610,9 @@ class StudentAdmissionFormModel extends Model
             $teacher['pub_year_4'] = 0;
             $teacher['pub_year_5'] = 0;
             $teacher['admission_year'] = null;
+            $this->normalizeTeacherAcademicPosition($teacher);
         }
+        unset($teacher);
 
         $this->attachTeacherEducation($defaultTeachers);
         return $defaultTeachers;

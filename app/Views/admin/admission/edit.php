@@ -497,12 +497,22 @@
                                     <input type="date" name="curriculum_head_approval_date" value="<?= esc($form['curriculum_head_approval_date'] ?? '') ?>" class="form-input">
                                 </div>
                                 <div>
+                                    <label class="form-label">ตำแหน่งวิชาการ</label>
+                                    <select id="chair_position_select" class="form-input mb-2"
+                                            onchange="updateOfficialPosition('chair', this.value)"
+                                            <?= ! empty($form['chair_email']) ? '' : 'disabled' ?>>
+                                        <option value="" <?= empty($chairPosition) ? 'selected' : '' ?>>-- เลือก --</option>
+                                        <?php foreach ($positionOptions as $opt): ?>
+                                            <option value="<?= esc($opt) ?>" <?= ($chairPosition ?? '') === $opt ? 'selected' : '' ?>><?= esc($opt) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
                                     <label class="form-label">ชื่อประธานหลักสูตร</label>
-                                    <input type="text" name="curriculum_head_name" value="<?= esc($form['curriculum_head_name'] ?? '') ?>" class="form-input">
+                                    <input type="text" name="curriculum_head_name" id="curriculum_head_name_input"
+                                           value="<?= esc($chairDisplayName ?? '') ?>" class="form-input">
                                     <?php if (! empty($form['chair_email'])): ?>
                                         <p class="text-xs text-gray-500 mt-1">
                                             <span class="text-green-600">✓</span> เชื่อมจากประธานหลักสูตรในระบบ
-                                            (<?= esc($form['chair_email']) ?>)
+                                            (<span id="chair_system_hint"><?= esc($chairDisplayName ?? '-') ?></span>)
                                         </p>
                                     <?php else: ?>
                                         <p class="text-xs text-gray-500 mt-1">ยังไม่ได้ตั้งประธานหลักสูตรในระบบ</p>
@@ -513,12 +523,22 @@
                         <div class="p-4 bg-orange-50 rounded-lg">
                             <h3 class="font-medium text-orange-700 mb-3">ความเห็นชอบของคณบดี</h3>
                             <div>
+                                <label class="form-label">ตำแหน่งวิชาการ</label>
+                                <select id="dean_position_select" class="form-input mb-2"
+                                        onchange="updateOfficialPosition('dean', this.value)"
+                                        <?= ! empty($form['dean_email']) ? '' : 'disabled' ?>>
+                                    <option value="" <?= empty($deanPosition) ? 'selected' : '' ?>>-- เลือก --</option>
+                                    <?php foreach ($positionOptions as $opt): ?>
+                                        <option value="<?= esc($opt) ?>" <?= ($deanPosition ?? '') === $opt ? 'selected' : '' ?>><?= esc($opt) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
                                 <label class="form-label">ชื่อคณบดี</label>
-                                <input type="text" name="dean_name" value="<?= esc($form['dean_name'] ?? '') ?>" class="form-input">
+                                <input type="text" name="dean_name" id="dean_name_input"
+                                       value="<?= esc($deanDisplayName ?? '') ?>" class="form-input">
                                 <?php if (! empty($form['dean_email'])): ?>
                                     <p class="text-xs text-gray-500 mt-1">
                                         <span class="text-orange-600">✓</span> เชื่อมจากคณบดีในระบบ
-                                        (<?= esc($form['dean_email']) ?>)
+                                        (<span id="dean_system_hint"><?= esc($deanDisplayName ?? '-') ?></span>)
                                     </p>
                                 <?php endif; ?>
                             </div>
@@ -544,6 +564,51 @@
     <script src="<?= base_url('assets/js/app-routes.js') ?>?v=<?= @filemtime(FCPATH . 'assets/js/app-routes.js') ?: time() ?>"></script>
     <script>
         const FORM_ID = <?= $form['id'] ?>;
+        const OFFICIAL_PERSONS = {
+            chair: {
+                email: <?= json_encode($form['chair_email'] ?? '') ?>,
+                thaiName: <?= json_encode($form['chair_user_name'] ?? '') ?>,
+                thaiLastname: <?= json_encode($form['chair_user_lastname'] ?? '') ?>
+            },
+            dean: {
+                email: <?= json_encode($form['dean_email'] ?? '') ?>,
+                thaiName: <?= json_encode($form['dean_user_name'] ?? '') ?>,
+                thaiLastname: <?= json_encode($form['dean_user_lastname'] ?? '') ?>
+            }
+        };
+
+        function buildOfficialName(title, thaiName, thaiLastname) {
+            const t = String(title || '').trim();
+            const n = [thaiName || '', thaiLastname || ''].join(' ').trim();
+            if (!n) return t;
+            return t ? (t + ' ' + n) : n;
+        }
+
+        function updateOfficialPosition(role, position) {
+            const person = OFFICIAL_PERSONS[role];
+            if (!person || !person.email) return;
+
+            const name = buildOfficialName(position, person.thaiName, person.thaiLastname);
+            if (role === 'chair') {
+                document.getElementById('curriculum_head_name_input').value = name;
+                const hint = document.getElementById('chair_system_hint');
+                if (hint) hint.textContent = name || '-';
+            } else {
+                document.getElementById('dean_name_input').value = name;
+                const hint = document.getElementById('dean_system_hint');
+                if (hint) hint.textContent = name || '-';
+            }
+
+            fetch(appRoute('admin/admission/update-position'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: person.email,
+                    position: position,
+                    form_id: FORM_ID
+                })
+            }).catch(() => {});
+        }
 
         // Toggle incomplete fields visibility
         function toggleIncompleteFields() {

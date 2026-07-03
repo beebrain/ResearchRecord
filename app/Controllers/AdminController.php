@@ -3620,7 +3620,24 @@ class AdminController extends Controller
             'form' => $form,
             'faculties' => $faculties,
             'curricula' => $curricula,
-            'users' => $users
+            'users' => $users,
+            'positionOptions' => \App\Models\StudentAdmissionFormModel::ACADEMIC_POSITION_OPTIONS,
+            'chairPosition' => $admissionModel->resolveOfficialPositionForForm($form, 'chair'),
+            'deanPosition' => $admissionModel->resolveOfficialPositionForForm($form, 'dean'),
+            'chairDisplayName' => $form['curriculum_head_name'] ?: $admissionModel->buildOfficialDisplayName(
+                $admissionModel->resolveOfficialPositionForForm($form, 'chair'),
+                $form['chair_user_name'] ?? '',
+                $form['chair_user_lastname'] ?? '',
+                $form['chair_gf_name'] ?? '',
+                $form['chair_gl_name'] ?? ''
+            ),
+            'deanDisplayName' => $form['dean_name'] ?: $admissionModel->buildOfficialDisplayName(
+                $admissionModel->resolveOfficialPositionForForm($form, 'dean'),
+                $form['dean_user_name'] ?? '',
+                $form['dean_user_lastname'] ?? '',
+                $form['dean_gf_name'] ?? '',
+                $form['dean_gl_name'] ?? ''
+            ),
         ]);
     }
 
@@ -3902,7 +3919,17 @@ class AdminController extends Controller
             }
 
             // Update titleThai in user table
-            $this->userModel->update($userId, ['titleThai' => $position]);
+            $email = \App\Libraries\UserIdentity::normalizeEmail((string) $userId);
+            $this->userModel->update($email, ['titleThai' => $position]);
+
+            $formId = isset($input['form_id']) ? (int) $input['form_id'] : 0;
+            if ($formId > 0 && $email !== '') {
+                $db = \Config\Database::connect();
+                $db->table('admission_form_teachers')
+                    ->where('admission_form_id', $formId)
+                    ->where('user_email', $email)
+                    ->update(['position' => $position]);
+            }
 
             return $this->response->setJSON([
                 'success' => true,
@@ -3926,12 +3953,19 @@ class AdminController extends Controller
             return null;
         }
 
-        // Get title (prefer Thai title, fallback to English title)
+        // Get title (prefer Thai title, fallback to normalized English title)
         $title = '';
         if (!empty($faculty['dean_title'])) {
-            $title = $faculty['dean_title'];
+            $title = (string) $faculty['dean_title'];
         } elseif (!empty($faculty['dean_title_en'])) {
-            $title = $faculty['dean_title_en'];
+            $admissionModel = new \App\Models\StudentAdmissionFormModel();
+            $title = $admissionModel->resolveOfficialPositionForForm([
+                'dean_email'     => $faculty['dean_email'] ?? '',
+                'dean_title'     => '',
+                'dean_title_en'  => $faculty['dean_title_en'],
+                'dean_name'      => '',
+                'teachers'       => [],
+            ], 'dean');
         }
 
         // Prefer Thai name, fallback to English name
