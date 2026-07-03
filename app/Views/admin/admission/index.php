@@ -1116,7 +1116,7 @@
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อประธานหลักสูตร</label>
                                     <input type="text" name="curriculum_head_name" value="${form.curriculum_head_name || ''}" class="w-full px-3 py-2 border rounded-lg" placeholder="ชื่อ" id="curriculum_head_name_input">
-                                    ${form.chair_id ? `
+                                    ${form.chair_email ? `
                                         <p class="text-xs text-gray-500 mt-1">
                                             <span class="text-green-600">✓</span> ดึงข้อมูลจากระบบ: 
                                             ${(() => {
@@ -1139,7 +1139,7 @@
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อคณบดี</label>
                                     <input type="text" name="dean_name" value="${form.dean_name || ''}" class="w-full px-3 py-2 border rounded-lg overflow-visible" placeholder="ชื่อ" id="dean_name_input">
-                                    ${form.dean_id ? `
+                                    ${form.dean_email ? `
                                         <p class="text-xs text-gray-500 mt-1">
                                             <span class="text-orange-600">✓</span> ดึงข้อมูลจากระบบ: 
                                             ${(() => {
@@ -2307,7 +2307,7 @@
         // Auto-fill function (called automatically when form loads)
         function fillFromSystemAuto(form) {
             // Fill curriculum head name
-            if (form.chair_id) {
+            if (form.chair_email) {
                 let chairName = '';
                 if (form.chair_name && form.chair_lastname) {
                     const title = form.chair_title ? form.chair_title + ' ' : '';
@@ -2323,7 +2323,7 @@
             }
 
             // Fill dean name
-            if (form.dean_id) {
+            if (form.dean_email) {
                 let deanName = '';
                 // Use dean_name_from_db to avoid conflict with form.dean_name (saved value)
                 const deanNameDb = form.dean_name_from_db || '';
@@ -2356,7 +2356,7 @@
             const form = window.currentFormData || {};
 
             // Fill curriculum head name (always fill, even if already has value)
-            if (form.chair_id) {
+            if (form.chair_email) {
                 let chairName = '';
                 if (form.chair_name && form.chair_lastname) {
                     const title = form.chair_title ? form.chair_title + ' ' : '';
@@ -2371,7 +2371,7 @@
             }
 
             // Fill dean name (always fill, even if already has value)
-            if (form.dean_id) {
+            if (form.dean_email) {
                 let deanName = '';
                 // Use dean_name_from_db to avoid conflict
                 const deanNameDb = form.dean_name_from_db;

@@ -499,6 +499,14 @@
                                 <div>
                                     <label class="form-label">ชื่อประธานหลักสูตร</label>
                                     <input type="text" name="curriculum_head_name" value="<?= esc($form['curriculum_head_name'] ?? '') ?>" class="form-input">
+                                    <?php if (! empty($form['chair_email'])): ?>
+                                        <p class="text-xs text-gray-500 mt-1">
+                                            <span class="text-green-600">✓</span> เชื่อมจากประธานหลักสูตรในระบบ
+                                            (<?= esc($form['chair_email']) ?>)
+                                        </p>
+                                    <?php else: ?>
+                                        <p class="text-xs text-gray-500 mt-1">ยังไม่ได้ตั้งประธานหลักสูตรในระบบ</p>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
@@ -507,6 +515,12 @@
                             <div>
                                 <label class="form-label">ชื่อคณบดี</label>
                                 <input type="text" name="dean_name" value="<?= esc($form['dean_name'] ?? '') ?>" class="form-input">
+                                <?php if (! empty($form['dean_email'])): ?>
+                                    <p class="text-xs text-gray-500 mt-1">
+                                        <span class="text-orange-600">✓</span> เชื่อมจากคณบดีในระบบ
+                                        (<?= esc($form['dean_email']) ?>)
+                                    </p>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>

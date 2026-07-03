@@ -179,6 +179,14 @@ class StudentAdmissionFormModel extends Model
                 }
             }
 
+            // Backward compat: UI/API may still check chair_id / dean_id (removed after email PK migration)
+            if (! empty($form['chair_email'])) {
+                $form['chair_id'] = $form['chair_email'];
+            }
+            if (! empty($form['dean_email'])) {
+                $form['dean_id'] = $form['dean_email'];
+            }
+
             // Format dean name (คณบดี) - store original values to avoid conflict
             if (!empty($form['dean_email'])) {
                 // IMPORTANT: When using SELECT with student_admission_forms.*, 
