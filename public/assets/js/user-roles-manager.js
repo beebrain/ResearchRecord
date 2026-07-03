@@ -302,9 +302,19 @@ function populateFacultyCheckboxes(managedFaculties) {
  */
 function toggleUserTypeFaculty() {
     const userType = $('#userType').val();
+    const isSuspended = $('#userSuspended').is(':checked');
     const facultySelect = $('#userFaculty');
     const requiredIndicator = $('#facultyRequiredIndicator');
     const helpText = $('#facultyHelpText');
+
+    if (isSuspended) {
+        facultySelect.prop('disabled', false);
+        facultySelect.prop('required', false);
+        requiredIndicator.addClass('hidden');
+        helpText.text('ไม่บังคับเมื่อระงับการใช้งาน');
+        helpText.removeClass('text-blue-600').addClass('text-gray-500');
+        return;
+    }
 
     if (userType === 'TEACHER') {
         // Teachers MUST have faculty
@@ -377,6 +387,8 @@ function openRoleModal() {
  * Setup event listeners
  */
 function setupEventListeners() {
+    $('#userSuspended').on('change', toggleUserTypeFaculty);
+
     // Role form submission
     $('#roleForm').on('submit', async function(e) {
         e.preventDefault();
@@ -395,14 +407,14 @@ function setupEventListeners() {
             return;
         }
 
-        // Validation: Teacher must have faculty
-        if (userType === 'TEACHER' && !facultyId) {
+        // Validation: Teacher must have faculty (unless suspending account)
+        if (!isSuspended && userType === 'TEACHER' && !facultyId) {
             showNotification('Teachers must have a faculty affiliation', 'warning');
             return;
         }
 
         let managedFaculties = [];
-        if (role === 'faculty_admin') {
+        if (!isSuspended && role === 'faculty_admin') {
             managedFaculties = $('input[name="managed_faculties[]"]:checked').map(function() {
                 return parseInt($(this).val());
             }).get();

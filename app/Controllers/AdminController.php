@@ -2173,8 +2173,8 @@ class AdminController extends Controller
                 ]);
             }
 
-            // Validate faculty requirement for teachers
-            if ($userType === 'TEACHER' && empty($facultyId)) {
+            // Validate faculty requirement for teachers (not when suspending)
+            if ($active !== 0 && $userType === 'TEACHER' && empty($facultyId)) {
                 log_message('warning', 'updateUserRole - Teacher missing faculty: userId=' . $userId);
                 return $this->response->setJSON([
                     'success' => false,
@@ -2197,8 +2197,8 @@ class AdminController extends Controller
                 ]);
             }
 
-            // Validate managed faculties for faculty admin
-            if ($role === 'faculty_admin') {
+            // Validate managed faculties for faculty admin (not when suspending)
+            if ($active !== 0 && $role === 'faculty_admin') {
                 if (empty($managedFaculties) || !is_array($managedFaculties)) {
                     return $this->response->setJSON([
                         'success' => false,
