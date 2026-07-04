@@ -37,6 +37,11 @@ class AuthFilter implements FilterInterface
                     'บัญชีถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ'
                 );
             }
+
+            $thaiRedirect = \App\Libraries\UserIdentity::redirectIfThaiNameRequired($request);
+            if ($thaiRedirect !== null) {
+                return $thaiRedirect;
+            }
         }
     }
 

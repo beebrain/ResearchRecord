@@ -422,8 +422,12 @@ class AuthenController extends Controller
      */
     private function getPostLoginRedirect(array $userData = []): string
     {
-        // All users (including admins) go to the general user dashboard
-        // Admins will see a button to access the admin dashboard from there
+        if (! \App\Libraries\UserIdentity::userHasCompleteThaiName($userData)) {
+            session()->set('thai_name_return_url', site_url('dashboard'));
+
+            return site_url('auth/complete-thai-name');
+        }
+
         return site_url('dashboard');
     }
 
@@ -551,8 +555,16 @@ class AuthenController extends Controller
         log_message('info', self::SSO_LOG_PREFIX . 'ssoEntry success email=' . $email . ' name=' . trim(($userData['gf_name'] ?? '') . ' ' . ($userData['gl_name'] ?? '')));
 
         $entryPath = \App\Libraries\PublicationReturnNavigation::applySsoPayload($payload);
+        $target    = site_url(ltrim($entryPath, '/'));
 
-        return redirect()->to(site_url(ltrim($entryPath, '/')))->with('success', 'เข้าสู่ระบบจาก newScience สำเร็จ');
+        if (! \App\Libraries\UserIdentity::userHasCompleteThaiName($userData)) {
+            session()->set('thai_name_return_url', $target);
+
+            return redirect()->to(site_url('auth/complete-thai-name'))
+                ->with('success', 'เข้าสู่ระบบจาก newScience สำเร็จ — กรุณายืนยันชื่อและนามสกุล');
+        }
+
+        return redirect()->to($target)->with('success', 'เข้าสู่ระบบจาก newScience สำเร็จ');
     }
 
     /**
@@ -613,6 +625,11 @@ class AuthenController extends Controller
             $thaiLast = $glName;
         }
 
+        if (! preg_match('/[\x{0E00}-\x{0E7F}]/u', $thaiName . $thaiLast)) {
+            $thaiName = '';
+            $thaiLast = '';
+        }
+
         $extra = [];
         foreach ([
             'faculty_id', 'department_id', 'user_type', 'title', 'titleThai',
@@ -660,13 +677,15 @@ class AuthenController extends Controller
             $payloadThaiName = trim((string) ($profileFromPayload['thai_name'] ?? ''));
             $payloadThaiLast = trim((string) ($profileFromPayload['thai_lastname'] ?? ''));
             if ($payloadThaiName !== '') {
-                $existingThai = trim((string) ($user['thai_name'] ?? '') . (string) ($user['thai_lastname'] ?? ''));
                 $incomingThai = $payloadThaiName . $payloadThaiLast;
                 $hasIncomingThai = (bool) preg_match('/[\x{0E00}-\x{0E7F}]/u', $incomingThai);
-                $hasExistingThai = (bool) preg_match('/[\x{0E00}-\x{0E7F}]/u', $existingThai);
-                if ($hasIncomingThai || ! $hasExistingThai) {
-                    $patch['thai_name'] = $payloadThaiName;
+                $nameConfirmed   = ($user['profile_customer'] ?? '') === \App\Libraries\UserIdentity::PROFILE_SSO_NAME_OK;
+
+                if ($hasIncomingThai) {
+                    $patch['thai_name']     = $payloadThaiName;
                     $patch['thai_lastname'] = $payloadThaiLast;
+                } elseif (! $nameConfirmed) {
+                    // Do not mirror English-only SSO names into thai_* — user must confirm on form
                 }
             }
         }
@@ -717,6 +736,97 @@ class AuthenController extends Controller
         }
         $decoded = base64_decode(strtr($data, '-_', '+/'), true);
         return $decoded !== false ? $decoded : null;
+    }
+
+    /**
+     * บังคับยืนยันชื่อ-นามสกุลจริงเมื่อ SSO ไม่ส่งชื่อไทยมา (ชาวต่างชาติใช้ภาษาอังกฤษได้)
+     */
+    public function completeThaiName()
+    {
+        if (! session()->get('logged_in')) {
+            return redirect()->to(site_url('auth/login'));
+        }
+
+        $user = \App\Libraries\UserIdentity::sessionUser();
+        if ($user === null) {
+            return redirect()->to(site_url('auth/login'))->with('error', 'ไม่พบข้อมูลผู้ใช้');
+        }
+
+        if (\App\Libraries\UserIdentity::userHasCompleteThaiName($user)) {
+            return redirect()->to($this->thaiNameReturnUrl());
+        }
+
+        return view('auth/complete_thai_name', [
+            'title' => 'ยืนยันชื่อและนามสกุล',
+            'user'  => $user,
+        ]);
+    }
+
+    public function saveThaiName()
+    {
+        if (! session()->get('logged_in')) {
+            return redirect()->to(site_url('auth/login'));
+        }
+
+        $email = \App\Libraries\UserIdentity::sessionEmail();
+        if ($email === '') {
+            return redirect()->to(site_url('auth/login'));
+        }
+
+        $thaiName = trim((string) $this->request->getPost('thai_name'));
+        $thaiLast = trim((string) $this->request->getPost('thai_lastname'));
+
+        if ($thaiName === '' || $thaiLast === '') {
+            return redirect()->back()->withInput()->with('error', 'กรุณากรอกชื่อและนามสกุลให้ครบ');
+        }
+
+        if (mb_strlen($thaiName) > 100 || mb_strlen($thaiLast) > 100) {
+            return redirect()->back()->withInput()->with('error', 'ชื่อหรือนามสกุลยาวเกินไป (สูงสุด 100 ตัวอักษร)');
+        }
+
+        if (! \App\Libraries\UserIdentity::isAcceptableLegalNamePart($thaiName)
+            || ! \App\Libraries\UserIdentity::isAcceptableLegalNamePart($thaiLast)) {
+            return redirect()->back()->withInput()->with(
+                'error',
+                'กรุณาระบุชื่อและนามสกุลจริง — คนไทยใช้ภาษาไทย ชาวต่างชาติใช้ภาษาอังกฤษ'
+            );
+        }
+
+        $userRow = $this->userModel->find($email);
+        $update  = [
+            'thai_name'     => $thaiName,
+            'thai_lastname' => $thaiLast,
+        ];
+        if (is_array($userRow) && ($userRow['profile_customer'] ?? '') === 'newscience_sso') {
+            $update['profile_customer'] = \App\Libraries\UserIdentity::PROFILE_SSO_NAME_OK;
+        }
+
+        if (! $this->userModel->update($email, $update)) {
+            return redirect()->back()->withInput()->with('error', 'ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่');
+        }
+
+        $user = $this->userModel->find($email);
+        if (is_array($user)) {
+            \App\Libraries\UserIdentity::setSessionUser($user);
+            $sessionData = session()->get('user_data') ?? [];
+            $sessionData['thai_name'] = trim($thaiName . ' ' . $thaiLast);
+            session()->set('user_data', $sessionData);
+        }
+
+        session()->remove('thai_name_return_url');
+
+        return redirect()->to($this->thaiNameReturnUrl())
+            ->with('success', 'บันทึกชื่อและนามสกุลเรียบร้อยแล้ว');
+    }
+
+    private function thaiNameReturnUrl(): string
+    {
+        $return = session()->get('thai_name_return_url');
+        if (is_string($return) && $return !== '' && str_contains($return, site_url())) {
+            return $return;
+        }
+
+        return site_url('dashboard');
     }
 
     /**

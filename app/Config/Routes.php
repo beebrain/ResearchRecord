@@ -13,6 +13,8 @@ $routes->group('auth', function ($routes) {
     $routes->get('logout', 'AuthenController::logout');
     // SSO entry จาก newScience — รับ token แล้วสร้าง session โดยไม่ต้อง login ซ้ำ (ใช้ email ระบุตัวตน)
     $routes->get('sso-entry', 'AuthenController::ssoEntry');
+    $routes->get('complete-thai-name', 'AuthenController::completeThaiName');
+    $routes->post('complete-thai-name', 'AuthenController::saveThaiName');
 });
 
 // Alternative login routes

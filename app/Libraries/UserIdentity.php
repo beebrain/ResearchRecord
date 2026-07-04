@@ -18,6 +18,98 @@ final class UserIdentity
         return (bool) preg_match('/@live\.uru\.ac\.th$/', self::normalizeEmail($email));
     }
 
+    public static function hasThaiScript(string $text): bool
+    {
+        return (bool) preg_match('/[\x{0E00}-\x{0E7F}]/u', $text);
+    }
+
+    /** Latin legal name (foreign nationals may use English). */
+    public static function isValidLatinLegalName(string $text): bool
+    {
+        $text = trim($text);
+        if ($text === '' || mb_strlen($text) > 100 || mb_strlen($text) < 2) {
+            return false;
+        }
+
+        return (bool) preg_match("/^[A-Za-z][A-Za-z\\s'\\-.]*[A-Za-z\\.]$|^[A-Za-z]{2,}$/u", $text);
+    }
+
+    public static function isAcceptableLegalNamePart(string $text): bool
+    {
+        $text = trim($text);
+
+        return $text !== '' && (self::hasThaiScript($text) || self::isValidLatinLegalName($text));
+    }
+
+    public const PROFILE_SSO_NAME_OK = 'newscience_sso_name_ok';
+
+    /**
+     * @param array<string,mixed> $userRow
+     */
+    public static function userHasCompleteThaiName(array $userRow): bool
+    {
+        $first = trim((string) ($userRow['thai_name'] ?? ''));
+        $last  = trim((string) ($userRow['thai_lastname'] ?? ''));
+
+        if ($first === '' || $last === '') {
+            return false;
+        }
+
+        if (strcasecmp($first, 'User') === 0 || strcasecmp($last, 'User') === 0) {
+            return false;
+        }
+
+        if (self::hasThaiScript($first) && self::hasThaiScript($last)) {
+            return true;
+        }
+
+        if (self::isValidLatinLegalName($first) && self::isValidLatinLegalName($last)) {
+            $profile = (string) ($userRow['profile_customer'] ?? '');
+            if ($profile === self::PROFILE_SSO_NAME_OK) {
+                return true;
+            }
+            // English mirrored from SSO before user confirmed on the form
+            if ($profile === 'newscience_sso') {
+                return false;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Redirect logged-in users who lack a confirmed legal name to the completion form.
+     *
+     * @return \CodeIgniter\HTTP\RedirectResponse|null
+     */
+    public static function redirectIfThaiNameRequired(\CodeIgniter\HTTP\RequestInterface $request)
+    {
+        $session = session();
+        if (! $session->get('logged_in')) {
+            return null;
+        }
+
+        $path = strtolower($request->getUri()->getPath());
+        if (str_contains($path, 'complete-thai-name')
+            || str_contains($path, 'auth/logout')
+            || str_contains($path, '/logout')) {
+            return null;
+        }
+
+        $user = self::sessionUser();
+        if ($user === null || self::userHasCompleteThaiName($user)) {
+            return null;
+        }
+
+        if ($session->get('thai_name_return_url') === null) {
+            $session->set('thai_name_return_url', (string) current_url());
+        }
+
+        return redirect()->to(site_url('auth/complete-thai-name'));
+    }
+
     /**
      * @return array<string,mixed>|null
      */
