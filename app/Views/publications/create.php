@@ -161,7 +161,7 @@
                                     <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                     </svg>
-                                    <strong>เคล็ดลับ:</strong> สามารถใส่ลิงก์ DOI (เช่น https://doi.org/10.xxxx/xxxxx) ในช่องด้านล่างเพื่อให้ AI ช่วยดึงข้อมูล — หลังกรอกแล้วอย่าลืมบันทึกลิงก์เดียวกันในช่อง <strong>ลิงก์ภายนอก (แสดงบน CV)</strong> ด้านล่างฟอร์มด้วย
+                                    <strong>เคล็ดลับ:</strong> ใส่ลิงก์ DOI ในช่องด้านล่างได้ AI จะช่วยดึงข้อมูลให้ — ถ้าต้องการให้แสดงบน CV ให้ใส่ลิงก์ซ้ำในช่อง「ลิงก์บทความภายนอก」ในรายละเอียดการตีพิมพ์
                                 </p>
 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -211,14 +211,14 @@
                                             <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
                                             </svg>
-                                            URL ให้ AI อ่าน (ไม่บันทึกเป็นลิงก์ CV)
+                                            หรือใส่ URL (ให้ AI อ่าน)
                                         </label>
                                         <input
                                             type="url"
                                             id="ai-url-input"
                                             placeholder="https://example.com/paper.pdf"
                                             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm">
-                                        <p class="text-xs text-gray-500 mt-2">ใช้ช่วยสกัดข้อมูลเท่านั้น — ถ้าต้องการให้ผู้ชม CV กดเปิดลิงก์ ให้ใส่ในช่อง <strong>ลิงก์ภายนอก</strong> ด้านล่าง</p>
+                                        <p class="text-xs text-gray-500 mt-2">ใช้ช่วยสกัดข้อมูลเท่านั้น ไม่บันทึกเป็นลิงก์บน CV</p>
                                     </div>
                                 </div>
 
@@ -430,34 +430,20 @@
                                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
                             </div>
 
+                            <!-- External URL (syncs to CV) -->
+                            <div class="md:col-span-2 lg:col-span-3 field-transition">
+                                <label for="url" class="block text-sm font-medium text-gray-700">
+                                    ลิงก์บทความภายนอก
+                                    <span class="font-normal text-gray-500">(แสดงปุ่ม「เว็บ」บน CV)</span>
+                                </label>
+                                <input type="url" id="url" name="url"
+                                    value="<?= esc((string) ($p['url'] ?? ''), 'attr') ?>"
+                                    placeholder="https://journal.example.com/article/123"
+                                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                                <p class="mt-1 text-xs text-gray-500">ลิงก์ไปวารสาร สำนักพิมพ์ หรือ DOI — sync จาก กบศ. ไป CV วิทยาการ แยกจากไฟล์ที่อัปโหลด (ปุ่ม「ไฟล์」)</p>
                             </div>
-                        </div>
-                    </div>
 
-                    <!-- External link for CV -->
-                    <div class="form-section">
-                        <h3 class="section-title">ลิงก์ภายนอก (แสดงบน CV)</h3>
-                        <div class="rounded-lg border-2 border-emerald-300 bg-emerald-50 p-5">
-                            <div class="flex items-start gap-3 mb-4">
-                                <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-emerald-600 text-white flex items-center justify-center">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                                    </svg>
-                                </div>
-                                <div class="text-sm text-gray-700 space-y-1">
-                                    <p class="font-medium text-gray-900">ลิงก์เชื่อมไปเว็บภายนอก (วารสาร, สำนักพิมพ์, DOI ฯลฯ)</p>
-                                    <p>ข้อมูลในช่องนี้จะ sync จาก กบศ. ไปแสดงเป็นปุ่ม <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-white border border-emerald-400 text-emerald-800">เว็บ</span> บน CV วิทยาการ (newScience)</p>
-                                    <p class="text-xs text-gray-600">แยกจากการอัปโหลดไฟล์ด้านบน (ปุ่ม <span class="font-semibold">ไฟล์</span> บน CV) และช่อง URL ใน AI ช่วยกรอก (ไม่บันทึกเป็นลิงก์)</p>
-                                </div>
                             </div>
-                            <label for="url" class="block text-sm font-semibold text-gray-800 mb-2">
-                                URL บทความ / ลิงก์อ้างอิงภายนอก
-                            </label>
-                            <input type="url" id="url" name="url"
-                                value="<?= esc((string) ($p['url'] ?? ''), 'attr') ?>"
-                                placeholder="https://journal.example.com/article/123 หรือ https://doi.org/10.xxxx/xxxxx"
-                                class="block w-full px-4 py-3 border border-emerald-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all">
-                            <p class="mt-2 text-xs text-emerald-800">กรอกแล้วต้องกด <strong>บันทึก</strong> ด้านล่าง — ลิงก์จึงจะไปโผล่บน CV</p>
                         </div>
                     </div>
 
