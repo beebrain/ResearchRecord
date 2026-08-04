@@ -284,6 +284,10 @@ class PublicationController extends Controller
                 'doi' => $this->request->getPost('doi') ?: null,
                 'abstract' => $this->request->getPost('abstract') ?: null,
                 'keywords' => $this->request->getPost('keywords') ?: null,
+                'ref_url' => publication_resolve_ref_url(
+                    $this->request->getPost('ref_url'),
+                    $this->request->getPost('url')
+                ),
                 'created_by_email' => $this->sessionUserEmail($userData)
             ];
 
@@ -474,8 +478,10 @@ class PublicationController extends Controller
                 'editor' => $this->request->getPost('editor') ?: null,
                 'keywords' => $this->request->getPost('keywords') ?: null,
                 'notes' => $this->request->getPost('notes') ?: null,
-                'ref_url' => $this->request->getPost('ref_url') ?: null,
-                'url' => $this->request->getPost('url') ?: null
+                'ref_url' => publication_resolve_ref_url(
+                    $this->request->getPost('ref_url'),
+                    $this->request->getPost('url')
+                ),
             ];
 
             // Only update title if provided (not editable in user edit form)

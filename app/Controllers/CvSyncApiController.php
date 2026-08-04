@@ -190,7 +190,8 @@ class CvSyncApiController extends ApiController
                     'isbn'               => $pub['isbn'] ?? null,
                     'keywords'           => $pub['keywords'] ?? null,
                     'notes'              => $pub['notes'] ?? null,
-                    'ref_url'            => $pub['ref_url'] ?? null,
+                    'ref_url'            => publication_sync_ref_url($pub),
+                    'url'                => trim((string) ($pub['url'] ?? '')) ?: null,
                     'contributors'       => $contributorsByPublication[$id] ?? [],
                     'metadata'           => [
                         'rr_publication_id' => $id,
@@ -506,7 +507,7 @@ class CvSyncApiController extends ApiController
             'isbn'             => trim((string) ($pub['isbn'] ?? '')) ?: null,
             'keywords'         => trim((string) ($pub['keywords'] ?? '')) ?: null,
             'notes'            => trim((string) ($pub['notes'] ?? '')) ?: null,
-            'ref_url'          => trim((string) ($pub['ref_url'] ?? '')) ?: null,
+            'ref_url'          => publication_sync_ref_url($pub),
             'created_by_email' => UserIdentity::normalizeEmail((string) ($user['email'] ?? '')),
             'approve'          => null, // pending review (3-level: null/0/1)
         ];
@@ -703,7 +704,8 @@ class CvSyncApiController extends ApiController
                 'isbn'               => $pub['isbn'] ?? null,
                 'keywords'           => $pub['keywords'] ?? null,
                 'notes'              => $pub['notes'] ?? null,
-                'ref_url'            => $pub['ref_url'] ?? null,
+                'ref_url'            => publication_sync_ref_url($pub),
+                'url'                => trim((string) ($pub['url'] ?? '')) ?: null,
                 'contributors'       => $contributorsByPublication[$id] ?? [],
                 'metadata'           => [
                     'rr_publication_id' => $id,

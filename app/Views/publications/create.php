@@ -573,6 +573,10 @@
                 $('#' + key).val(pub[key]);
             }
         });
+        if (pub.ref_url && !pub.url) {
+            $('#url').val(pub.ref_url);
+        }
+        $('#ref_url').val(pub.ref_url || pub.url || '');
         if (pub.publication_type) {
             $('#publication_type').val(pub.publication_type);
             $('.publication-type-card[data-type="' + pub.publication_type + '"]').trigger('click');
