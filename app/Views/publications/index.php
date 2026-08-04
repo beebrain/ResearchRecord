@@ -333,18 +333,14 @@
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
 
-                    <!-- URLs -->
-                    <div class="grid grid-cols-2 gap-4 mb-6">
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">URL อ้างอิง (Reference URL)</label>
-                            <input type="url" id="edit_ref_url" name="ref_url"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">URL เพิ่มเติม (Additional URL)</label>
-                            <input type="url" id="edit_url" name="url"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        </div>
+                    <!-- External link for CV -->
+                    <div class="mb-6 rounded-lg border-2 border-emerald-300 bg-emerald-50 p-4">
+                        <p class="text-sm font-semibold text-gray-900 mb-1">ลิงก์ภายนอก (แสดงบน CV เป็นปุ่มเว็บ)</p>
+                        <p class="text-xs text-gray-600 mb-3">ลิงก์ไปวารสาร สำนักพิมพ์ หรือ DOI — sync จาก กบศ. ไป CV วิทยาการ (newScience)</p>
+                        <label for="edit_url" class="block text-sm font-medium text-gray-800 mb-2">URL บทความ / ลิงก์อ้างอิงภายนอก</label>
+                        <input type="url" id="edit_url" name="url" placeholder="https://journal.example.com/article/123"
+                            class="w-full px-4 py-2 border border-emerald-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                        <input type="hidden" id="edit_ref_url" name="ref_url">
                     </div>
 
                     <!-- Notes -->
@@ -757,8 +753,10 @@
                     document.getElementById('edit_chapter').value = publication.chapter || '';
                     document.getElementById('edit_editor').value = publication.editor || '';
                     document.getElementById('edit_keywords').value = publication.keywords || '';
-                    document.getElementById('edit_ref_url').value = publication.ref_url || '';
-                    document.getElementById('edit_url').value = publication.url || '';
+                    const refUrl = publication.ref_url || '';
+                    const isLocalFile = refUrl.startsWith('local:') || refUrl.includes('downloadFile');
+                    document.getElementById('edit_ref_url').value = isLocalFile ? refUrl : '';
+                    document.getElementById('edit_url').value = publication.url || (isLocalFile ? '' : refUrl);
                     document.getElementById('edit_notes').value = publication.notes || '';
 
                     // Clear and add authors
