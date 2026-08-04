@@ -582,7 +582,11 @@
             }
         });
         if (pub.ref_url && !pub.url) {
-            $('#url').val(pub.ref_url);
+            var ref = String(pub.ref_url);
+            var isLocalFile = ref.indexOf('local:') === 0 || ref.indexOf('downloadFile') !== -1;
+            if (!isLocalFile) {
+                $('#url').val(ref);
+            }
         }
         $('#ref_url').val(pub.ref_url || pub.url || '');
         if (pub.publication_type) {

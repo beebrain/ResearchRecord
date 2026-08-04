@@ -291,7 +291,7 @@ function removeAuthor(button) {
     const totalRows = $('.author-row').length;
     
     if (totalRows <= 1) {
-        showMessage('At least one author is required', 'error');
+        showMessage('ต้องมีผู้แต่งอย่างน้อย 1 คน', 'error');
         return;
     }
     
@@ -318,7 +318,7 @@ function updateAuthorNumbers() {
 
 function updateAuthorStatus() {
     const count = $('.author-row').length;
-    const text = count === 1 ? '1 author added' : `${count} authors added`;
+    const text = count === 1 ? 'เพิ่มผู้แต่งแล้ว 1 คน' : `เพิ่มผู้แต่งแล้ว ${count} คน`;
     $('#authorStatus').text(text);
 }
 
