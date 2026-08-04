@@ -22,7 +22,7 @@
     <link rel="stylesheet" href="<?= base_url('assets/css/admin-common.css') ?>">
 
     <!-- Publication Form Specific Styles -->
-    <link rel="stylesheet" href="<?= base_url('assets/css/publication-form.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/publication-form.css?v=' . (@filemtime(FCPATH . 'assets/css/publication-form.css') ?: time())) ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/author-search.css') ?>">
 
     <style>
@@ -429,28 +429,26 @@
                                 <input type="date" id="conference_date" name="conference_date"
                                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
                             </div>
-
-                            <!-- External URL (syncs to CV) -->
-                            <div class="md:col-span-2 lg:col-span-3 field-transition">
-                                <label for="url" class="block text-sm font-medium text-gray-700">
-                                    ลิงก์บทความภายนอก
-                                    <span class="font-normal text-gray-500">(แสดงปุ่ม「เว็บ」บน CV)</span>
-                                </label>
-                                <input type="url" id="url" name="url"
-                                    value="<?= esc((string) ($p['url'] ?? ''), 'attr') ?>"
-                                    placeholder="https://journal.example.com/article/123"
-                                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-                                <p class="mt-1 text-xs text-gray-500">ลิงก์ไปวารสาร สำนักพิมพ์ หรือ DOI — sync จาก กบศ. ไป CV วิทยาการ แยกจากไฟล์ที่อัปโหลด (ปุ่ม「ไฟล์」)</p>
-                            </div>
-
-                            </div>
                         </div>
                     </div>
 
+                    <!-- External URL (syncs to CV) -->
+                    <div class="form-section publication-link-section">
+                        <h3 class="section-title">ลิงก์บทความภายนอก</h3>
+                        <p class="section-description">ลิงก์ไปวารสาร สำนักพิมพ์ หรือ DOI — sync จาก กบศ. ไปปุ่ม「เว็บ」บน CV วิทยาการ (แยกจากไฟล์อัปโหลด ปุ่ม「ไฟล์」)</p>
+                        <label for="url" class="block text-sm font-medium text-gray-700 mb-2">
+                            URL บทความ
+                        </label>
+                        <input type="url" id="url" name="url"
+                            value="<?= esc((string) ($p['url'] ?? ''), 'attr') ?>"
+                            placeholder="https://journal.example.com/article/123"
+                            class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+
                     <!-- Authors Section -->
-                    <div class="authors-section">
-                        <div class="flex items-center justify-between mb-4">
-                            <label class="block text-sm font-medium text-gray-700">ผู้แต่ง/ผู้วิจัย *</label>
+                    <div class="form-section authors-section">
+                        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                            <h3 class="section-title mb-0">ผู้แต่ง/ผู้วิจัย *</h3>
                             <div class="flex items-center gap-3">
                                 <span id="authorStatus" class="text-sm text-gray-500">เพิ่มผู้แต่งแล้ว 1 คน</span>
                                 <button type="button" onclick="addAuthor()"
@@ -570,7 +568,7 @@
         const BASE_URL = '<?= rtrim(base_url(), '/') ?>';
         let authorCount = 1;
     </script>
-    <script src="<?= base_url('assets/js/publication-form.js') ?>"></script>
+    <script src="<?= base_url('assets/js/publication-form.js?v=' . (@filemtime(FCPATH . 'assets/js/publication-form.js') ?: time())) ?>"></script>
     <?php if ($isEdit): ?>
     <script>
     $(function () {
