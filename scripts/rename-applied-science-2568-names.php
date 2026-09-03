@@ -3,8 +3,8 @@
 /**
  * ONE-TIME: rename duplicate applied-science 2568 curricula to include degree in name.
  *
- *   id 113 SCMA01 master  → ... ป.โท 2568
- *   id 114 SCPH01 doctoral → ... ป.เอก 2568
+ *   id 113 SCMA01 master  → ... 2568 (ป.โท)
+ *   id 114 SCPH01 doctoral → ... 2568 (ป.เอก)
  *
  * Usage (win-kc):
  *   php scripts/rename-applied-science-2568-names.php --dry-run --pass=...
@@ -31,8 +31,8 @@ $m = new mysqli('localhost', 'rac', $pass, 'rac');
 $m->set_charset('utf8mb4');
 
 $updates = [
-    113 => 'สาขาวิชาวิทยาศาสตร์ประยุกต์ ป.โท 2568',
-    114 => 'สาขาวิชาวิทยาศาสตร์ประยุกต์ ป.เอก 2568',
+    113 => 'สาขาวิชาวิทยาศาสตร์ประยุกต์ 2568 (ป.โท)',
+    114 => 'สาขาวิชาวิทยาศาสตร์ประยุกต์ 2568 (ป.เอก)',
 ];
 
 foreach ($updates as $id => $newName) {
