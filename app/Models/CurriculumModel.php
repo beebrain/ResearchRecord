@@ -215,24 +215,32 @@ class CurriculumModel extends Model
      *
      * @return list<array<string,mixed>>
      */
-    public function searchActiveByNamePartial(string $name, ?int $facultyId = null, ?string $code = null): array
-    {
+    public function searchActiveByNamePartial(
+        string $name,
+        ?int $facultyId = null,
+        ?string $code = null,
+        ?string $degreeLevel = null
+    ): array {
         $name = trim($name);
         if ($name === '') {
             return [];
         }
 
-        $normalized = mb_strtolower($name);
-        $codeFilter = $code !== null && trim($code) !== '' ? trim($code) : null;
-        $db         = $this->db;
-        $select     = 'curriculum.*, faculties.name as faculty_name, faculties.code as faculty_code';
+        $normalized   = mb_strtolower($name);
+        $codeFilter   = $code !== null && trim($code) !== '' ? trim($code) : null;
+        $degreeFilter = self::normalizeDegreeLevelFilter($degreeLevel);
+        $db           = $this->db;
+        $select       = 'curriculum.*, faculties.name as faculty_name, faculties.code as faculty_code';
 
-        $applyFilters = static function ($builder) use ($facultyId, $codeFilter) {
+        $applyFilters = static function ($builder) use ($facultyId, $codeFilter, $degreeFilter) {
             if ($facultyId !== null && $facultyId > 0) {
                 $builder->where('curriculum.faculty_id', $facultyId);
             }
             if ($codeFilter !== null) {
                 $builder->where('curriculum.code', $codeFilter);
+            }
+            if ($degreeFilter !== null) {
+                $builder->where('curriculum.degree_level', $degreeFilter);
             }
 
             return $builder;
@@ -260,6 +268,38 @@ class CurriculumModel extends Model
         );
 
         return $partialBuilder->orderBy('curriculum.name', 'ASC')->get()->getResultArray();
+    }
+
+    /**
+     * Accept API values: master, doctoral, bachelor — or Thai labels ป.โท / ป.เอก / ป.ตรี.
+     */
+    public static function normalizeDegreeLevelFilter(?string $degreeLevel): ?string
+    {
+        if ($degreeLevel === null) {
+            return null;
+        }
+
+        $raw = mb_strtolower(trim($degreeLevel));
+        if ($raw === '') {
+            return null;
+        }
+
+        return match ($raw) {
+            'master', 'm', 'ป.โท', 'ปริญญาโท' => 'master',
+            'doctoral', 'doctorate', 'd', 'phd', 'ป.เอก', 'ปริญญาเอก' => 'doctoral',
+            'bachelor', 'b', 'ป.ตรี', 'ปริญญาตรี' => 'bachelor',
+            default => in_array($raw, ['master', 'doctoral', 'bachelor'], true) ? $raw : null,
+        };
+    }
+
+    public static function degreeLevelLabelTh(string $degreeLevel): string
+    {
+        return match ($degreeLevel) {
+            'master'   => 'ป.โท',
+            'doctoral' => 'ป.เอก',
+            'bachelor' => 'ป.ตรี',
+            default    => $degreeLevel,
+        };
     }
 
     /**

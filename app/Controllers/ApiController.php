@@ -597,6 +597,18 @@ class ApiController extends Controller
             $facultyId      = $this->request->getGet('faculty_id');
             $facultyId      = ($facultyId !== null && $facultyId !== '') ? (int) $facultyId : null;
             $curriculumCode = trim((string) ($this->request->getGet('curriculum_code') ?? ''));
+            $degreeLevelRaw = trim((string) ($this->request->getGet('degree_level') ?? ''));
+            $degreeLevel    = \App\Models\CurriculumModel::normalizeDegreeLevelFilter(
+                $degreeLevelRaw !== '' ? $degreeLevelRaw : null
+            );
+
+            if ($degreeLevelRaw !== '' && $degreeLevel === null) {
+                return $this->response->setStatusCode(400)->setJSON([
+                    'success' => false,
+                    'error'   => 'INVALID_PARAMETER',
+                    'message' => 'degree_level must be master, doctoral, bachelor (or ป.โท / ป.เอก / ป.ตรี)',
+                ]);
+            }
 
             if ($curriculumName === '') {
                 return $this->response->setStatusCode(400)->setJSON([
@@ -609,7 +621,8 @@ class ApiController extends Controller
             $matches = $this->curriculumModel->searchActiveByNamePartial(
                 $curriculumName,
                 $facultyId,
-                $curriculumCode !== '' ? $curriculumCode : null
+                $curriculumCode !== '' ? $curriculumCode : null,
+                $degreeLevel
             );
 
             if ($matches === []) {
@@ -622,20 +635,24 @@ class ApiController extends Controller
 
             if (count($matches) > 1) {
                 $candidates = array_map(static function (array $row): array {
+                    $level = (string) ($row['degree_level'] ?? '');
+
                     return [
-                        'id'           => (int) ($row['id'] ?? 0),
-                        'name'         => $row['name'] ?? '',
-                        'code'         => $row['code'] ?? '',
-                        'faculty_id'   => (int) ($row['faculty_id'] ?? 0),
-                        'faculty_name' => $row['faculty_name'] ?? '',
-                        'faculty_code' => $row['faculty_code'] ?? '',
+                        'id'                  => (int) ($row['id'] ?? 0),
+                        'name'                => $row['name'] ?? '',
+                        'code'                => $row['code'] ?? '',
+                        'degree_level'        => $level,
+                        'degree_level_label'  => \App\Models\CurriculumModel::degreeLevelLabelTh($level),
+                        'faculty_id'          => (int) ($row['faculty_id'] ?? 0),
+                        'faculty_name'        => $row['faculty_name'] ?? '',
+                        'faculty_code'        => $row['faculty_code'] ?? '',
                     ];
                 }, $matches);
 
                 return $this->response->setStatusCode(409)->setJSON([
                     'success'    => false,
                     'error'      => 'AMBIGUOUS_CURRICULUM',
-                    'message'    => 'Multiple curricula matched; pass faculty_id and/or curriculum_code to disambiguate',
+                    'message'    => 'Multiple curricula matched; pass faculty_id, degree_level (ป.โท/ป.เอก), and/or curriculum_code',
                     'candidates' => $candidates,
                 ]);
             }

@@ -23,6 +23,7 @@ final class CurriculumDetailApiTest extends CIUnitTestCase
         $params = $spec['paths']['/api/curriculum-detail-by-name']['get']['parameters'] ?? [];
         $paramNames = array_column($params, 'name');
         $this->assertContains('curriculum_code', $paramNames);
+        $this->assertContains('degree_level', $paramNames);
         $this->assertArrayHasKey('curriculumApiToken', $spec['components']['securitySchemes']);
         $this->assertArrayNotHasKey('apiKeyAuth', $spec['components']['securitySchemes']);
         $this->assertArrayNotHasKey('/api/public/publications-by-email', $spec['paths']);

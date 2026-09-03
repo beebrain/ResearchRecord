@@ -69,6 +69,13 @@ final class RrOpenApiSpec
                             'description' => 'รหัสหลักสูตร (code) — ใช้เมื่อชื่อและ faculty_id ซ้ำกัน เช่น SCMA01',
                             'schema'      => ['type' => 'string', 'example' => 'SCMA01'],
                         ],
+                        [
+                            'name'        => 'degree_level',
+                            'in'          => 'query',
+                            'required'    => false,
+                            'description' => 'ระดับปริญญา — master (ป.โท), doctoral (ป.เอก), bachelor (ป.ตรี)',
+                            'schema'      => ['type' => 'string', 'enum' => ['master', 'doctoral', 'bachelor'], 'example' => 'master'],
+                        ],
                     ],
                     'responses' => [
                         '200' => [
@@ -219,6 +226,8 @@ final class RrOpenApiSpec
                                             'id'           => ['type' => 'integer'],
                                             'name'         => ['type' => 'string'],
                                             'code'         => ['type' => 'string'],
+                                            'degree_level' => ['type' => 'string', 'example' => 'master'],
+                                            'degree_level_label' => ['type' => 'string', 'example' => 'ป.โท'],
                                             'faculty_id'   => ['type' => 'integer'],
                                             'faculty_name' => ['type' => 'string'],
                                             'faculty_code' => ['type' => 'string'],
