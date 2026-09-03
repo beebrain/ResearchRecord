@@ -20,6 +20,9 @@ final class CurriculumDetailApiTest extends CIUnitTestCase
 
         $this->assertSame('3.0.3', $spec['openapi']);
         $this->assertArrayHasKey('/api/curriculum-detail-by-name', $spec['paths']);
+        $params = $spec['paths']['/api/curriculum-detail-by-name']['get']['parameters'] ?? [];
+        $paramNames = array_column($params, 'name');
+        $this->assertContains('curriculum_code', $paramNames);
         $this->assertArrayHasKey('curriculumApiToken', $spec['components']['securitySchemes']);
         $this->assertArrayNotHasKey('apiKeyAuth', $spec['components']['securitySchemes']);
         $this->assertArrayNotHasKey('/api/public/publications-by-email', $spec['paths']);

@@ -86,6 +86,7 @@ GET {baseURL}/api/curriculum-detail-by-name
 |-----------|--------|----------|
 | `curriculum_name` | **ใช่** | ชื่อหลักสูตร — ค้นหาแบบ **exact ก่อน** แล้ว **partial** (`LIKE %name%`) |
 | `faculty_id` | ไม่ | รหัสคณะ — ใช้เมื่อชื่อหลักสูตรซ้ำหลายคณะ |
+| `curriculum_code` | ไม่ | รหัสหลักสูตร (`code`) — ใช้เมื่อชื่อและ `faculty_id` ซ้ำกันภายในคณะเดียวกัน |
 
 ---
 

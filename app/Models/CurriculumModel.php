@@ -215,7 +215,7 @@ class CurriculumModel extends Model
      *
      * @return list<array<string,mixed>>
      */
-    public function searchActiveByNamePartial(string $name, ?int $facultyId = null): array
+    public function searchActiveByNamePartial(string $name, ?int $facultyId = null, ?string $code = null): array
     {
         $name = trim($name);
         if ($name === '') {
@@ -223,18 +223,22 @@ class CurriculumModel extends Model
         }
 
         $normalized = mb_strtolower($name);
+        $codeFilter = $code !== null && trim($code) !== '' ? trim($code) : null;
         $db         = $this->db;
         $select     = 'curriculum.*, faculties.name as faculty_name, faculties.code as faculty_code';
 
-        $applyFacultyFilter = static function ($builder) use ($facultyId) {
+        $applyFilters = static function ($builder) use ($facultyId, $codeFilter) {
             if ($facultyId !== null && $facultyId > 0) {
                 $builder->where('curriculum.faculty_id', $facultyId);
+            }
+            if ($codeFilter !== null) {
+                $builder->where('curriculum.code', $codeFilter);
             }
 
             return $builder;
         };
 
-        $exactBuilder = $applyFacultyFilter(
+        $exactBuilder = $applyFilters(
             $db->table('curriculum')
                 ->select($select)
                 ->join('faculties', 'faculties.id = curriculum.faculty_id')
@@ -247,7 +251,7 @@ class CurriculumModel extends Model
             return $exact;
         }
 
-        $partialBuilder = $applyFacultyFilter(
+        $partialBuilder = $applyFilters(
             $db->table('curriculum')
                 ->select($select)
                 ->join('faculties', 'faculties.id = curriculum.faculty_id')

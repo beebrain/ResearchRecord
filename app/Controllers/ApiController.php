@@ -596,6 +596,7 @@ class ApiController extends Controller
             $curriculumName = trim((string) ($this->request->getGet('curriculum_name') ?? ''));
             $facultyId      = $this->request->getGet('faculty_id');
             $facultyId      = ($facultyId !== null && $facultyId !== '') ? (int) $facultyId : null;
+            $curriculumCode = trim((string) ($this->request->getGet('curriculum_code') ?? ''));
 
             if ($curriculumName === '') {
                 return $this->response->setStatusCode(400)->setJSON([
@@ -605,7 +606,11 @@ class ApiController extends Controller
                 ]);
             }
 
-            $matches = $this->curriculumModel->searchActiveByNamePartial($curriculumName, $facultyId);
+            $matches = $this->curriculumModel->searchActiveByNamePartial(
+                $curriculumName,
+                $facultyId,
+                $curriculumCode !== '' ? $curriculumCode : null
+            );
 
             if ($matches === []) {
                 return $this->response->setStatusCode(404)->setJSON([
@@ -630,7 +635,7 @@ class ApiController extends Controller
                 return $this->response->setStatusCode(409)->setJSON([
                     'success'    => false,
                     'error'      => 'AMBIGUOUS_CURRICULUM',
-                    'message'    => 'Multiple curricula matched; pass faculty_id to disambiguate',
+                    'message'    => 'Multiple curricula matched; pass faculty_id and/or curriculum_code to disambiguate',
                     'candidates' => $candidates,
                 ]);
             }

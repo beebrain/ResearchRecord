@@ -59,8 +59,15 @@ final class RrOpenApiSpec
                             'name'        => 'faculty_id',
                             'in'          => 'query',
                             'required'    => false,
-                            'description' => 'กรองคณะเมื่อชื่อหลักสูตรซ้ำ (ใช้หลังได้ 409)',
+                            'description' => 'กรองคณะเมื่อชื่อหลักสูตรซ้ำหลายคณะ (ใช้หลังได้ 409)',
                             'schema'      => ['type' => 'integer', 'example' => 3],
+                        ],
+                        [
+                            'name'        => 'curriculum_code',
+                            'in'          => 'query',
+                            'required'    => false,
+                            'description' => 'รหัสหลักสูตร (code) — ใช้เมื่อชื่อและ faculty_id ซ้ำกัน เช่น SCMA01',
+                            'schema'      => ['type' => 'string', 'example' => 'SCMA01'],
                         ],
                     ],
                     'responses' => [
