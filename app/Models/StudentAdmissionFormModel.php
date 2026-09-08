@@ -509,39 +509,53 @@ class StudentAdmissionFormModel extends Model
     }
 
     /**
-     * Create forms for all curricula for a new academic year
-     * Called when a new year starts to auto-generate forms
+     * Active curricula that do not yet have an admission form for the year.
+     * $facultyIds = null means all faculties; empty array means none.
      */
-    public function createFormsForNewYear(int $year, ?array $facultyIds = null)
+    public function getCurriculaWithoutForms(int $year, ?array $facultyIds = null): array
     {
+        if ($facultyIds !== null && $facultyIds === []) {
+            return [];
+        }
+
         $db = \Config\Database::connect();
-        $curriculumModel = new CurriculumModel();
-
-        // Get all active curricula (optionally filtered by faculty)
         $builder = $db->table('curriculum')
-            ->select('curriculum.id as curriculum_id, curriculum.name, curriculum.faculty_id')
-            ->where('curriculum.status', 1);
+            ->select('curriculum.id as curriculum_id, curriculum.name, curriculum.faculty_id, faculties.name as faculty_name')
+            ->join('faculties', 'faculties.id = curriculum.faculty_id', 'left')
+            ->join(
+                'student_admission_forms saf',
+                'saf.curriculum_id = curriculum.id AND saf.academic_year = ' . (int) $year,
+                'left'
+            )
+            ->where('curriculum.status', 1)
+            ->where('saf.id', null)
+            ->orderBy('faculties.name', 'ASC')
+            ->orderBy('curriculum.name', 'ASC');
 
-        if ($facultyIds && !empty($facultyIds)) {
+        if ($facultyIds !== null) {
             $builder->whereIn('curriculum.faculty_id', $facultyIds);
         }
 
-        $curricula = $builder->get()->getResultArray();
+        return $builder->get()->getResultArray();
+    }
+
+    /**
+     * Create forms for active curricula that do not yet have a form for the year.
+     */
+    public function createFormsForNewYear(int $year, ?array $facultyIds = null)
+    {
+        $curricula = $this->getCurriculaWithoutForms($year, $facultyIds);
 
         $createdCount = 0;
         foreach ($curricula as $curr) {
-            // Check if form already exists
-            $existing = $this->getFormByCurriculumAndYear($curr['curriculum_id'], $year);
-            if (!$existing) {
-                $this->insert([
-                    'academic_year' => $year,
-                    'curriculum_id' => $curr['curriculum_id'],
-                    'faculty_id' => $curr['faculty_id'],
-                    'curriculum_name' => $curr['name'],
-                    'status' => 'draft'
-                ]);
-                $createdCount++;
-            }
+            $this->insert([
+                'academic_year' => $year,
+                'curriculum_id' => $curr['curriculum_id'],
+                'faculty_id' => $curr['faculty_id'],
+                'curriculum_name' => $curr['name'],
+                'status' => 'draft'
+            ]);
+            $createdCount++;
         }
 
         return $createdCount;

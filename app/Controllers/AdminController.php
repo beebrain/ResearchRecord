@@ -3565,33 +3565,58 @@ class AdminController extends Controller
     }
 
     /**
+     * Preview curricula that would get a new admission form for the year.
+     */
+    public function admissionGeneratePreview()
+    {
+        try {
+            $year = $this->admissionGenerateYear();
+            if ($year === null) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'กรุณากรอกปีการศึกษาที่ถูกต้อง'
+                ]);
+            }
+
+            $admissionModel = new \App\Models\StudentAdmissionFormModel();
+            $curricula = $admissionModel->getCurriculaWithoutForms(
+                $year,
+                $this->admissionGenerateFacultyScope($this->currentAdmissionUser())
+            );
+
+            return $this->response->setJSON([
+                'success' => true,
+                'year' => $year,
+                'curricula' => $curricula
+            ]);
+        } catch (\Exception $e) {
+            log_message('error', 'Admission generate preview error: ' . $e->getMessage());
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
      * Generate admission forms for a new academic year
      */
     public function admissionGenerate()
     {
         try {
-            $input = $this->request->getJSON(true);
-            $year = $input['year'] ?? null;
-
-            if (!$year || $year < 2500 || $year > 2600) {
+            $year = $this->admissionGenerateYear();
+            if ($year === null) {
                 return $this->response->setJSON([
                     'success' => false,
-                    'message' => 'Invalid year'
+                    'message' => 'กรุณากรอกปีการศึกษาที่ถูกต้อง'
                 ]);
             }
 
             $admissionModel = new \App\Models\StudentAdmissionFormModel();
-
-            // Get user's managed faculties if faculty admin
-            $userData = $this->session->get('user_data');
-            $user = $this->userModel->find(UserIdentity::sessionEmail() ?: ($userData['email'] ?? ''));
-
-            $facultyIds = null;
-            if (RoleHelper::isFacultyAdmin($user) && !$this->session->get('god_mode')) {
-                $facultyIds = RoleHelper::getManagedFaculties($user);
-            }
-
-            $count = $admissionModel->createFormsForNewYear($year, $facultyIds);
+            $count = $admissionModel->createFormsForNewYear(
+                $year,
+                $this->admissionGenerateFacultyScope($this->currentAdmissionUser())
+            );
 
             return $this->response->setJSON([
                 'success' => true,
@@ -3605,6 +3630,27 @@ class AdminController extends Controller
                 'message' => 'Error: ' . $e->getMessage()
             ]);
         }
+    }
+
+    private function admissionGenerateYear(): ?int
+    {
+        $input = $this->request->getJSON(true) ?? [];
+        $year = (int) ($input['year'] ?? 0);
+
+        if ($year < 2500 || $year > 2600) {
+            return null;
+        }
+
+        return $year;
+    }
+
+    private function admissionGenerateFacultyScope(?array $user): ?array
+    {
+        if ($user && RoleHelper::isFacultyAdmin($user) && !$this->session->get('god_mode')) {
+            return RoleHelper::getManagedFaculties($user);
+        }
+
+        return null;
     }
 
     /**

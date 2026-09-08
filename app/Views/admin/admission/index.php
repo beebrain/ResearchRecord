@@ -618,7 +618,7 @@
                 inputLabel: 'ปีการศึกษา (พ.ศ.)',
                 inputValue: currentYear + 1,
                 showCancelButton: true,
-                confirmButtonText: 'สร้าง',
+                confirmButtonText: 'ดูรายชื่อสาขา',
                 cancelButtonText: 'ยกเลิก',
                 inputValidator: (value) => {
                     if (!value || value < 2500 || value > 2600) {
@@ -627,28 +627,86 @@
                 }
             });
 
-            if (year) {
-                $.ajax({
-                    url: appRoute('admin/admission/generate'),
+            if (!year) {
+                return;
+            }
+
+            Swal.fire({
+                title: 'กำลังตรวจสอบสาขาที่ยังไม่มีแบบฟอร์ม...',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
+
+            let preview;
+            try {
+                preview = await $.ajax({
+                    url: appRoute('admin/admission/generate-preview'),
                     type: 'POST',
                     contentType: 'application/json',
                     data: JSON.stringify({
-                        year: year
-                    }),
-                    success: function(result) {
-                        if (result.success) {
-                            Swal.fire('สำเร็จ!', `สร้างแบบฟอร์ม ${result.count} รายการ`, 'success').then(() => {
-                                window.location.href = appRoute('admin/admission/' + year);
-                            });
-                        } else {
-                            Swal.fire('ผิดพลาด', result.message, 'error');
-                        }
-                    },
-                    error: function() {
-                        Swal.fire('ผิดพลาด', 'ไม่สามารถสร้างแบบฟอร์มได้', 'error');
-                    }
+                        year: parseInt(year, 10)
+                    })
                 });
+            } catch (e) {
+                Swal.fire('ผิดพลาด', 'ไม่สามารถตรวจสอบรายชื่อสาขาได้', 'error');
+                return;
             }
+
+            if (!preview.success) {
+                Swal.fire('ผิดพลาด', preview.message || 'ไม่สามารถตรวจสอบรายชื่อสาขาได้', 'error');
+                return;
+            }
+
+            const curricula = preview.curricula || [];
+            if (curricula.length === 0) {
+                Swal.fire({
+                    icon: 'info',
+                    title: 'ไม่ต้องสร้างเพิ่ม',
+                    text: `ปีการศึกษา ${year} มีแบบฟอร์มครบทุกสาขาแล้ว`
+                });
+                return;
+            }
+
+            const listHtml = curricula.map((c) => {
+                const faculty = escapeHtml(c.faculty_name || '-');
+                const name = escapeHtml(c.name || '-');
+                return `<li class="py-0.5"><span class="text-gray-500">${faculty}</span> — ${name}</li>`;
+            }).join('');
+
+            const confirmed = await Swal.fire({
+                title: 'ยืนยันการสร้างแบบฟอร์ม',
+                html: `<p class="text-left mb-3">สร้างแบบฟอร์มเฉพาะสาขาต่อไปนี้ <strong>${curricula.length} สาขา</strong> ประจำปีการศึกษา ${escapeHtml(year)}</p>
+                       <ul class="text-left max-h-72 overflow-y-auto pl-5 list-disc text-sm">${listHtml}</ul>`,
+                width: 640,
+                showCancelButton: true,
+                confirmButtonText: 'สร้างแบบฟอร์ม',
+                cancelButtonText: 'ยกเลิก'
+            });
+
+            if (!confirmed.isConfirmed) {
+                return;
+            }
+
+            $.ajax({
+                url: appRoute('admin/admission/generate'),
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    year: parseInt(year, 10)
+                }),
+                success: function(result) {
+                    if (result.success) {
+                        Swal.fire('สำเร็จ!', `สร้างแบบฟอร์ม ${result.count} รายการ`, 'success').then(() => {
+                            window.location.href = appRoute('admin/admission/' + year);
+                        });
+                    } else {
+                        Swal.fire('ผิดพลาด', result.message, 'error');
+                    }
+                },
+                error: function() {
+                    Swal.fire('ผิดพลาด', 'ไม่สามารถสร้างแบบฟอร์มได้', 'error');
+                }
+            });
         }
 
         function openEditModal(id) {
