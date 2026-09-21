@@ -12,13 +12,25 @@ use CodeIgniter\HTTP\ResponseInterface;
 class ApiDocsController extends Controller
 {
     /**
-     * Swagger UI — GET /api/docs
+     * Swagger UI — GET /docs
      */
     public function index()
     {
         return view('api_docs/swagger', [
             'title'   => 'Research Record API',
             'specUrl' => site_url('api/openapi.json'),
+        ]);
+    }
+
+    /**
+     * Browser test page for curriculum-detail-by-name — GET /docs/curriculum-test
+     * Encodes Thai query params via URLSearchParams (avoids raw-UTF-8 curl pitfalls).
+     */
+    public function curriculumTest()
+    {
+        return view('api_docs/curriculum_test', [
+            'title'  => 'ทดสอบ Curriculum API',
+            'apiUrl' => site_url('api/curriculum-detail-by-name'),
         ]);
     }
 

@@ -13,6 +13,17 @@ class DevController extends Controller
 {
     public function login()
     {
+        return $this->establishDevSession(false);
+    }
+
+    /** God-mode admin session (for index.php?/dev/god — no &query params). */
+    public function godLogin()
+    {
+        return $this->establishDevSession(true);
+    }
+
+    private function establishDevSession(bool $asGod)
+    {
         helper(['url', 'app_redirect']);
 
         if (ENVIRONMENT !== 'development') {
@@ -32,7 +43,8 @@ class DevController extends Controller
         }
 
         if (! $user) {
-            $user = $userModel->where('active', 1)->where('admin', 1)->first()
+            $user = $userModel->where('active', 1)->where('role', 'super_admin')->first()
+                ?? $userModel->where('active', 1)->where('admin', 1)->first()
                 ?? $userModel->where('active', 1)->first();
         }
 
@@ -40,7 +52,6 @@ class DevController extends Controller
             return redirect()->to('/auth/login')->with('error', 'Dev login: no active user in database.');
         }
 
-        $asGod = $this->request->getGet('god') === '1';
         UserIdentity::establishLoginSession($user, [
             'login_method' => 'dev',
             'god_mode'     => $asGod,

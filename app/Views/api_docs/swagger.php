@@ -23,6 +23,7 @@
 <div class="rr-docs-banner">
     <strong>Research Record API Docs</strong>
     — กด <strong>Authorize</strong> แล้วใส่ <code>CURRICULUM_API_TOKEN</code> จาก <code>.env</code> (header <code>X-Curriculum-Api-Token</code>).
+    · <a href="<?= esc(site_url('docs/curriculum-test')) ?>">หน้าทดสอบ Curriculum API</a>
 </div>
 <div id="swagger-ui"></div>
 <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.18.2/swagger-ui-bundle.js" crossorigin></script>

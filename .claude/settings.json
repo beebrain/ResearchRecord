@@ -17,7 +17,16 @@
       "Bash(curl -s -o /dev/null -D - -w \"HTTP %{http_code}\\\\n\" \"http://localhost/ResearchRecord/public/index.php/admin/admission/pdf-summary/1\")",
       "Bash(grep -n 'group\\('\\\\''admin'\\\\''\\\\|group\\(\"admin\"\\\\|$routes->group\\\\|filter' app/Config/Routes.php)",
       "Bash(WIN_KC_PASS=admin@SCI@URU sshpass -e ssh -F /dev/null -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/Users/boobee/.ssh/known_hosts -o PubkeyAuthentication=no -o PreferredAuthentications=password -o 'ProxyCommand=tailscale nc %h 22' -o ConnectTimeout=30 Administrator@100.74.66.65 'cd /d C:\\\\inetpub\\\\ResearchRecord && git rev-parse --short HEAD && findstr /C:\"pdf-download\" app\\\\Config\\\\Routes.php')",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(git --no-pager diff app/Controllers/DashboardController.php)",
+      "Bash(git --no-pager diff public/assets/js/publication-ai.js)",
+      "Bash(git --no-pager diff -- app/Config/N8n.php)",
+      "Bash(git config *)",
+      "Bash(git --no-pager diff)",
+      "Bash(curl -sS --max-time 20 \"https://sci.uru.ac.th/recordresearch/assets/js/publication-ai.js\")",
+      "Bash(' app/Database/ 2>/dev/null *)",
+      "Bash(grep -rln 'CREATE.*VIEW.*publication_view\\\\|publication_view AS\\\\|publication_view__CMDSUB_OUTPUT__')",
+      "Bash(php -l app/Models/StudentAdmissionFormModel.php)"
     ]
   }
 }

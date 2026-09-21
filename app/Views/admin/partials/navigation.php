@@ -132,6 +132,11 @@ $currentUri = service('uri')->getPath();
                     🎓 หลักสูตรของผู้ใช้
                 </a>
 
+                <a href="<?= site_url('admin/teacher-capacity') ?>"
+                    class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'teacher-capacity') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
+                    📈 ศักยภาพอาจารย์
+                </a>
+
                 <a href="<?= site_url('admin/faculty-curriculum') ?>"
                     class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'faculty-curriculum') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
                     🏛️ คณะและหลักสูตร
@@ -172,6 +177,11 @@ $currentUri = service('uri')->getPath();
                 <a href="<?= site_url('admin/manage-user-curriculum') ?>"
                     class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'manage-user-curriculum') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
                     🎓 หลักสูตรของผู้ใช้
+                </a>
+
+                <a href="<?= site_url('admin/teacher-capacity') ?>"
+                    class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'teacher-capacity') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
+                    📈 ศักยภาพอาจารย์
                 </a>
 
                 <a href="<?= site_url('admin/admission') ?>"

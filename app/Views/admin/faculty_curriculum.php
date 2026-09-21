@@ -218,6 +218,14 @@
                         <option value="doctoral">ปริญญาเอก</option>
                     </select>
                 </div>
+                <div class="mb-4">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="curriculumMultidisciplinary" name="is_multidisciplinary"
+                            class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                        <span class="ml-2 text-sm text-gray-700">หลักสูตรพหุสาขา</span>
+                    </label>
+                    <p class="text-xs text-gray-500 mt-1 ml-6">ติ๊กเมื่อหลักสูตรนี้เป็นพหุสาขา — จะแสดงเป็น ชื่อหลักสูตร (พหุสาขา)</p>
+                </div>
                 <div class="mb-6">
                     <label class="flex items-center">
                         <input type="checkbox" id="curriculumStatus" name="status" checked

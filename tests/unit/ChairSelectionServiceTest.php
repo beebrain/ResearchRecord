@@ -62,6 +62,15 @@ final class ChairSelectionServiceTest extends CIUnitTestCase
         $this->assertSame([], $result['warnings']);
     }
 
+    public function testCoordinatorQuotaAllowsOneRegularAndOneMultidisciplinary(): void
+    {
+        $this->assertTrue(ChairSelectionService::coordinatorQuotaAllows(false, 0, 0));
+        $this->assertTrue(ChairSelectionService::coordinatorQuotaAllows(true, 1, 0));
+        $this->assertFalse(ChairSelectionService::coordinatorQuotaAllows(false, 1, 0));
+        $this->assertFalse(ChairSelectionService::coordinatorQuotaAllows(true, 0, 1));
+        $this->assertFalse(ChairSelectionService::coordinatorQuotaAllows(true, 1, 1));
+    }
+
     public function testSearchTeachersReturnsEmptyWhenQueryTooShort(): void
     {
         $this->assertSame([], $this->service->searchTeachers('ก', 1));

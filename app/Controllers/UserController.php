@@ -120,13 +120,16 @@ class UserController extends Controller
                 ]);
             }
 
-            // Assign curriculum using teacher_curriculum table
-            // Set as primary curriculum and mark others as non-primary
+            $role = (string) ($this->request->getPost('role') ?: 'coordinator');
+            if (! in_array($role, ['instructor', 'coordinator', 'assistant'], true)) {
+                $role = 'instructor';
+            }
+
             $assigned = $this->userModel->assignTeacherToCurriculum(
                 $userId,
                 $curriculumId,
-                'instructor', // default role
-                true // set as primary
+                $role,
+                true
             );
 
             // Also update legacy user.curriculum_id for backward compatibility
@@ -143,6 +146,11 @@ class UserController extends Controller
             return $this->response->setJSON([
                 'success' => false,
                 'message' => 'Failed to update user curriculum'
+            ]);
+        } catch (\RuntimeException $e) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => $e->getMessage(),
             ]);
         } catch (\Exception $e) {
             log_message('error', 'Update user curriculum error: ' . $e->getMessage());

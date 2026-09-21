@@ -778,9 +778,9 @@ class ApiController extends Controller
         }
 
         return match ($role) {
-            'coordinator' => 'ผู้ประสานงานหลักสูตร',
+            'coordinator' => 'ผู้รับผิดชอบหลักสูตร',
             'assistant'   => 'ผู้ช่วยผู้รับผิดชอบหลักสูตร',
-            default       => 'อาจารย์ผู้รับผิดชอบหลักสูตร',
+            default       => 'อาจารย์ประจำหลักสูตร',
         };
     }
 

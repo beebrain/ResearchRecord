@@ -447,7 +447,7 @@ class UserModel extends Model
      * @param bool $isPrimary Whether this is the primary curriculum
      * @return bool Success status
      */
-    public function assignTeacherToCurriculum(string $teacherEmail, $curriculumId, $role = 'instructor', $isPrimary = false)
+    public function assignTeacherToCurriculum(string $teacherEmail, $curriculumId, $role = 'coordinator', $isPrimary = false)
     {
         $teacherEmail = \App\Libraries\UserIdentity::normalizeEmail($teacherEmail);
         $builder      = $this->db->table('teacher_curriculum');
@@ -457,6 +457,14 @@ class UserModel extends Model
             ->where('curriculum_id', $curriculumId)
             ->get()
             ->getRowArray();
+
+        if ($role === 'coordinator') {
+            $quota = (new \App\Services\ChairSelectionService($this->db))
+                ->getCoordinatorAssignmentConflicts($teacherEmail, (int) $curriculumId);
+            if (! $quota['allowed']) {
+                throw new \RuntimeException($quota['message']);
+            }
+        }
 
         if ($existing) {
             // Update existing assignment
@@ -543,7 +551,7 @@ class UserModel extends Model
     }
 
     /**
-     * อาจารย์ผู้รับผิดชอบหลักสูตร (สูงสุด 5 คน) จาก teacher_curriculum + ประธานหลักสูตร
+     * อาจารย์ในหลักสูตรจาก teacher_curriculum (ประธานไม่ถูกเติมอัตโนมัติ)
      *
      * @return list<array<string,mixed>>
      */
@@ -568,33 +576,7 @@ class UserModel extends Model
             ->get()
             ->getResultArray();
 
-        $chairInList = false;
-        if ($chairEmail !== null) {
-            foreach ($rows as $row) {
-                if (\App\Libraries\UserIdentity::normalizeEmail((string) ($row['email'] ?? '')) === $chairEmail) {
-                    $chairInList = true;
-                    break;
-                }
-            }
-
-            if (! $chairInList) {
-                $chair = $this->find($chairEmail);
-                if (is_array($chair) && (int) ($chair['active'] ?? 0) === 1) {
-                    array_unshift($rows, [
-                        'email'         => $chair['email'],
-                        'title'         => $chair['title'] ?? '',
-                        'titleThai'     => $chair['titleThai'] ?? '',
-                        'gf_name'       => $chair['gf_name'] ?? '',
-                        'gl_name'       => $chair['gl_name'] ?? '',
-                        'thai_name'     => $chair['thai_name'] ?? '',
-                        'thai_lastname' => $chair['thai_lastname'] ?? '',
-                        'faculty_id'    => $chair['faculty_id'] ?? null,
-                        'role'          => 'chair',
-                        'is_primary'    => 1,
-                    ]);
-                }
-            }
-        }
+        // ประธานหลักสูตรไม่ถูกดึงเข้าผู้รับผิดชอบอัตโนมัติ — แสดงเฉพาะคนที่อยู่ใน teacher_curriculum
 
         $roleOrder = ['chair' => 0, 'coordinator' => 1, 'instructor' => 2, 'assistant' => 3];
 

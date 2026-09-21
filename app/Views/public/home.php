@@ -184,7 +184,7 @@
                                         <div class="flex items-start justify-between gap-3">
                                             <div class="min-w-0">
                                                 <div class="font-medium text-slate-900 group-hover:text-indigo-700 truncate">
-                                                    <?= esc($c['name'] ?? '') ?>
+                                                    <?= esc($c['display_name'] ?? $c['name'] ?? '') ?>
                                                 </div>
                                         <div class="mt-2 text-xs text-slate-600">
                                                     <span class="inline-flex items-center gap-2">
@@ -231,7 +231,7 @@
                         'curriculums' => array_map(static function ($c) {
                             return [
                                 'id' => (int) ($c['id'] ?? 0),
-                                'name' => (string) ($c['name'] ?? ''),
+                                'name' => (string) ($c['display_name'] ?? $c['name'] ?? ''),
                                 'code' => (string) ($c['code'] ?? ''),
                                 'degree_level' => (string) ($c['degree_level'] ?? ''),
                             ];
@@ -381,7 +381,7 @@
                             var badge = (role === 'chair') ? 'ประธานหลักสูตร'
                                 : (role === 'coordinator') ? 'ผู้รับผิดชอบหลักสูตร'
                                 : (role === 'assistant') ? 'ผู้ช่วยผู้รับผิดชอบ'
-                                : 'อาจารย์';
+                                : 'อาจารย์ประจำหลักสูตร';
                             return (
                                 '<button type="button" class="teacher-pill w-full text-left rounded-xl border border-slate-200 px-4 py-3 hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600" data-teacher-email="' + esc(t.email || '') + '" data-teacher-name="' + esc(name) + '" aria-pressed="false">' +
                                     '<div class="flex items-start justify-between gap-3">' +

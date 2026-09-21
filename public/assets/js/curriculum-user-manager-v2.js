@@ -10,11 +10,53 @@ let curriculums = [];
 let faculties = [];
 let searchTimeout = null;
 
+/** Keep expanded curriculum cards open across re-renders after assign/remove. */
+const expandedCurriculumIds = new Set();
+
+function isCurriculumExpanded(curriculumId) {
+    return expandedCurriculumIds.has(String(curriculumId));
+}
+
+function toggleCurriculumExpanded(curriculumId, forceOpen) {
+    const key = String(curriculumId);
+    const open = forceOpen === true ? true : forceOpen === false ? false : !expandedCurriculumIds.has(key);
+    if (open) {
+        expandedCurriculumIds.add(key);
+    } else {
+        expandedCurriculumIds.delete(key);
+    }
+    const card = document.querySelector(`.curriculum-card[data-curriculum-id="${key}"]`);
+    if (card) {
+        card.classList.toggle('is-expanded', open);
+        const header = card.querySelector('.curriculum-card-header');
+        if (header) {
+            header.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+    }
+    return open;
+}
+
+function roleLabelTh(role) {
+    if (role === 'coordinator') return 'ผู้รับผิดชอบ';
+    if (role === 'assistant') return 'ผู้ช่วย';
+    return 'อาจารย์ประจำ';
+}
+
+/**
+ * Normalize member identity: email preferred (PK), legacy uid fallback.
+ */
+function memberIdentity(member) {
+    const email = (member.email || member.teacher_email || '').toString().trim();
+    if (email.includes('@')) {
+        return email;
+    }
+    return member.teacher_uid || member.uid || member.user_id || member.id || null;
+}
+
 // Make function globally available for onclick
 window.removecurrilumn = function (uid, curriculumId, buttonElement) {
     console.log('removecurrilumn called', { uid, curriculumId, buttonElement });
 
-    // Get values from button data attributes if parameters are null/undefined
     let actualUid = uid;
     let actualCurriculumId = curriculumId;
     let userName = 'ผู้ใช้';
@@ -22,50 +64,40 @@ window.removecurrilumn = function (uid, curriculumId, buttonElement) {
 
     if (buttonElement) {
         const $button = $(buttonElement);
-        // Try to get from data attributes if parameters are null/undefined/invalid
         if (!actualUid || actualUid === 'null' || actualUid === null) {
             actualUid = $button.data('user-id') || $button.attr('data-user-id') || null;
         }
         if (!actualCurriculumId || actualCurriculumId === 'null' || actualCurriculumId === null) {
             actualCurriculumId = $button.data('curriculum-id') || $button.attr('data-curriculum-id') || null;
         }
-
-        // Get user name and curriculum name for confirmation from button
         userName = $button.data('user-name') || $button.attr('data-user-name') || 'ผู้ใช้';
         curriculumName = $button.data('curriculum-name') || $button.attr('data-curriculum-name') || 'หลักสูตร';
     }
 
-    // Validate that we have both IDs
     if (!actualUid || !actualCurriculumId || actualUid === 'null' || actualCurriculumId === 'null') {
-        console.error('Missing uid or curriculum_id', { actualUid, actualCurriculumId, originalUid: uid, originalCurriculumId: curriculumId });
-        Swal.fire({
-            title: 'เกิดข้อผิดพลาด!',
-            text: 'ไม่พบข้อมูลผู้ใช้หรือหลักสูตร',
-            icon: 'error',
-            confirmButtonText: 'ตกลง'
-        });
+        showError('ไม่พบข้อมูลผู้ใช้หรือหลักสูตร');
         return;
     }
 
-    // Convert to numbers if they're strings
-    actualUid = parseInt(actualUid);
-    actualCurriculumId = parseInt(actualCurriculumId);
-
-    if (isNaN(actualUid) || isNaN(actualCurriculumId)) {
-        console.error('Invalid uid or curriculum_id', { actualUid, actualCurriculumId });
-        Swal.fire({
-            title: 'เกิดข้อผิดพลาด!',
-            text: 'ข้อมูลผู้ใช้หรือหลักสูตรไม่ถูกต้อง',
-            icon: 'error',
-            confirmButtonText: 'ตกลง'
-        });
+    // Email PK: do not parseInt emails. Curriculum id is numeric.
+    const uidStr = String(actualUid);
+    if (!uidStr.includes('@')) {
+        const asNum = parseInt(uidStr, 10);
+        if (!isNaN(asNum)) {
+            actualUid = asNum;
+        }
+    } else {
+        actualUid = uidStr;
+    }
+    actualCurriculumId = parseInt(actualCurriculumId, 10);
+    if (isNaN(actualCurriculumId)) {
+        showError('ข้อมูลหลักสูตรไม่ถูกต้อง');
         return;
     }
 
-    // Confirm before removing using SweetAlert2
     Swal.fire({
         title: 'ยืนยันการลบ',
-        html: `คุณต้องการนำ <strong>"${userName}"</strong> ออกจากหลักสูตร <strong>"${curriculumName}"</strong> ใช่หรือไม่?`,
+        html: `คุณต้องการนำ <strong>"${escapeHtml(userName)}"</strong> ออกจากหลักสูตร <strong>"${escapeHtml(curriculumName)}"</strong> ใช่หรือไม่?`,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
@@ -74,63 +106,34 @@ window.removecurrilumn = function (uid, curriculumId, buttonElement) {
         cancelButtonText: 'ยกเลิก',
         reverseButtons: true
     }).then((result) => {
-        if (result.isConfirmed) {
-            console.log('Sending remove request via jQuery AJAX...', { uid, curriculumId });
-
-            // Use jQuery AJAX
-            $.ajax({
-                url: appRoute('user/removeFromCurriculum'),
-                type: 'POST',
-                dataType: 'json',
-                data: {
-                    user_id: actualUid,
-                    curriculum_id: actualCurriculumId
-                },
-                beforeSend: function (xhr) {
-                    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-                },
-                success: function (result) {
-                    console.log('Response data:', result);
-
-                    if (result.success) {
-                        // Reload data to reflect changes
-                        loadUsers(
-                            $('#user-search').val() || '',
-                            $('#user-faculty-filter').val() || 'all'
-                        );
-                        loadCurriculums($('#curriculum-faculty-filter').val() || 'all');
-
-                        // Show success message using SweetAlert2
-                        Swal.fire({
-                            title: 'สำเร็จ!',
-                            text: `นำ "${userName}" ออกจากหลักสูตร "${curriculumName}" สำเร็จ`,
-                            icon: 'success',
-                            confirmButtonText: 'ตกลง',
-                            timer: 2000,
-                            timerProgressBar: true
-                        });
-                    } else {
-                        // Show error message using SweetAlert2
-                        Swal.fire({
-                            title: 'เกิดข้อผิดพลาด!',
-                            text: 'ไม่สามารถนำผู้ใช้ออกจากหลักสูตรได้: ' + (result.message || 'Unknown error'),
-                            icon: 'error',
-                            confirmButtonText: 'ตกลง'
-                        });
-                    }
-                },
-                error: function (xhr, status, error) {
-                    console.error('Error removing user from curriculum:', { xhr, status, error });
-                    // Show error message using SweetAlert2
-                    Swal.fire({
-                        title: 'เกิดข้อผิดพลาด!',
-                        text: 'เกิดข้อผิดพลาดในการนำผู้ใช้ออกจากหลักสูตร: ' + (error || 'Unknown error'),
-                        icon: 'error',
-                        confirmButtonText: 'ตกลง'
-                    });
-                }
-            });
+        if (!result.isConfirmed) {
+            return;
         }
+
+        $.ajax({
+            url: appRoute('user/removeFromCurriculum'),
+            type: 'POST',
+            dataType: 'json',
+            data: {
+                user_id: actualUid,
+                curriculum_id: actualCurriculumId
+            },
+            beforeSend: function (xhr) {
+                xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+            },
+            success: function (result) {
+                if (result.success) {
+                    loadUsers($('#user-search').val() || '', $('#user-faculty-filter').val() || 'all');
+                    loadCurriculums($('#curriculum-faculty-filter').val() || 'all');
+                    showToast(`นำ "${userName}" ออกจากหลักสูตรแล้ว`, 'success');
+                } else {
+                    showError(result.message || 'ไม่สามารถนำผู้ใช้ออกจากหลักสูตรได้');
+                }
+            },
+            error: function () {
+                showError('เกิดข้อผิดพลาดในการนำผู้ใช้ออกจากหลักสูตร');
+            }
+        });
     });
 };
 
@@ -460,7 +463,7 @@ function renderUsers() {
         return `
             <div class="user-card draggable bg-gray-50 border border-gray-200 rounded-lg p-4" 
                  draggable="true" 
-                 data-user-id="${user.uid}"
+                 data-user-id="${escapeHtml(user.email || user.uid || '')}"
                  data-user-name="${escapeHtml(name)}">
                 <div class="flex items-start justify-between">
                     <div class="flex-1">
@@ -575,7 +578,7 @@ function renderCurriculums() {
 }
 
 /**
- * Render a single curriculum card
+ * Render a single curriculum card (collapsed by default; click header to expand).
  */
 function renderCurriculumCard(curriculum) {
     const degreeLevelMap = {
@@ -586,116 +589,140 @@ function renderCurriculumCard(curriculum) {
 
     const degreeLevel = degreeLevelMap[curriculum.degree_level] || curriculum.degree_level;
     const members = curriculum.members || [];
+    const coordinators = members.filter(m => (m.role || '') === 'coordinator');
+    const instructors = members.filter(m => (m.role || 'instructor') !== 'coordinator');
 
     const chairInfo = curriculum.chair_info;
     const chairName = chairInfo && chairInfo.name ? chairInfo.name : null;
+    const displayName = curriculum.display_name || curriculum.name;
+    const expanded = isCurriculumExpanded(curriculum.id);
+    const bodyId = `curriculum-body-${curriculum.id}`;
 
-    return `
-        <div class="curriculum-card drop-zone bg-blue-50 border border-blue-200 rounded-lg p-4" 
-             data-curriculum-id="${curriculum.id}"
-             data-curriculum-name="${escapeHtml(curriculum.name)}">
-            <div class="flex items-start justify-between mb-3">
-                <div class="flex-1">
-                    ${chairName ? `
-                        <div class="mb-1 flex items-center">
-                            <svg class="w-4 h-4 mr-1 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                            </svg>
-                            <span class="text-xs font-medium text-green-700">ประธานหลักสูตร: ${escapeHtml(chairName)}</span>
-                        </div>
-                    ` : ''}
-                    <h5 class="font-semibold text-gray-800 mb-1">
-                        ${escapeHtml(curriculum.name)} 
-                        <span class="text-sm font-normal text-gray-600">(${escapeHtml(curriculum.code)})</span>
-                    </h5>
-                    <p class="text-xs text-gray-600">${escapeHtml(degreeLevel)}</p>
-                </div>
-                <div class="flex items-center space-x-2">
-                    <button 
-                        type="button"
-                        class="bg-green-600 hover:bg-green-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
-                        title="เลือกประธานหลักสูตร"
-                        data-curriculum-id="${curriculum.id}"
-                        data-curriculum-name="${escapeHtml(curriculum.name)}"
-                        data-chair-id="${chairInfo ? chairInfo.email : ''}">
-                        เลือกประธานหลักสูตร
-                    </button>
-                    <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-1 rounded">
-                        ${curriculum.member_count || 0} คน
-                    </span>
-                </div>
-            </div>
-            
-            ${members.length > 0 ? `
-                <div class="mt-3 pt-3 border-t border-blue-200">
-                    <p class="text-xs font-medium text-gray-700 mb-2">สมาชิกในหลักสูตร:</p>
-                    <div class="space-y-2">
-                        ${members.map(member => {
+    const renderMemberRow = (member) => {
         const memberName = (member.thai_name && member.thai_lastname)
             ? `${member.thai_name} ${member.thai_lastname}`
             : `${member.gf_name || ''}`.trim() || 'ไม่มีชื่อ';
 
-        const isPrimary = member.is_primary == 1;
         const role = member.role || 'instructor';
-
-        // Get user ID - try multiple possible field names
-        const userId = member.teacher_uid || member.uid || member.user_id || member.id || null;
+        const userId = memberIdentity(member);
         const curriculumId = curriculum.id || null;
-
-        // Validate IDs before rendering button
-        if (!userId || !curriculumId) {
-            console.warn('Missing user_id or curriculum_id for member:', {
-                member,
-                userId,
-                curriculumId,
-                curriculum
-            });
-        }
-
-        // Escape strings for use in onclick attribute
-        const safeMemberName = memberName.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-        const safeCurriculumName = curriculum.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        const email = member.email || '';
 
         return `
-                                <div class="flex items-center justify-between text-sm group">
-                                    <div class="flex items-center space-x-2 flex-1">
-                                        <span class="member-badge ${isPrimary ? 'primary' : 'secondary'}">
-                                            ${isPrimary ? 'หลัก' : 'รอง'}
-                                        </span>
-                                        <span class="text-gray-700">${escapeHtml(memberName)}</span>
-                                        ${member.teacher_faculty_name ? `
-                                            <span class="text-xs text-gray-500">(${escapeHtml(member.teacher_faculty_name)})</span>
-                                        ` : ''}
-                                    </div>
-                                    <div class="flex items-center space-x-2">
-                                        ${member.email ? `
-                                            <span class="text-xs text-gray-500">${escapeHtml(member.email)}</span>
-                                        ` : ''}
-                                        <button 
-                                            type="button"
-                                            class="remove-member-btn text-red-500 hover:text-red-700 opacity-30 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-50 cursor-pointer"
-                                            onclick="removecurrilumn(${userId || 'null'}, ${curriculumId || 'null'}, this)"
-                                            data-user-id="${userId || ''}"
-                                            data-curriculum-id="${curriculumId || ''}"
-                                            data-user-name="${escapeHtml(memberName)}"
-                                            data-curriculum-name="${escapeHtml(curriculum.name)}"
-                                            title="นำออกจากหลักสูตร"
-                                            style="pointer-events: auto; z-index: 10;">
-                                            <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </div>
-                            `;
-    }).join('')}
+            <div class="flex items-center justify-between gap-2 text-sm group py-1">
+                <div class="flex items-center gap-2 flex-1 min-w-0">
+                    <select class="member-role-select shrink-0"
+                        data-user-id="${escapeHtml(String(userId || ''))}"
+                        data-curriculum-id="${curriculumId || ''}"
+                        data-user-name="${escapeHtml(memberName)}"
+                        data-curriculum-name="${escapeHtml(displayName)}"
+                        data-previous-role="${escapeHtml(role)}"
+                        aria-label="บทบาทของ ${escapeHtml(memberName)}"
+                        title="เปลี่ยนบทบาทโดยไม่ต้องลากใหม่">
+                        <option value="instructor" ${role === 'instructor' || role === 'assistant' ? 'selected' : ''}>อาจารย์ประจำ</option>
+                        <option value="coordinator" ${role === 'coordinator' ? 'selected' : ''}>ผู้รับผิดชอบ</option>
+                    </select>
+                    <div class="min-w-0">
+                        <span class="text-gray-800 font-medium truncate block">${escapeHtml(memberName)}</span>
+                        ${member.teacher_faculty_name ? `<span class="text-xs text-gray-500 truncate block">${escapeHtml(member.teacher_faculty_name)}</span>` : ''}
                     </div>
                 </div>
-            ` : `
-                <div class="mt-3 pt-3 border-t border-blue-200 text-sm text-gray-500 text-center">
-                    ยังไม่มีสมาชิกในหลักสูตร
+                <div class="flex items-center gap-1 shrink-0">
+                    ${email ? `<span class="text-xs text-gray-400 hidden xl:inline max-w-[9rem] truncate">${escapeHtml(email)}</span>` : ''}
+                    <button
+                        type="button"
+                        class="remove-member-btn text-red-500 hover:text-red-700 opacity-40 group-hover:opacity-100 transition-opacity p-2 rounded hover:bg-red-50 cursor-pointer min-h-[40px] min-w-[40px] flex items-center justify-center"
+                        onclick="removecurrilumn(null, null, this)"
+                        data-user-id="${escapeHtml(String(userId || ''))}"
+                        data-curriculum-id="${curriculumId || ''}"
+                        data-user-name="${escapeHtml(memberName)}"
+                        data-curriculum-name="${escapeHtml(displayName)}"
+                        title="นำออกจากหลักสูตร"
+                        aria-label="นำ ${escapeHtml(memberName)} ออกจากหลักสูตร">
+                        <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
                 </div>
-            `}
+            </div>
+        `;
+    };
+
+    return `
+        <div class="curriculum-card drop-zone ${expanded ? 'is-expanded' : ''}"
+             data-curriculum-id="${curriculum.id}"
+             data-curriculum-name="${escapeHtml(displayName)}"
+             data-drop-role="coordinator">
+            <div role="button"
+                tabindex="0"
+                class="curriculum-card-header"
+                data-curriculum-toggle="${curriculum.id}"
+                aria-expanded="${expanded ? 'true' : 'false'}"
+                aria-controls="${bodyId}">
+                <svg class="curriculum-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+                <div class="flex-1 min-w-0">
+                    ${chairName ? `
+                        <div class="text-xs font-medium text-green-700 truncate mb-0.5">ประธาน: ${escapeHtml(chairName)}</div>
+                    ` : ''}
+                    <div class="font-semibold text-gray-900 truncate">
+                        ${escapeHtml(displayName)}
+                        <span class="text-sm font-normal text-gray-500">(${escapeHtml(curriculum.code || '')})</span>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-0.5">
+                        ${escapeHtml(degreeLevel)}
+                        · ผู้รับผิดชอบ ${coordinators.length}
+                        · ประจำ ${instructors.length}
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button
+                        type="button"
+                        class="bg-green-600 hover:bg-green-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors min-h-[40px]"
+                        title="เลือกประธานหลักสูตร"
+                        data-curriculum-id="${curriculum.id}"
+                        data-curriculum-name="${escapeHtml(curriculum.name)}"
+                        data-chair-id="${chairInfo ? chairInfo.email : ''}">
+                        ประธาน
+                    </button>
+                    <span class="bg-slate-200 text-slate-700 text-xs font-semibold px-2 py-1 rounded">
+                        ${curriculum.member_count || 0}
+                    </span>
+                </div>
+            </div>
+
+            <div id="${bodyId}" class="curriculum-card-body space-y-3 pt-3">
+                <div class="role-drop-zone drop-zone"
+                     data-role="coordinator"
+                     data-curriculum-id="${curriculum.id}"
+                     data-curriculum-name="${escapeHtml(displayName)}"
+                     data-drop-role="coordinator">
+                    <div class="flex items-center justify-between mb-1">
+                        <p class="text-xs font-semibold text-violet-800">ผู้รับผิดชอบหลักสูตร</p>
+                        <span class="text-xs text-violet-600">${coordinators.length} คน</span>
+                    </div>
+                    ${coordinators.length > 0
+                        ? `<div class="space-y-1">${coordinators.map(renderMemberRow).join('')}</div>`
+                        : `<p class="text-xs text-violet-700/80 text-center py-3">ลากอาจารย์มาวางที่นี่เพื่อตั้งเป็นผู้รับผิดชอบ</p>`
+                    }
+                </div>
+
+                <div class="role-drop-zone drop-zone"
+                     data-role="instructor"
+                     data-curriculum-id="${curriculum.id}"
+                     data-curriculum-name="${escapeHtml(displayName)}"
+                     data-drop-role="instructor">
+                    <div class="flex items-center justify-between mb-1">
+                        <p class="text-xs font-semibold text-blue-800">อาจารย์ประจำหลักสูตร</p>
+                        <span class="text-xs text-blue-600">${instructors.length} คน</span>
+                    </div>
+                    ${instructors.length === 0
+                        ? `<p class="text-xs text-amber-700 text-center py-3">ยังไม่มีอาจารย์ประจำ — ลากมาวางที่นี่</p>`
+                        : `<div class="space-y-1 max-h-52 overflow-y-auto pr-1">${instructors.map(renderMemberRow).join('')}</div>`
+                    }
+                </div>
+            </div>
         </div>
     `;
 }
@@ -709,12 +736,10 @@ document.addEventListener('DOMContentLoaded', function () {
         searchInput.addEventListener('input', function () {
             const search = this.value.trim();
 
-            // Clear existing timeout
             if (searchTimeout) {
                 clearTimeout(searchTimeout);
             }
 
-            // Debounce search
             searchTimeout = setTimeout(() => {
                 const facultyId = document.getElementById('user-faculty-filter')?.value || 'all';
                 loadUsers(search, facultyId);
@@ -722,7 +747,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Setup drag and drop after initial render
     setTimeout(() => {
         setupDragAndDrop();
     }, 500);
@@ -739,14 +763,12 @@ function escapeHtml(text) {
 }
 
 /**
- * Setup drag and drop functionality
+ * Setup drag and drop + expand toggles
  */
 function setupDragAndDrop() {
-    // Remove existing event listeners by cloning nodes
     const userCards = document.querySelectorAll('.user-card.draggable');
-    const curriculumCards = document.querySelectorAll('.curriculum-card.drop-zone');
+    const dropZones = document.querySelectorAll('.drop-zone');
 
-    // Setup drag events for user cards
     userCards.forEach(card => {
         card.removeEventListener('dragstart', handleDragStart);
         card.removeEventListener('dragend', handleDragEnd);
@@ -754,14 +776,45 @@ function setupDragAndDrop() {
         card.addEventListener('dragend', handleDragEnd);
     });
 
-    // Setup drop events for curriculum cards
-    curriculumCards.forEach(card => {
-        card.removeEventListener('dragover', handleDragOver);
-        card.removeEventListener('dragleave', handleDragLeave);
-        card.removeEventListener('drop', handleDrop);
-        card.addEventListener('dragover', handleDragOver);
-        card.addEventListener('dragleave', handleDragLeave);
-        card.addEventListener('drop', handleDrop);
+    dropZones.forEach(zone => {
+        zone.removeEventListener('dragover', handleDragOver);
+        zone.removeEventListener('dragleave', handleDragLeave);
+        zone.removeEventListener('drop', handleDrop);
+        zone.addEventListener('dragover', handleDragOver);
+        zone.addEventListener('dragleave', handleDragLeave);
+        zone.addEventListener('drop', handleDrop);
+    });
+
+    bindMemberRoleSelects(document.getElementById('curriculums-list'));
+    bindCurriculumExpandToggles();
+}
+
+function bindCurriculumExpandToggles() {
+    document.querySelectorAll('[data-curriculum-toggle]').forEach((header) => {
+        if (header.dataset.toggleBound === '1') return;
+        header.dataset.toggleBound = '1';
+
+        const toggle = () => {
+            const id = header.getAttribute('data-curriculum-toggle');
+            if (id) {
+                toggleCurriculumExpanded(id);
+            }
+        };
+
+        header.addEventListener('click', (e) => {
+            // Don't collapse/expand when clicking chair / remove / selects inside header area
+            if (e.target.closest('button[data-curriculum-id], .remove-member-btn, .member-role-select, a')) {
+                return;
+            }
+            toggle();
+        });
+
+        header.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggle();
+            }
+        });
     });
 }
 
@@ -794,22 +847,40 @@ function handleDragEnd(e) {
         userCard.classList.remove('dragging');
     }
 
-    // Remove drag-over class from all drop zones
     document.querySelectorAll('.drop-zone').forEach(zone => {
         zone.classList.remove('drag-over');
     });
 }
 
 /**
- * Handle drag over
+ * Handle drag over — prefer innermost role zone; auto-expand collapsed card.
  */
 function handleDragOver(e) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
 
-    const dropZone = e.target.closest('.drop-zone');
-    if (dropZone) {
-        dropZone.classList.add('drag-over');
+    const roleZone = e.target.closest('.role-drop-zone');
+    const card = e.target.closest('.curriculum-card');
+
+    document.querySelectorAll('.drop-zone.drag-over').forEach((z) => {
+        if (z !== roleZone && z !== card) {
+            z.classList.remove('drag-over');
+        }
+    });
+
+    if (roleZone) {
+        roleZone.classList.add('drag-over');
+        if (card) {
+            card.classList.remove('drag-over');
+            if (!card.classList.contains('is-expanded')) {
+                toggleCurriculumExpanded(card.dataset.curriculumId, true);
+            }
+        }
+        return;
+    }
+
+    if (card) {
+        card.classList.add('drag-over');
     }
 }
 
@@ -824,34 +895,47 @@ function handleDragLeave(e) {
 }
 
 /**
- * Handle drop
+ * Handle drop — role from zone (coordinator/instructor). Collapsed card = instructor.
  */
 function handleDrop(e) {
     e.preventDefault();
+    e.stopPropagation();
 
-    const dropZone = e.target.closest('.drop-zone');
+    const roleZone = e.target.closest('.role-drop-zone');
+    const card = e.target.closest('.curriculum-card');
+    const dropZone = roleZone || card;
     if (!dropZone) return;
 
-    dropZone.classList.remove('drag-over');
+    document.querySelectorAll('.drop-zone').forEach((z) => z.classList.remove('drag-over'));
 
     const userId = e.dataTransfer.getData('text/plain');
-    const curriculumId = dropZone.dataset.curriculumId;
-    const curriculumName = dropZone.dataset.curriculumName;
+    const curriculumId = dropZone.dataset.curriculumId || card?.dataset.curriculumId;
+    const curriculumName = dropZone.dataset.curriculumName || card?.dataset.curriculumName;
+    const role = (dropZone.dataset.dropRole || dropZone.dataset.role || 'coordinator') === 'instructor'
+        ? 'instructor'
+        : 'coordinator';
+
+    if (curriculumId) {
+        // Keep open after assign so user sees the new member
+        expandedCurriculumIds.add(String(curriculumId));
+    }
 
     if (userId && curriculumId) {
-        assignUserToCurriculum(userId, curriculumId, curriculumName);
+        assignUserToCurriculum(userId, curriculumId, curriculumName, role);
     }
 }
 
 /**
  * Assign user to curriculum via API
  */
-function assignUserToCurriculum(userId, curriculumId, curriculumName) {
-    // Show loading state
-    const userCard = document.querySelector(`[data-user-id="${userId}"]`);
+function assignUserToCurriculum(userId, curriculumId, curriculumName, role = 'coordinator', options = {}) {
+    const silent = !!options.silent;
+    const userCard = document.querySelector(`[data-user-id="${CSS.escape ? CSS.escape(String(userId)) : String(userId)}"]`);
     if (userCard) {
         userCard.style.opacity = '0.5';
     }
+
+    const roleText = roleLabelTh(role);
 
     $.ajax({
         url: appRoute('user/updateCurriculum'),
@@ -859,37 +943,95 @@ function assignUserToCurriculum(userId, curriculumId, curriculumName) {
         dataType: 'json',
         data: {
             user_id: userId,
-            curriculum_id: curriculumId
+            curriculum_id: curriculumId,
+            role: role
         },
         beforeSend: function (xhr) {
             xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
         },
         success: function (result) {
             if (result.success) {
-                // Reload data to reflect changes
                 loadUsers(
                     $('#user-search').val() || '',
                     $('#user-faculty-filter').val() || 'all'
                 );
                 loadCurriculums($('#curriculum-faculty-filter').val() || 'all');
-
-                // Show success message
-                showSuccess(`เพิ่มผู้ใช้เข้ากับหลักสูตร "${curriculumName}" สำเร็จ`);
+                if (!silent) {
+                    showToast(`บันทึกแล้ว: ${roleText} ใน «${curriculumName}»`, 'success');
+                }
             } else {
-                showError('ไม่สามารถเพิ่มผู้ใช้เข้ากับหลักสูตรได้: ' + (result.message || 'Unknown error'));
+                showError(result.message || 'ไม่สามารถเพิ่มผู้ใช้เข้ากับหลักสูตรได้');
+                if (typeof options.onError === 'function') {
+                    options.onError(result);
+                }
             }
         },
-        error: function (xhr, status, error) {
-            console.error('Error assigning user to curriculum:', { xhr, status, error });
+        error: function () {
             showError('เกิดข้อผิดพลาดในการเพิ่มผู้ใช้เข้ากับหลักสูตร');
+            if (typeof options.onError === 'function') {
+                options.onError({});
+            }
         },
         complete: function () {
-            // Restore user card opacity
-            const userCard = document.querySelector(`[data-user-id="${userId}"]`);
-            if (userCard) {
-                userCard.style.opacity = '1';
+            const card = document.querySelector(`[data-user-id="${CSS.escape ? CSS.escape(String(userId)) : String(userId)}"]`);
+            if (card) {
+                card.style.opacity = '1';
             }
         }
+    });
+}
+
+/**
+ * Change member role from inline select (no re-drag).
+ */
+function handleMemberRoleChange(selectEl) {
+    const userId = selectEl.dataset.userId;
+    const curriculumId = selectEl.dataset.curriculumId;
+    const curriculumName = selectEl.dataset.curriculumName || 'หลักสูตร';
+    const userName = selectEl.dataset.userName || 'อาจารย์';
+    const previous = selectEl.dataset.previousRole || 'instructor';
+    const nextRole = selectEl.value;
+
+    if (!userId || !curriculumId || nextRole === previous) {
+        return;
+    }
+
+    selectEl.disabled = true;
+    assignUserToCurriculum(userId, curriculumId, curriculumName, nextRole, {
+        onError: function () {
+            selectEl.value = previous;
+            selectEl.disabled = false;
+        }
+    });
+    // Success path reloads lists; toast says "เพิ่มเป็น…" which is ok for role change too
+    // Soften message via toast after — assignUserToCurriculum already toasts.
+    selectEl.dataset.previousRole = nextRole;
+}
+
+function bindMemberRoleSelects(root) {
+    const scope = root || document;
+    scope.querySelectorAll('.member-role-select').forEach((sel) => {
+        if (sel.dataset.bound === '1') return;
+        sel.dataset.bound = '1';
+        sel.addEventListener('change', function () {
+            handleMemberRoleChange(this);
+        });
+    });
+}
+
+/**
+ * Lightweight toast — better for bulk dragging many instructors.
+ */
+function showToast(message, type = 'info') {
+    const icon = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+    Swal.fire({
+        text: message,
+        icon: icon,
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 2200,
+        timerProgressBar: true
     });
 }
 
@@ -897,14 +1039,7 @@ function assignUserToCurriculum(userId, curriculumId, curriculumName) {
  * Show success message using SweetAlert2
  */
 function showSuccess(message) {
-    Swal.fire({
-        title: 'สำเร็จ!',
-        text: message,
-        icon: 'success',
-        confirmButtonText: 'ตกลง',
-        timer: 2000,
-        timerProgressBar: true
-    });
+    showToast(message, 'success');
 }
 
 /**

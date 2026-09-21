@@ -347,7 +347,15 @@ function initCurriculumTable(data) {
         data: data,
         columns: [
             { data: 'code' },
-            { data: 'name' },
+            {
+                data: 'name',
+                render: function(data, type, row) {
+                    if (row.is_multidisciplinary == 1) {
+                        return (data || '') + ' <span class="text-purple-700 font-medium">(พหุสาขา)</span>';
+                    }
+                    return data || '';
+                }
+            },
             { data: 'faculty_name' },
             {
                 data: 'degree_level',
@@ -425,6 +433,7 @@ function initCurriculumForm() {
             code: $('#curriculumCode').val(),
             name: $('#curriculumName').val(),
             degree_level: $('#curriculumDegree').val(),
+            is_multidisciplinary: $('#curriculumMultidisciplinary').is(':checked'),
             status: $('#curriculumStatus').is(':checked')
         };
 
@@ -453,12 +462,14 @@ function openCurriculumModal(data = null) {
         $('#curriculumName').val(data.name);
         $('#curriculumDegree').val(data.degree_level);
         $('#curriculumStatus').prop('checked', data.status == 1);
+        $('#curriculumMultidisciplinary').prop('checked', data.is_multidisciplinary == 1);
     } else {
         // Add mode
         $('#curriculumModalTitle').text('เพิ่มหลักสูตร');
         $('#curriculumForm')[0].reset();
         $('#curriculumId').val('');
         $('#curriculumStatus').prop('checked', true);
+        $('#curriculumMultidisciplinary').prop('checked', false);
     }
     $('#curriculumModal').removeClass('hidden');
 }

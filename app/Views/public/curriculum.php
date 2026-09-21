@@ -74,7 +74,7 @@
                     </svg>
                     กลับหน้าแรก
                 </a>
-                <h1 class="mt-2 text-lg sm:text-xl font-semibold truncate"><?= esc($curriculum['name'] ?? '') ?></h1>
+                <h1 class="mt-2 text-lg sm:text-xl font-semibold truncate"><?= esc($curriculum['display_name'] ?? $curriculum['name'] ?? '') ?></h1>
                 <p class="text-sm text-slate-600 mt-1">
                     คณะ: <span class="font-medium text-slate-800"><?= esc($curriculum['faculty_name'] ?? '-') ?></span>
                     <span class="mx-2 text-slate-300">•</span>
@@ -136,6 +136,23 @@
             </form>
         </section>
 
+        <?php
+        $chair = is_array($curriculum['chair'] ?? null) ? $curriculum['chair'] : null;
+        $chairThai = $chair ? trim(($chair['thai_name'] ?? '') . ' ' . ($chair['thai_lastname'] ?? '')) : '';
+        $chairEn   = $chair ? trim(($chair['gf_name'] ?? '') . ' ' . ($chair['gl_name'] ?? '')) : '';
+        $chairName = $chairThai !== '' ? $chairThai : $chairEn;
+        if ($chairName !== '' && ! empty($chair['titleThai'])) {
+            $chairName = trim((string) $chair['titleThai'] . ' ' . $chairName);
+        }
+        ?>
+        <?php if ($chairName !== ''): ?>
+        <section class="rr-card rr-cardShell rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
+            <h2 class="text-base font-semibold">ประธานหลักสูตร</h2>
+            <p class="mt-2 text-sm text-slate-800"><?= esc($chairName) ?></p>
+            <p class="text-xs text-slate-500 mt-1">ประธานไม่จำเป็นต้องเป็นผู้รับผิดชอบหลักสูตร</p>
+        </section>
+        <?php endif; ?>
+
         <section class="rr-card rr-cardShell rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
             <div class="flex items-center justify-between gap-4">
                 <h2 class="text-base font-semibold">อาจารย์ผู้รับผิดชอบหลักสูตร</h2>
@@ -157,7 +174,7 @@
                             'chair' => 'ประธานหลักสูตร',
                             'coordinator' => 'ผู้รับผิดชอบหลักสูตร',
                             'assistant' => 'ผู้ช่วยผู้รับผิดชอบ',
-                            default => 'อาจารย์',
+                            default => 'อาจารย์ประจำหลักสูตร',
                         };
                         ?>
                         <button type="button"
@@ -321,7 +338,7 @@
                         'curriculums' => array_map(static function ($c) {
                             return [
                                 'id' => (int) ($c['id'] ?? 0),
-                                'name' => (string) ($c['name'] ?? ''),
+                                'name' => (string) ($c['display_name'] ?? $c['name'] ?? ''),
                                 'code' => (string) ($c['code'] ?? ''),
                                 'degree_level' => (string) ($c['degree_level'] ?? ''),
                                 'faculty_id' => (int) ($c['faculty_id'] ?? 0),

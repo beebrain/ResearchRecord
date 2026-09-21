@@ -141,27 +141,154 @@
         }
 
         .drop-zone {
-            min-height: 100px;
-            transition: all 0.2s ease;
+            transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
         }
 
-        .drop-zone.drag-over {
-            background-color: #dbeafe !important;
-            border-color: #3b82f6 !important;
-            border-width: 2px;
-            transform: scale(1.02);
+        .curriculum-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.75rem;
+            overflow: hidden;
         }
 
-        .drop-zone.drag-over::before {
-            content: 'วางที่นี่';
+        .curriculum-card.is-expanded {
+            background: #eff6ff;
+            border-color: #bfdbfe;
+        }
+
+        .curriculum-card-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            width: 100%;
+            text-align: left;
+            padding: 0.85rem 1rem;
+            cursor: pointer;
+            background: transparent;
+            border: 0;
+            min-height: 44px;
+        }
+
+        .curriculum-card-header:hover {
+            background: rgba(15, 23, 42, 0.03);
+        }
+
+        .curriculum-card-header:focus-visible {
+            outline: 2px solid #2563eb;
+            outline-offset: -2px;
+        }
+
+        .curriculum-chevron {
+            width: 1.1rem;
+            height: 1.1rem;
+            flex-shrink: 0;
+            margin-top: 0.15rem;
+            color: #64748b;
+            transition: transform 0.15s ease;
+        }
+
+        .curriculum-card.is-expanded .curriculum-chevron {
+            transform: rotate(90deg);
+        }
+
+        .curriculum-card-body {
+            display: none;
+            padding: 0 0.85rem 0.85rem;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .curriculum-card.is-expanded .curriculum-card-body {
+            display: block;
+        }
+
+        .role-drop-zone {
+            min-height: 4.5rem;
+            border: 1.5px dashed #cbd5e1;
+            border-radius: 0.65rem;
+            padding: 0.65rem 0.75rem;
+            background: #fff;
+        }
+
+        .role-drop-zone[data-role="coordinator"] {
+            border-color: #c4b5fd;
+            background: #faf5ff;
+        }
+
+        .role-drop-zone[data-role="instructor"] {
+            border-color: #93c5fd;
+            background: #f8fafc;
+        }
+
+        .role-drop-zone.drag-over {
+            border-style: solid;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+
+        .role-drop-zone[data-role="coordinator"].drag-over {
+            background: #f3e8ff !important;
+            border-color: #7c3aed !important;
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+        }
+
+        .role-drop-zone[data-role="instructor"].drag-over {
+            background: #dbeafe !important;
+            border-color: #2563eb !important;
+        }
+
+        .role-drop-zone.drag-over::before {
             display: block;
             text-align: center;
-            color: #3b82f6;
             font-weight: 600;
-            padding: 8px;
-            background-color: rgba(59, 130, 246, 0.1);
-            border-radius: 4px;
+            font-size: 0.8rem;
+            padding: 6px;
+            border-radius: 6px;
             margin-bottom: 8px;
+        }
+
+        .role-drop-zone[data-role="instructor"].drag-over::before {
+            content: 'วางเพื่อเพิ่มเป็นอาจารย์ประจำ';
+            color: #1d4ed8;
+            background-color: rgba(37, 99, 235, 0.08);
+        }
+
+        .role-drop-zone[data-role="coordinator"].drag-over::before {
+            content: 'วางเพื่อตั้งเป็นผู้รับผิดชอบ';
+            color: #6d28d9;
+            background-color: rgba(124, 58, 237, 0.08);
+        }
+
+        .curriculum-card.drop-zone.drag-over:not(.is-expanded) {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+            background: #eff6ff;
+        }
+
+        .curriculum-card.drop-zone.drag-over:not(.is-expanded)::after {
+            content: 'วางเพื่อเพิ่มเป็นอาจารย์ประจำ (หรือคลิกเปิดเพื่อเลือกช่อง)';
+            display: block;
+            margin: 0 1rem 0.75rem;
+            padding: 0.4rem 0.6rem;
+            border-radius: 0.4rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #1d4ed8;
+            background: rgba(37, 99, 235, 0.08);
+            text-align: center;
+        }
+
+        .member-role-select {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.4rem;
+            border-radius: 0.375rem;
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #334155;
+            max-width: 8.5rem;
+        }
+
+        .member-role-select:focus {
+            outline: 2px solid #2563eb;
+            outline-offset: 1px;
         }
     </style>
 </head>
@@ -241,13 +368,18 @@
                             </h3>
 
                             <!-- Faculty Filter for Curriculums -->
-                            <div class="mb-4">
+                            <div class="mb-3">
                                 <label for="curriculum-faculty-filter" class="block text-sm font-medium text-gray-700 mb-2">กรองตามคณะ:</label>
                                 <select id="curriculum-faculty-filter" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white">
                                     <option value="all">ทุกคณะ</option>
                                     <option value="null">ไม่มีสังกัดคณะ</option>
                                 </select>
                             </div>
+
+                            <p class="text-xs text-slate-600 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
+                                คลิกชื่อหลักสูตรเพื่อเปิดรายชื่ออาจารย์ · ลากลงช่อง <span class="font-medium text-violet-700">ผู้รับผิดชอบ</span>
+                                หรือ <span class="font-medium text-blue-700">อาจารย์ประจำ</span> · ลากลงแถบชื่อที่ยุบอยู่ = เพิ่มเป็นอาจารย์ประจำ
+                            </p>
                         </div>
 
                         <!-- Curriculums List -->

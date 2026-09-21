@@ -156,24 +156,91 @@ class ChairSelectionService
             $warnings[] = 'เป็นประธานหลักสูตร «' . ($row['name'] ?? '-') . '» อยู่แล้ว';
         }
 
-        $otherCoordinators = $this->db->table('teacher_curriculum tc')
-            ->select('c.name')
+        return [
+            'has_conflict' => $warnings !== [],
+            'warnings'     => $warnings,
+        ];
+    }
+
+    /**
+     * ผู้รับผิดชอบอยู่ได้ 1 สาขาหลัก + 1 พหุสาขา — ประธานไม่นับในโควตานี้
+     */
+    public static function coordinatorQuotaAllows(
+        bool $targetIsMultidisciplinary,
+        int $otherRegularCount,
+        int $otherMultiCount
+    ): bool {
+        if ($targetIsMultidisciplinary) {
+            return $otherMultiCount < 1;
+        }
+
+        return $otherRegularCount < 1;
+    }
+
+    /**
+     * @return array{allowed: bool, message: string, warnings: list<string>}
+     */
+    public function getCoordinatorAssignmentConflicts(string $email, int $curriculumId): array
+    {
+        $email = UserIdentity::normalizeEmail($email);
+        if ($email === '' || $curriculumId <= 0) {
+            return ['allowed' => false, 'message' => 'ข้อมูลอาจารย์หรือหลักสูตรไม่ถูกต้อง', 'warnings' => []];
+        }
+
+        $hasFlag = $this->db->fieldExists('is_multidisciplinary', 'curriculum');
+        $targetSelect = $hasFlag ? 'id, name, is_multidisciplinary' : 'id, name';
+
+        $target = $this->db->table('curriculum')
+            ->select($targetSelect)
+            ->where('id', $curriculumId)
+            ->get()
+            ->getRowArray();
+
+        if ($target === null) {
+            return ['allowed' => false, 'message' => 'ไม่พบหลักสูตร', 'warnings' => []];
+        }
+
+        $targetIsMulti = $hasFlag && (int) ($target['is_multidisciplinary'] ?? 0) === 1;
+
+        $others = $this->db->table('teacher_curriculum tc')
+            ->select($hasFlag ? 'c.name, c.is_multidisciplinary' : 'c.name')
             ->join('curriculum c', 'c.id = tc.curriculum_id', 'inner')
             ->where('tc.teacher_email', $email)
             ->where('tc.status', 1)
             ->where('tc.role', 'coordinator')
             ->where('tc.curriculum_id !=', $curriculumId)
+            ->where('c.status', 1)
             ->orderBy('c.name', 'ASC')
             ->get()
             ->getResultArray();
 
-        foreach ($otherCoordinators as $row) {
-            $warnings[] = 'เป็นผู้รับผิดชอบหลักสูตร «' . ($row['name'] ?? '-') . '» อยู่แล้ว';
+        $regularNames = [];
+        $multiNames   = [];
+        foreach ($others as $row) {
+            $label = \App\Models\CurriculumModel::displayName($row);
+            if ((int) ($row['is_multidisciplinary'] ?? 0) === 1) {
+                $multiNames[] = $label;
+            } else {
+                $regularNames[] = $label;
+            }
+        }
+
+        if (self::coordinatorQuotaAllows($targetIsMulti, count($regularNames), count($multiNames))) {
+            return ['allowed' => true, 'message' => '', 'warnings' => []];
+        }
+
+        if ($targetIsMulti) {
+            $message = 'เป็นผู้รับผิดชอบหลักสูตรพหุสาขาได้เพียง 1 หลักสูตร (อยู่แล้วที่ «'
+                . ($multiNames[0] ?? '-') . '»)';
+        } else {
+            $message = 'เป็นผู้รับผิดชอบสาขาหลักได้เพียง 1 หลักสูตร (อยู่แล้วที่ «'
+                . ($regularNames[0] ?? '-') . '») — หลักสูตรที่สองต้องเป็นพหุสาขา';
         }
 
         return [
-            'has_conflict' => $warnings !== [],
-            'warnings'     => $warnings,
+            'allowed'  => false,
+            'message'  => $message,
+            'warnings' => [$message],
         ];
     }
 

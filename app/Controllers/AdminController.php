@@ -1135,6 +1135,341 @@ class AdminController extends Controller
     }
 
     /**
+     * Dashboard: teacher capacity / curriculum affiliation overview
+     */
+    public function teacherCapacityDashboard()
+    {
+        return view('admin/teachers/capacity', [
+            'title' => 'ศักยภาพการจัดการอาจารย์',
+        ]);
+    }
+
+    /**
+     * AJAX: teacher capacity metrics + detail lists
+     */
+    public function getTeacherCapacityData()
+    {
+        if (! $this->request->isAJAX() && $this->request->getMethod() !== 'post') {
+            // Allow GET for simple local checks; still require adminauth via route filter
+        }
+
+        try {
+            $userData = $this->session->get('user_data') ?? [];
+            $userRole = $userData['role'] ?? null;
+            $isGodMode = $this->session->get('god_mode') === true;
+            $isSuperAdmin = ($userRole === 'super_admin') || $isGodMode;
+            $isFacultyAdmin = ($userRole === 'faculty_admin') && ! $isGodMode;
+
+            $managedFaculties = [];
+            if ($isFacultyAdmin) {
+                $managedFaculties = \App\Helpers\RoleHelper::getManagedFaculties($userData);
+                if ($managedFaculties === []) {
+                    return $this->response->setJSON([
+                        'success' => true,
+                        'data'    => $this->emptyTeacherCapacityPayload(),
+                    ]);
+                }
+            } elseif (! $isSuperAdmin) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'Access denied',
+                ]);
+            }
+
+            $facultyFilter = $this->request->getPost('faculty_id') ?? $this->request->getGet('faculty_id');
+            if ($facultyFilter !== null && $facultyFilter !== '' && $facultyFilter !== 'all') {
+                $fid = (int) $facultyFilter;
+                if ($isFacultyAdmin && ! in_array($fid, $managedFaculties, true)) {
+                    return $this->response->setJSON(['success' => false, 'message' => 'Access denied']);
+                }
+                $managedFaculties = [$fid];
+            }
+
+            $data = $this->buildTeacherCapacityPayload($isFacultyAdmin || $facultyFilter ? $managedFaculties : []);
+
+            return $this->response->setJSON(['success' => true, 'data' => $data]);
+        } catch (\Throwable $e) {
+            log_message('error', 'getTeacherCapacityData: ' . $e->getMessage());
+
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Failed to load teacher capacity data',
+            ]);
+        }
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private function emptyTeacherCapacityPayload(): array
+    {
+        return [
+            'summary' => [
+                'teachers_total'            => 0,
+                'teachers_unassigned'       => 0,
+                'teachers_multi'            => 0,
+                'teachers_single'           => 0,
+                'assignments_total'         => 0,
+                'instructors'               => 0,
+                'coordinators'              => 0,
+                'curricula_active'          => 0,
+                'curricula_no_instructor'   => 0,
+                'curricula_no_coordinator'  => 0,
+                'curricula_no_chair'        => 0,
+                'curricula_multidisciplinary'=> 0,
+                'avg_teachers_per_curriculum'=> 0,
+                'coverage_pct'              => 0,
+            ],
+            'unassigned'           => [],
+            'multi_curriculum'     => [],
+            'curricula_gaps'       => [],
+            'faculty_breakdown'    => [],
+            'faculties'            => [],
+        ];
+    }
+
+    /**
+     * @param list<int> $facultyIds empty = all
+     * @return array<string,mixed>
+     */
+    private function buildTeacherCapacityPayload(array $facultyIds = []): array
+    {
+        $db = $this->db;
+        $hasMultiFlag = $db->fieldExists('is_multidisciplinary', 'curriculum');
+
+        $faculties = $db->table('faculties')
+            ->select('id, name, code')
+            ->where('status', 1)
+            ->orderBy('name', 'ASC')
+            ->get()
+            ->getResultArray();
+        if ($facultyIds !== []) {
+            $faculties = array_values(array_filter(
+                $faculties,
+                static fn (array $f): bool => in_array((int) $f['id'], $facultyIds, true)
+            ));
+        }
+
+        $teacherBuilder = $db->table('user u')
+            ->select('u.email, u.titleThai, u.title, u.thai_name, u.thai_lastname, u.gf_name, u.gl_name, u.faculty_id, f.name as faculty_name')
+            ->join('faculties f', 'f.id = u.faculty_id', 'left')
+            ->where('u.active', 1)
+            ->where('u.user_type', 'TEACHER');
+        if ($facultyIds !== []) {
+            $teacherBuilder->whereIn('u.faculty_id', $facultyIds);
+        }
+        $teachers = $teacherBuilder->orderBy('u.thai_name', 'ASC')->get()->getResultArray();
+
+        $assignBuilder = $db->table('teacher_curriculum tc')
+            ->select('tc.teacher_email, tc.curriculum_id, tc.role, tc.is_primary, c.name as curriculum_name, c.code as curriculum_code, c.faculty_id as curriculum_faculty_id, c.status as curriculum_status'
+                . ($hasMultiFlag ? ', c.is_multidisciplinary' : ''))
+            ->join('curriculum c', 'c.id = tc.curriculum_id', 'inner')
+            ->where('tc.status', 1)
+            ->where('c.status', 1);
+        if ($facultyIds !== []) {
+            $assignBuilder->groupStart()
+                ->whereIn('c.faculty_id', $facultyIds)
+                ->orWhereIn('tc.teacher_email', array_column($teachers, 'email') ?: ['__none__'])
+                ->groupEnd();
+        }
+        $assignments = $assignBuilder->get()->getResultArray();
+
+        $byTeacher = [];
+        foreach ($assignments as $row) {
+            $email = strtolower((string) ($row['teacher_email'] ?? ''));
+            if ($email === '') {
+                continue;
+            }
+            $byTeacher[$email][] = $row;
+        }
+
+        $unassigned = [];
+        $multi = [];
+        $singleCount = 0;
+        foreach ($teachers as $t) {
+            $email = strtolower((string) ($t['email'] ?? ''));
+            $rows  = $byTeacher[$email] ?? [];
+            $name  = $this->formatCapacityTeacherName($t);
+            if ($rows === []) {
+                $unassigned[] = [
+                    'email'        => $t['email'],
+                    'name'         => $name,
+                    'faculty_id'   => $t['faculty_id'],
+                    'faculty_name' => $t['faculty_name'] ?? '-',
+                ];
+                continue;
+            }
+            if (count($rows) === 1) {
+                $singleCount++;
+            } else {
+                $curricula = [];
+                foreach ($rows as $r) {
+                    $curricula[] = [
+                        'id'   => (int) $r['curriculum_id'],
+                        'name' => CurriculumModel::displayName($r),
+                        'role' => $r['role'] ?? 'instructor',
+                    ];
+                }
+                $multi[] = [
+                    'email'            => $t['email'],
+                    'name'             => $name,
+                    'faculty_id'       => $t['faculty_id'],
+                    'faculty_name'     => $t['faculty_name'] ?? '-',
+                    'curriculum_count' => count($rows),
+                    'curricula'        => $curricula,
+                ];
+            }
+        }
+        usort($multi, static fn ($a, $b) => $b['curriculum_count'] <=> $a['curriculum_count']);
+
+        $currBuilder = $db->table('curriculum c')
+            ->select('c.id, c.name, c.code, c.degree_level, c.faculty_id, c.chair_email, f.name as faculty_name'
+                . ($hasMultiFlag ? ', c.is_multidisciplinary' : ''))
+            ->join('faculties f', 'f.id = c.faculty_id', 'left')
+            ->where('c.status', 1);
+        if ($facultyIds !== []) {
+            $currBuilder->whereIn('c.faculty_id', $facultyIds);
+        }
+        $curricula = $currBuilder->orderBy('f.name')->orderBy('c.name')->get()->getResultArray();
+
+        $membersByCurr = [];
+        foreach ($assignments as $row) {
+            $cid = (int) ($row['curriculum_id'] ?? 0);
+            $membersByCurr[$cid][] = $row;
+        }
+
+        $gaps = [];
+        $noInstructor = 0;
+        $noCoordinator = 0;
+        $noChair = 0;
+        $multiCurrCount = 0;
+
+        foreach ($curricula as $c) {
+            $cid = (int) $c['id'];
+            $members = $membersByCurr[$cid] ?? [];
+            $hasInstructor = false;
+            $hasCoordinator = false;
+            $instructorCount = 0;
+            $memberCount = count($members);
+            foreach ($members as $m) {
+                $role = (string) ($m['role'] ?? 'instructor');
+                if ($role === 'instructor' || $role === 'assistant') {
+                    $hasInstructor = true;
+                    $instructorCount++;
+                }
+                if ($role === 'coordinator') {
+                    $hasCoordinator = true;
+                }
+            }
+            $isMulti = $hasMultiFlag && (int) ($c['is_multidisciplinary'] ?? 0) === 1;
+            if ($isMulti) {
+                $multiCurrCount++;
+            }
+            $chairMissing = empty($c['chair_email']);
+            if (! $hasInstructor) {
+                $noInstructor++;
+            }
+            if (! $hasCoordinator) {
+                $noCoordinator++;
+            }
+            if ($chairMissing) {
+                $noChair++;
+            }
+            if (! $hasInstructor || ! $hasCoordinator || $chairMissing) {
+                $gaps[] = [
+                    'id'                   => $cid,
+                    'name'                 => CurriculumModel::displayName($c),
+                    'code'                 => $c['code'],
+                    'faculty_name'         => $c['faculty_name'] ?? '-',
+                    'degree_level'         => $c['degree_level'],
+                    'member_count'         => $memberCount,
+                    'instructor_count'     => $instructorCount,
+                    'has_instructor'       => $hasInstructor,
+                    'has_coordinator'      => $hasCoordinator,
+                    'has_chair'            => ! $chairMissing,
+                    'is_multidisciplinary' => $isMulti ? 1 : 0,
+                ];
+            }
+        }
+
+        $instructorAssign = 0;
+        $coordinatorAssign = 0;
+        foreach ($assignments as $row) {
+            $role = (string) ($row['role'] ?? 'instructor');
+            if ($role === 'coordinator') {
+                $coordinatorAssign++;
+            } elseif ($role === 'instructor') {
+                $instructorAssign++;
+            }
+        }
+
+        $teachersTotal = count($teachers);
+        $curriculaActive = count($curricula);
+        $assignedTeachers = $teachersTotal - count($unassigned);
+        $coverage = $teachersTotal > 0 ? round(($assignedTeachers / $teachersTotal) * 100, 1) : 0;
+        $avgPerCurr = $curriculaActive > 0 ? round(count($assignments) / $curriculaActive, 2) : 0;
+
+        $facultyBreakdown = [];
+        foreach ($faculties as $f) {
+            $fid = (int) $f['id'];
+            $fTeachers = array_filter($teachers, static fn ($t) => (int) ($t['faculty_id'] ?? 0) === $fid);
+            $fUnassigned = array_filter($unassigned, static fn ($t) => (int) ($t['faculty_id'] ?? 0) === $fid);
+            $fCurr = array_filter($curricula, static fn ($c) => (int) ($c['faculty_id'] ?? 0) === $fid);
+            $facultyBreakdown[] = [
+                'id'              => $fid,
+                'name'            => $f['name'],
+                'code'            => $f['code'],
+                'teachers'        => count($fTeachers),
+                'unassigned'      => count($fUnassigned),
+                'curricula'       => count($fCurr),
+                'coverage_pct'    => count($fTeachers) > 0
+                    ? round(((count($fTeachers) - count($fUnassigned)) / count($fTeachers)) * 100, 1)
+                    : 0,
+            ];
+        }
+
+        return [
+            'summary' => [
+                'teachers_total'             => $teachersTotal,
+                'teachers_unassigned'        => count($unassigned),
+                'teachers_multi'             => count($multi),
+                'teachers_single'            => $singleCount,
+                'assignments_total'          => count($assignments),
+                'instructors'                => $instructorAssign,
+                'coordinators'               => $coordinatorAssign,
+                'curricula_active'           => $curriculaActive,
+                'curricula_no_instructor'    => $noInstructor,
+                'curricula_no_coordinator'   => $noCoordinator,
+                'curricula_no_chair'         => $noChair,
+                'curricula_multidisciplinary'=> $multiCurrCount,
+                'avg_teachers_per_curriculum'=> $avgPerCurr,
+                'coverage_pct'               => $coverage,
+            ],
+            'unassigned'        => $unassigned,
+            'multi_curriculum'  => $multi,
+            'curricula_gaps'    => $gaps,
+            'faculty_breakdown' => $facultyBreakdown,
+            'faculties'         => $faculties,
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $user
+     */
+    private function formatCapacityTeacherName(array $user): string
+    {
+        $title = (string) ($user['titleThai'] ?? $user['title'] ?? '');
+        if (! empty($user['thai_name']) && ! empty($user['thai_lastname'])) {
+            return trim(($title !== '' ? $title . ' ' : '') . $user['thai_name'] . ' ' . $user['thai_lastname']);
+        }
+        if (! empty($user['gf_name']) || ! empty($user['gl_name'])) {
+            return trim(($title !== '' ? $title . ' ' : '') . ($user['gf_name'] ?? '') . ' ' . ($user['gl_name'] ?? ''));
+        }
+
+        return (string) ($user['email'] ?? '-');
+    }
+
+    /**
      * Manage User Emails
      * Displays the email management interface for managing secondary user emails
      */
@@ -1657,6 +1992,11 @@ class AdminController extends Controller
 
             log_message('debug', 'getCurricula - Returning ' . count($curricula) . ' curricula');
 
+            $curricula = array_map(
+                static fn (array $row): array => \App\Models\CurriculumModel::withDisplayName($row),
+                $curricula
+            );
+
             return $this->response->setJSON([
                 'success' => true,
                 'data' => $curricula
@@ -1897,6 +2237,7 @@ class AdminController extends Controller
                 'code' => $data['code'],
                 'name' => $data['name'],
                 'degree_level' => $data['degree_level'],
+                'is_multidisciplinary' => ! empty($data['is_multidisciplinary']) ? 1 : 0,
                 'status' => isset($data['status']) ? 1 : 0
             ];
 
@@ -1941,6 +2282,7 @@ class AdminController extends Controller
                 'code' => $data['code'],
                 'name' => $data['name'],
                 'degree_level' => $data['degree_level'],
+                'is_multidisciplinary' => ! empty($data['is_multidisciplinary']) ? 1 : 0,
                 'status' => isset($data['status']) ? 1 : 0
             ];
 
@@ -3132,14 +3474,18 @@ class AdminController extends Controller
 
             // Get curriculums by faculty
             $curriculumBuilder = $this->db->table('curriculum c');
-            $curriculumBuilder->select([
+            $curriculumSelect = [
                 'c.id',
                 'c.name',
                 'c.code',
                 'c.degree_level',
                 'c.faculty_id',
                 'c.chair_email',
-                // chair.* columns are joined below; chair_email already carries the account identifier
+            ];
+            if ($this->db->fieldExists('is_multidisciplinary', 'curriculum')) {
+                $curriculumSelect[] = 'c.is_multidisciplinary';
+            }
+            $curriculumSelect = array_merge($curriculumSelect, [
                 'f.name as faculty_name',
                 'f.code as faculty_code',
                 'chair.titleThai as chair_title',
@@ -3147,8 +3493,9 @@ class AdminController extends Controller
                 'chair.thai_name as chair_name',
                 'chair.thai_lastname as chair_lastname',
                 'chair.gf_name as chair_gf_name',
-                'chair.gl_name as chair_gl_name'
-            ])
+                'chair.gl_name as chair_gl_name',
+            ]);
+            $curriculumBuilder->select($curriculumSelect)
                 ->join('faculties f', 'f.id = c.faculty_id', 'left')
                 ->join('user as chair', 'chair.email = c.chair_email', 'left')
                 ->where('c.status', 1);
@@ -3231,8 +3578,10 @@ class AdminController extends Controller
                 $result[] = [
                     'id' => $curriculum['id'],
                     'name' => $curriculum['name'],
+                    'display_name' => \App\Models\CurriculumModel::displayName($curriculum),
                     'code' => $curriculum['code'],
                     'degree_level' => $curriculum['degree_level'],
+                    'is_multidisciplinary' => (int) ($curriculum['is_multidisciplinary'] ?? 0),
                     'faculty_id' => $curriculum['faculty_id'],
                     'faculty_name' => $curriculum['faculty_name'],
                     'faculty_code' => $curriculum['faculty_code'],

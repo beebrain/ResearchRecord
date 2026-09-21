@@ -128,13 +128,22 @@ class FacultyModel extends Model
             ->findAll();
 
         // Get all active curriculums grouped by faculty
+        $select = 'id, faculty_id, name, code, degree_level';
+        if ($db->fieldExists('is_multidisciplinary', 'curriculum')) {
+            $select .= ', is_multidisciplinary';
+        }
+
         $curriculumQuery = $db->table('curriculum')
-            ->select('id, faculty_id, name, code, degree_level')
+            ->select($select)
             ->where('status', 1)
             ->orderBy('name', 'ASC')
             ->get();
 
         $curriculums = $curriculumQuery->getResultArray();
+        $curriculums = array_map(
+            static fn (array $row): array => CurriculumModel::withDisplayName($row),
+            $curriculums
+        );
 
         // Group curriculums by faculty
         $curriculumsByFaculty = [];

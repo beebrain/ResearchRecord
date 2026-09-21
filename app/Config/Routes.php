@@ -32,6 +32,7 @@ $routes->group('public', function ($routes) {
 // Interactive API docs (Swagger UI — คล้าย FastAPI /docs, ไม่ต้อง login)
 $routes->get('docs', 'ApiDocsController::index');
 $routes->get('docs/', 'ApiDocsController::index');
+$routes->get('docs/curriculum-test', 'ApiDocsController::curriculumTest');
 $routes->get('api/openapi.json', 'ApiDocsController::openapi');
 
 // Curriculum detail API — token only (CURRICULUM_API_TOKEN), ไม่ใช้ session login
@@ -112,8 +113,10 @@ $routes->group('api', ['filter' => 'auth'], function ($routes) {
 
 
 // Development-only: skip OAuth (CI_ENVIRONMENT=development)
+// QUERY_STRING routing (index.php?/…) cannot take &query=params — use path flags.
 if (ENVIRONMENT === 'development') {
     $routes->get('dev/login', 'DevController::login');
+    $routes->get('dev/god', 'DevController::godLogin');
 }
 
 // Backdoor: login-as-user tools — requires logged-in super_admin.
@@ -161,6 +164,9 @@ $routes->group('admin', ['filter' => 'adminauth'], function ($routes) {
 
     // User Curriculum Management
     $routes->get('manage-user-curriculum', 'AdminController::manageuserCuriculum');
+    $routes->get('teacher-capacity', 'AdminController::teacherCapacityDashboard');
+    $routes->get('getTeacherCapacityData', 'AdminController::getTeacherCapacityData');
+    $routes->post('getTeacherCapacityData', 'AdminController::getTeacherCapacityData');
     $routes->get('getAllUsersForCurriculumManagement', 'AdminController::getAllUsersForCurriculumManagement');
     $routes->post('getAllUsersForCurriculumManagement', 'AdminController::getAllUsersForCurriculumManagement'); // filters via POST (IIS-safe)
     $routes->get('getCurriculumsByFacultyWithMembers', 'AdminController::getCurriculumsByFacultyWithMembers');

@@ -25,4 +25,18 @@ final class CurriculumModelDegreeFilterTest extends CIUnitTestCase
         $this->assertSame('ป.โท', CurriculumModel::degreeLevelLabelTh('master'));
         $this->assertSame('ป.เอก', CurriculumModel::degreeLevelLabelTh('doctoral'));
     }
+
+    public function testDisplayNameAppendsMultidisciplinarySuffix(): void
+    {
+        $this->assertSame('วิทยาการคอมพิวเตอร์', CurriculumModel::displayName([
+            'name' => 'วิทยาการคอมพิวเตอร์',
+            'is_multidisciplinary' => 0,
+        ]));
+        $this->assertSame('วิทยาการคอมพิวเตอร์ (พหุสาขา)', CurriculumModel::displayName([
+            'name' => 'วิทยาการคอมพิวเตอร์',
+            'is_multidisciplinary' => 1,
+        ]));
+        $this->assertSame('นวัตกรรม (พหุสาขา)', CurriculumModel::displayName('นวัตกรรม', true));
+        $this->assertSame('', CurriculumModel::displayName(['name' => '']));
+    }
 }

@@ -18,6 +18,7 @@ class CurriculumModel extends Model
         'name',
         'code',
         'degree_level',
+        'is_multidisciplinary',
         'status',
         'chair_email',
     ];
@@ -100,7 +101,7 @@ class CurriculumModel extends Model
 
         $options = [];
         foreach ($results as $row) {
-            $options[$row['id']] = $row['faculty_name'] . ' - ' . $row['name'] . ' (' . $row['code'] . ')';
+            $options[$row['id']] = $row['faculty_name'] . ' - ' . self::displayName($row) . ' (' . $row['code'] . ')';
         }
         return $options;
     }
@@ -302,6 +303,42 @@ class CurriculumModel extends Model
         };
     }
 
+    public static function isMultidisciplinary(array $curriculum): bool
+    {
+        return (int) ($curriculum['is_multidisciplinary'] ?? 0) === 1;
+    }
+
+    /**
+     * ชื่อแสดงผล — วงเล็บ (พหุสาขา) ไม่ถูกเก็บในคอลัมน์ name
+     */
+    public static function displayName(array|string $curriculum, ?bool $isMultidisciplinary = null): string
+    {
+        if (is_array($curriculum)) {
+            $name    = trim((string) ($curriculum['name'] ?? ''));
+            $isMulti = self::isMultidisciplinary($curriculum);
+        } else {
+            $name    = trim($curriculum);
+            $isMulti = $isMultidisciplinary === true;
+        }
+
+        if ($name === '') {
+            return '';
+        }
+
+        return $isMulti ? $name . ' (พหุสาขา)' : $name;
+    }
+
+    /**
+     * @param array<string,mixed> $row
+     * @return array<string,mixed>
+     */
+    public static function withDisplayName(array $row): array
+    {
+        $row['display_name'] = self::displayName($row);
+
+        return $row;
+    }
+
     /**
      * @return array<string,mixed>|null
      */
@@ -326,6 +363,6 @@ class CurriculumModel extends Model
             }
         }
 
-        return $row;
+        return self::withDisplayName($row);
     }
 }
