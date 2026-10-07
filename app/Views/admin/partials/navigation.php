@@ -184,6 +184,11 @@ $currentUri = service('uri')->getPath();
                     📈 ศักยภาพอาจารย์
                 </a>
 
+                <a href="<?= site_url('admin/faculty-curriculum') ?>"
+                    class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'faculty-curriculum') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
+                    🏛️ หลักสูตรของคณะ
+                </a>
+
                 <a href="<?= site_url('admin/admission') ?>"
                     class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'admission') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
                     📋 แบบฟอร์มเปิดรับ นศ.
@@ -206,6 +211,11 @@ $currentUri = service('uri')->getPath();
                 <a href="<?= site_url('admin/publications/summary') ?>"
                     class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'publications/summary') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
                     📊 สรุปผลงานวิจัย
+                </a>
+
+                <a href="<?= site_url('admin/faculty-curriculum') ?>"
+                    class="flex items-center px-3 py-2 text-sm font-medium <?= strpos($currentUri, 'faculty-curriculum') !== false ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-50' ?> rounded-lg">
+                    🏛️ หลักสูตรของคณะ
                 </a>
 
                 <a href="<?= site_url('admin/admission') ?>"

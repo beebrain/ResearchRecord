@@ -1814,7 +1814,30 @@ class AdminController extends Controller
      */
     public function manageFacultyCurriculum()
     {
-        return view('admin/faculty_curriculum');
+        // Super admin / faculty admin manage; dean views own faculty read-only; chair has no access
+        $isSuper = $this->isSuperAdminSession();
+        $isFacultyAdmin = (($this->session->get('user_data') ?? [])['role'] ?? null) === 'faculty_admin';
+        if (! $isSuper && ! $isFacultyAdmin && ! RoleHelper::isDean(UserIdentity::sessionUser())) {
+            throw \CodeIgniter\Exceptions\PageNotFoundException::forPageNotFound();
+        }
+
+        return view('admin/faculty_curriculum', [
+            'canManageFaculties' => $isSuper,
+            'canManageCurricula' => $isSuper || $isFacultyAdmin,
+        ]);
+    }
+
+    /**
+     * Faculty ids a non-super user may view: faculty admin's managed faculties + faculties they are dean of.
+     */
+    private function scopedFacultyIds(array $user): array
+    {
+        $ids = RoleHelper::getDeanFaculties($user);
+        if (($user['role'] ?? null) === 'faculty_admin') {
+            $ids = array_merge($ids, RoleHelper::getManagedFaculties($user));
+        }
+
+        return array_values(array_unique(array_map('intval', $ids)));
     }
 
     /**
@@ -1856,9 +1879,9 @@ class AdminController extends Controller
             if ($userRole === 'super_admin' || (isset($user['admin']) && $user['admin'] == 1)) {
                 // Super admin sees all faculties
                 $faculties = $this->facultyModel->getWithCurriculumCount();
-            } elseif ($userRole === 'faculty_admin') {
-                // Faculty admin sees only assigned faculties
-                $managedFaculties = \App\Helpers\RoleHelper::getManagedFaculties($userData);
+            } else {
+                // Faculty admin: assigned faculties; dean: own faculty
+                $managedFaculties = $this->scopedFacultyIds(array_merge($user, $userData));
 
                 if (!empty($managedFaculties)) {
                     // Get only managed faculties with dean info
@@ -1878,12 +1901,8 @@ class AdminController extends Controller
                         ->get()
                         ->getResultArray();
                 } else {
-                    // Faculty admin without assigned faculties - return empty
                     $faculties = [];
                 }
-            } else {
-                // Regular users see no faculties
-                $faculties = [];
             }
 
             // Format dean information for each faculty
@@ -1946,20 +1965,8 @@ class AdminController extends Controller
             // Debug log
             log_message('debug', 'getCurricula - userRole: ' . $userRole . ', isGodMode: ' . ($isGodMode ? 'true' : 'false') . ', isSuperAdmin: ' . ($isSuperAdmin ? 'true' : 'false') . ', isFacultyAdmin: ' . ($isFacultyAdmin ? 'true' : 'false'));
 
-            // Get managed faculties for faculty admin
-            $managedFaculties = [];
-            if ($isFacultyAdmin) {
-                $managedFaculties = \App\Helpers\RoleHelper::getManagedFaculties($user);
-                log_message('debug', 'getCurricula - Faculty admin managed faculties: ' . json_encode($managedFaculties));
-
-                // If faculty admin has no managed faculties, return empty
-                if (empty($managedFaculties)) {
-                    return $this->response->setJSON([
-                        'success' => true,
-                        'data' => []
-                    ]);
-                }
-            }
+            // Faculty admin: managed faculties; dean: own faculty
+            $managedFaculties = $isSuperAdmin ? [] : $this->scopedFacultyIds($user);
 
             // Build query
             if ($isSuperAdmin) {
@@ -1969,8 +1976,8 @@ class AdminController extends Controller
                 } else {
                     $curricula = $this->curriculumModel->getWithFaculty();
                 }
-            } elseif ($isFacultyAdmin && !empty($managedFaculties)) {
-                // Faculty admin sees only curricula from managed faculties
+            } elseif (!empty($managedFaculties)) {
+                // Faculty admin / dean sees only curricula from their faculties
                 $curricula = $this->curriculumModel->select('curriculum.*, faculties.name as faculty_name, faculties.code as faculty_code')
                     ->join('faculties', 'faculties.id = curriculum.faculty_id')
                     ->where('curriculum.status', 1)
@@ -2015,6 +2022,10 @@ class AdminController extends Controller
      */
     public function createFaculty()
     {
+        if (! $this->isSuperAdminSession()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'เฉพาะผู้ดูแลระบบสูงสุดเท่านั้น'])->setStatusCode(403);
+        }
+
         try {
             $data = $this->request->getJSON(true);
 
@@ -2064,6 +2075,10 @@ class AdminController extends Controller
      */
     public function updateFaculty()
     {
+        if (! $this->isSuperAdminSession()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'เฉพาะผู้ดูแลระบบสูงสุดเท่านั้น'])->setStatusCode(403);
+        }
+
         try {
             $data = $this->request->getJSON(true);
             $id = $data['id'] ?? null;
@@ -2138,6 +2153,10 @@ class AdminController extends Controller
      */
     public function deleteFaculty()
     {
+        if (! $this->isSuperAdminSession()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'เฉพาะผู้ดูแลระบบสูงสุดเท่านั้น'])->setStatusCode(403);
+        }
+
         try {
             $data = $this->request->getJSON(true);
             $id = $data['id'] ?? null;
@@ -2183,6 +2202,10 @@ class AdminController extends Controller
      */
     public function toggleFacultyStatus()
     {
+        if (! $this->isSuperAdminSession()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'เฉพาะผู้ดูแลระบบสูงสุดเท่านั้น'])->setStatusCode(403);
+        }
+
         try {
             $data = $this->request->getJSON(true);
             $id = $data['id'] ?? null;
@@ -2225,12 +2248,58 @@ class AdminController extends Controller
     }
 
     /**
+     * Super admin (or god mode) — faculty_admin is never super, matching setCurriculumChair().
+     */
+    private function isSuperAdminSession(): bool
+    {
+        $userData = $this->session->get('user_data') ?? [];
+        $role = $userData['role'] ?? null;
+        if ($role === 'faculty_admin') {
+            return false;
+        }
+
+        return $role === 'super_admin'
+            || (int) ($userData['admin'] ?? 0) === 1
+            || $this->session->get('god_mode') === true
+            || $this->session->get('backdoor_session') === true;
+    }
+
+    /**
+     * Super admin: any faculty. Faculty admin: only faculties in managed_faculties.
+     */
+    private function canManageCurriculaOfFaculty($facultyId): bool
+    {
+        if ($this->isSuperAdminSession()) {
+            return true;
+        }
+        $userData = $this->session->get('user_data') ?? [];
+        if (($userData['role'] ?? null) !== 'faculty_admin' || empty($facultyId)) {
+            return false;
+        }
+        $managed = array_map('intval', \App\Helpers\RoleHelper::getManagedFaculties($userData));
+
+        return in_array((int) $facultyId, $managed, true);
+    }
+
+    private function curriculumAccessDenied()
+    {
+        return $this->response->setJSON([
+            'success' => false,
+            'message' => 'ไม่มีสิทธิ์จัดการหลักสูตรของคณะนี้'
+        ])->setStatusCode(403);
+    }
+
+    /**
      * Create new curriculum
      */
     public function createCurriculum()
     {
         try {
             $data = $this->request->getJSON(true);
+
+            if (! $this->canManageCurriculaOfFaculty($data['faculty_id'] ?? null)) {
+                return $this->curriculumAccessDenied();
+            }
 
             $curriculumData = [
                 'faculty_id' => $data['faculty_id'],
@@ -2277,6 +2346,13 @@ class AdminController extends Controller
                 ]);
             }
 
+            $existing = $this->curriculumModel->find($id);
+            if (! $existing
+                || ! $this->canManageCurriculaOfFaculty($existing['faculty_id'])
+                || ! $this->canManageCurriculaOfFaculty($data['faculty_id'] ?? null)) {
+                return $this->curriculumAccessDenied();
+            }
+
             $curriculumData = [
                 'faculty_id' => $data['faculty_id'],
                 'code' => $data['code'],
@@ -2320,6 +2396,11 @@ class AdminController extends Controller
                     'success' => false,
                     'message' => 'Curriculum ID is required'
                 ]);
+            }
+
+            $existing = $this->curriculumModel->find($id);
+            if (! $existing || ! $this->canManageCurriculaOfFaculty($existing['faculty_id'])) {
+                return $this->curriculumAccessDenied();
             }
 
             // Check if curriculum has users
@@ -2373,6 +2454,10 @@ class AdminController extends Controller
                     'success' => false,
                     'message' => 'Curriculum not found'
                 ]);
+            }
+
+            if (! $this->canManageCurriculaOfFaculty($curriculum['faculty_id'])) {
+                return $this->curriculumAccessDenied();
             }
 
             $newStatus = $curriculum['status'] == 1 ? 0 : 1;

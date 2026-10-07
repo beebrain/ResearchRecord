@@ -51,6 +51,7 @@
                                     <h2 class="text-xl font-bold text-gray-900">คณะ</h2>
                                     <p class="text-sm text-gray-600 mt-1">จัดการคณะของมหาวิทยาลัย</p>
                                 </div>
+                                <?php if ($canManageFaculties): ?>
                                 <button onclick="openFacultyModal()"
                                     class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center">
                                     <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -58,6 +59,7 @@
                                     </svg>
                                     เพิ่มคณะ
                                 </button>
+                                <?php endif; ?>
                             </div>
                         </div>
                         <div class="p-6">
@@ -85,6 +87,7 @@
                                     <h2 class="text-xl font-bold text-gray-900">หลักสูตร</h2>
                                     <p class="text-sm text-gray-600 mt-1">จัดการหลักสูตรของคณะ</p>
                                 </div>
+                                <?php if ($canManageCurricula): ?>
                                 <button onclick="openCurriculumModal()"
                                     class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center">
                                     <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -92,6 +95,7 @@
                                     </svg>
                                     เพิ่มหลักสูตร
                                 </button>
+                                <?php endif; ?>
                             </div>
                             <!-- Filter by Faculty -->
                             <div class="mt-4">
@@ -249,6 +253,8 @@
 
     <script>
         const BASE_URL = '<?= rtrim(base_url(), '/') ?>';
+        const CAN_MANAGE_FACULTIES = <?= $canManageFaculties ? 'true' : 'false' ?>;
+        const CAN_MANAGE_CURRICULA = <?= $canManageCurricula ? 'true' : 'false' ?>;
     </script>
     <script src="<?= base_url('assets/js/app-routes.js') ?>?v=<?= @filemtime(FCPATH . 'assets/js/app-routes.js') ?: time() ?>"></script>
     <script src="<?= base_url('assets/js/faculty-curriculum-manager.js') ?>?v=<?= @filemtime(FCPATH . 'assets/js/faculty-curriculum-manager.js') ?: time() ?>"></script>

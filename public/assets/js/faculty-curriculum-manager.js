@@ -74,6 +74,7 @@ function initFacultyTable(data) {
                 data: null,
                 orderable: false,
                 render: function(data) {
+                    if (!CAN_MANAGE_FACULTIES) return '';
                     return `
                         <div class="flex space-x-2">
                             <button onclick="editFaculty(${data.id})" class="text-blue-600 hover:text-blue-800" title="Edit">
@@ -382,6 +383,7 @@ function initCurriculumTable(data) {
                 data: null,
                 orderable: false,
                 render: function(data) {
+                    if (!CAN_MANAGE_CURRICULA) return '';
                     return `
                         <div class="flex space-x-2">
                             <button onclick="editCurriculum(${data.id})" class="text-blue-600 hover:text-blue-800" title="Edit">
